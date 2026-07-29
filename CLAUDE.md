@@ -27,6 +27,21 @@ model.
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
 
+## Known follow-ups
+
+- **Discount/coupon entries displayed as regular items in the DB Debug
+  Panel.** Discount/coupon entries (from receipt extraction) currently
+  display in the DB Debug Panel as if they were regular items — with a
+  category dropdown and essential/non-essential toggle — when they're
+  really internal accounting entries, not purchased products. This is
+  currently harmless since the debug panel is temporary, but must be
+  addressed before M8 (monthly stats), since discount entries should never
+  count as category spending (e.g. shouldn't inflate "Others" or any
+  category's essential/non-essential totals). Fix by either tagging
+  discount entries with a distinct type that stats/UI code explicitly
+  excludes, or filtering them out of any item-list/category display
+  entirely.
+
 ## Commands
 
 - `npm run dev` — dev server (no service worker; PWA/offline features only
