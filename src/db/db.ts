@@ -122,6 +122,17 @@ async function createTrip(): Promise<Trip> {
  * this pointer existed); otherwise we start a fresh trip rather than risk
  * picking the wrong one.
  */
+// Guards the read-then-create below against concurrent callers: App.tsx
+// mounts multiple features (shopping list, receipt capture) that each call
+// this independently on load via useActiveTripId. Without this, two calls
+// racing with no pointer set yet would both see zero drafts and both call
+// createTrip(), leaving two trips after a fresh load/reset. Safe because JS
+// runs each synchronous chunk to completion: the assignment to
+// pendingActiveTripCreation happens with no intervening await, so a second
+// caller checking it always sees either null (and creates the shared
+// promise) or the in-flight promise from the first caller — never a gap.
+let pendingActiveTripCreation: Promise<Trip> | null = null
+
 export async function getOrCreateActiveTrip(): Promise<Trip> {
   const pointer = await db.appState.get(ACTIVE_TRIP_KEY)
   if (typeof pointer?.value === 'number') {
@@ -129,8 +140,18 @@ export async function getOrCreateActiveTrip(): Promise<Trip> {
     if (pinned && pinned.status === 'draft') return pinned
   }
 
-  const drafts = await db.trips.where('status').equals('draft').toArray()
-  const trip = drafts.length === 1 ? drafts[0] : await createTrip()
-  await db.appState.put({ key: ACTIVE_TRIP_KEY, value: trip.id })
-  return trip
+  if (pendingActiveTripCreation) return pendingActiveTripCreation
+
+  pendingActiveTripCreation = (async () => {
+    try {
+      const drafts = await db.trips.where('status').equals('draft').toArray()
+      const trip = drafts.length === 1 ? drafts[0] : await createTrip()
+      await db.appState.put({ key: ACTIVE_TRIP_KEY, value: trip.id })
+      return trip
+    } finally {
+      pendingActiveTripCreation = null
+    }
+  })()
+
+  return pendingActiveTripCreation
 }

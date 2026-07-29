@@ -59,3 +59,18 @@ test('root cause: reset-then-create-trip-then-reload does not orphan the active 
   await expect(activeTripDiv).toHaveCount(1)
   await expect(activeTripDiv).toHaveAttribute('data-trip-id', shoppingListTripId ?? '')
 })
+
+test('reset all data then reload bootstraps exactly one trip, not phantom duplicates', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByTestId('debug-reset-all').click()
+  await expect(page.getByTestId('debug-trip')).toHaveCount(0)
+
+  await page.reload()
+
+  // ShoppingListPage and ReceiptCapture each resolve the active trip
+  // independently on mount; without a concurrency guard both would race
+  // past the "no active trip yet" check and create one each.
+  await expect.poll(() => itemNames(page)).toEqual([])
+  await expect(page.getByTestId('debug-trip')).toHaveCount(1)
+})
