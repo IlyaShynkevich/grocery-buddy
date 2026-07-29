@@ -55,6 +55,36 @@ test('successful extraction adds items to the shopping list and marks the receip
   await expect.poll(() => itemNames(page)).toEqual(['Milk', 'Bread'])
 })
 
+test('coupon/discount lines reduce the trip total but do not appear as shopping list items', async ({
+  page,
+}) => {
+  await page.route('**/api/extract-receipt', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        items: [
+          { name: 'Milk', price: 3.49, category: 'dairy', isDiscount: false },
+          { name: 'Coupon Herzstuecke', price: -0.38, category: 'other', isDiscount: true },
+        ],
+      }),
+    }),
+  )
+
+  await page.goto('/')
+  await captureReceipt(page)
+
+  await page.getByTestId('receipt-process-button').click()
+
+  await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed')
+  // the discount line must never show up as something to buy again
+  await expect.poll(() => itemNames(page)).toEqual(['Milk'])
+
+  // but it must still be reflected in the trip total: 3.49 - 0.38 = 3.11
+  const activeTripDiv = page.locator('[data-testid="debug-trip"][data-active="true"]')
+  await expect(activeTripDiv).toContainText('3,11')
+})
+
 test('a server error marks the receipt failed, shows the message, and allows retry', async ({ page }) => {
   let callCount = 0
   await page.route('**/api/extract-receipt', (route) => {
@@ -79,7 +109,7 @@ test('a server error marks the receipt failed, shows the message, and allows ret
   await page.getByTestId('receipt-process-button').click()
 
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Failed — will retry')
-  await expect(page.getByTestId('receipt-error')).toContainText('rate limited')
+  await expect(page.getByTestId('receipt-error')).toContainText('Too many requests — retrying automatically')
   await expect(page.getByTestId('receipt-process-button')).toHaveText('Retry')
 
   // no items should have been added from the failed attempt
@@ -102,7 +132,7 @@ test('a malformed response (garbage body) is treated as a failure, not a crash',
   await page.getByTestId('receipt-process-button').click()
 
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Failed — will retry')
-  await expect(page.getByTestId('receipt-error')).toContainText('malformed')
+  await expect(page.getByTestId('receipt-error')).toContainText("Couldn't read this receipt — try again")
 })
 
 test('a network-level failure (e.g. offline mid-request) is treated as a failure, not a crash', async ({

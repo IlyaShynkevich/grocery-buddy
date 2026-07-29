@@ -8,15 +8,19 @@ export interface ExtractedItem {
   name: string
   price: number
   category: string
+  /** true for a coupon/discount line, not a purchasable product */
+  isDiscount?: boolean
 }
 
 const CATEGORY_KEYS = CATEGORIES.map((category) => category.key)
 
 const SYSTEM_PROMPT = `You extract line items from a photo of a grocery store receipt.
-Respond with ONLY a JSON object of the shape {"items": [{"name": string, "price": number, "category": string}]}.
+Respond with ONLY a JSON object of the shape {"items": [{"name": string, "price": number, "category": string, "isDiscount": boolean}]}.
 - "price" is the item's paid price in the receipt's currency, as a plain number (no currency symbol, no thousands separators).
 - "category" must be exactly one of: ${CATEGORY_KEYS.join(', ')}. Pick the closest match; use "other" if unsure.
-- Skip subtotal, tax, total, discount, and payment-method lines — only include purchased items.
+- Skip subtotal, tax, total, and payment-method lines — only include purchased items and discounts.
+- Coupon/discount lines (e.g. "Coupon Herzstuecke -0,38") are not purchasable products: include them with "isDiscount": true, "price" as a negative number equal to the discount amount, and "category" set to "other".
+- For regular purchased items, set "isDiscount": false.
 - If the photo is not a legible receipt, respond with {"items": []}.
 Output raw JSON only. No markdown code fences, no commentary before or after.`
 
@@ -114,11 +118,16 @@ export function parseExtractedItems(content: string): ExtractedItem[] {
     if (!raw || typeof raw !== 'object') continue
     const record = raw as Record<string, unknown>
     const name = typeof record.name === 'string' ? record.name.trim() : ''
-    const price = Number(record.price)
+    const rawPrice = Number(record.price)
     const categoryRaw = typeof record.category === 'string' ? record.category : ''
-    if (!name || !Number.isFinite(price) || price < 0) continue
+    const isDiscount = record.isDiscount === true
+    if (!name || !Number.isFinite(rawPrice)) continue
+    // Discounts always net out negative regardless of the sign the model
+    // returned; regular items must be non-negative.
+    if (!isDiscount && rawPrice < 0) continue
+    const price = isDiscount ? -Math.abs(rawPrice) : rawPrice
     const category = CATEGORY_KEYS.includes(categoryRaw) ? categoryRaw : 'other'
-    items.push({ name, price, category })
+    items.push({ name, price, category, isDiscount })
   }
 
   // TEMPORARY DEBUG LOGGING — remove once the extraction issue is diagnosed.

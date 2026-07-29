@@ -31,9 +31,20 @@ export function DbDebugPanel() {
     setSelectedTripId((current) => current ?? data[0]?.id ?? null)
   }
 
+  // Reactivity signal only: items get added/edited by flows this panel
+  // doesn't own (receipt extraction), so item mutations must refresh the
+  // trip list even without any action taken here. Deliberately scoped to
+  // items rather than a broad live query over trips too: this panel's own
+  // actions (create/reset trip) already call refresh() directly below, and
+  // watching trips as well would also re-surface, on every render, the
+  // still-open "reset auto-recreates an active trip in the background"
+  // behavior tracked as a separate known issue.
+  const itemsSignal = useLiveQuery(() => db.items.toArray(), [])
+
   useEffect(() => {
-    refresh()
-  }, [])
+    if (itemsSignal !== undefined) refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsSignal])
 
   const createTrip = async () => {
     const id = await db.trips.add(newTrip({ store: 'Test Store' }))
@@ -47,25 +58,21 @@ export function DbDebugPanel() {
     const price = Number((Math.random() * 8 + 1).toFixed(2))
     await db.items.add(newItem(selectedTripId, { name, price, source: 'typed' }))
     await recomputeTripTotal(selectedTripId)
-    await refresh()
   }
 
   const updateItemCategory = async (item: Item, category: string) => {
     await db.items.update(item.id, { category })
-    await refresh()
   }
 
   const toggleEssentialOverride = async (item: Item) => {
     const current = resolveEssential(item)
     const next = item.essentialOverride === null ? !current : null
     await db.items.update(item.id, { essentialOverride: next })
-    await refresh()
   }
 
   const removeItem = async (item: Item) => {
     await db.items.delete(item.id)
     await recomputeTripTotal(item.tripId)
-    await refresh()
   }
 
   const makeActive = async (trip: Trip) => {
@@ -96,9 +103,6 @@ export function DbDebugPanel() {
         <button type="button" onClick={addRandomItem} disabled={selectedTripId === null}>
           Add random item to selected trip
         </button>
-        <button type="button" onClick={refresh}>
-          Refresh
-        </button>
         <button type="button" data-testid="debug-reset-all" onClick={resetAll}>
           Reset all data
         </button>
@@ -128,7 +132,7 @@ export function DbDebugPanel() {
             />{' '}
             <strong>
               Trip #{trip.id} — {trip.date} — {trip.store ?? '(no store)'} — total:{' '}
-              {formatPrice(trip.total)} — {trip.status}
+              {formatPrice(trip.items.reduce((sum, item) => sum + (item.price ?? 0), 0))} — {trip.status}
               {trip.id === activePointer?.value ? ' — ACTIVE' : ''}
             </strong>
           </label>
