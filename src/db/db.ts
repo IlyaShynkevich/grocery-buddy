@@ -37,6 +37,8 @@ export interface PendingReceipt {
   status: ReceiptStatus
   /** message from the most recent failed extraction attempt, if any */
   lastError?: string
+  /** timestamp to auto-retry at, when lastError parsed a rate-limit wait time */
+  retryAt?: number
 }
 
 /** Single-row-per-key table for small pointers like "which trip is active". */
