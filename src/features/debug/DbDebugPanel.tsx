@@ -1,5 +1,6 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
-import { db, newItem, newTrip, recomputeTripTotal, type Item, type Trip } from '../../db/db'
+import { ACTIVE_TRIP_KEY, db, newItem, newTrip, recomputeTripTotal, type Item, type Trip } from '../../db/db'
 import { CATEGORIES, resolveEssential } from '../../db/categories'
 
 interface TripWithItems extends Trip {
@@ -21,6 +22,7 @@ const SAMPLE_ITEM_NAMES = ['Milk', 'Bread', 'Chips', 'Soda', 'Apples', 'Chicken 
 export function DbDebugPanel() {
   const [trips, setTrips] = useState<TripWithItems[]>([])
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null)
+  const activePointer = useLiveQuery(() => db.appState.get(ACTIVE_TRIP_KEY))
 
   const refresh = async () => {
     const data = await loadTrips()
@@ -65,10 +67,15 @@ export function DbDebugPanel() {
     await refresh()
   }
 
+  const makeActive = async (trip: Trip) => {
+    await db.appState.put({ key: ACTIVE_TRIP_KEY, value: trip.id })
+  }
+
   const resetAll = async () => {
     await db.trips.clear()
     await db.items.clear()
     await db.pendingReceipts.clear()
+    await db.appState.clear()
     setSelectedTripId(null)
     await refresh()
   }
@@ -82,7 +89,7 @@ export function DbDebugPanel() {
       </p>
 
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-        <button type="button" onClick={createTrip}>
+        <button type="button" data-testid="debug-create-trip" onClick={createTrip}>
           Create test trip
         </button>
         <button type="button" onClick={addRandomItem} disabled={selectedTripId === null}>
@@ -91,7 +98,7 @@ export function DbDebugPanel() {
         <button type="button" onClick={refresh}>
           Refresh
         </button>
-        <button type="button" onClick={resetAll}>
+        <button type="button" data-testid="debug-reset-all" onClick={resetAll}>
           Reset all data
         </button>
       </div>
@@ -101,6 +108,9 @@ export function DbDebugPanel() {
       {trips.map((trip) => (
         <div
           key={trip.id}
+          data-testid="debug-trip"
+          data-trip-id={trip.id}
+          data-active={trip.id === activePointer?.value}
           style={{
             border: trip.id === selectedTripId ? '2px solid #2e7d32' : '1px solid #ccc',
             borderRadius: 4,
@@ -118,8 +128,14 @@ export function DbDebugPanel() {
             <strong>
               Trip #{trip.id} — {trip.date} — {trip.store ?? '(no store)'} — total: $
               {trip.total.toFixed(2)} — {trip.status}
+              {trip.id === activePointer?.value ? ' — ACTIVE' : ''}
             </strong>
           </label>
+          {trip.id !== activePointer?.value && (
+            <button type="button" onClick={() => makeActive(trip)} style={{ marginBottom: '0.5rem' }}>
+              Make active
+            </button>
+          )}
           <ul style={{ paddingLeft: '1.25rem' }}>
             {trip.items.map((item) => (
               <li key={item.id}>

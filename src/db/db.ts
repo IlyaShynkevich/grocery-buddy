@@ -37,16 +37,27 @@ export interface PendingReceipt {
   status: ReceiptStatus
 }
 
+/** Single-row-per-key table for small pointers like "which trip is active". */
+export interface AppStateEntry {
+  key: string
+  value: number | string | null
+}
+
 export const db = new Dexie('grocery-buddy') as Dexie & {
   trips: EntityTable<Trip, 'id'>
   items: EntityTable<Item, 'id'>
   pendingReceipts: EntityTable<PendingReceipt, 'id'>
+  appState: EntityTable<AppStateEntry, 'key'>
 }
 
 db.version(1).stores({
   trips: '++id, date, status',
   items: '++id, tripId, category',
   pendingReceipts: '++id, tripId, status',
+})
+
+db.version(2).stores({
+  appState: '&key',
 })
 
 export function newTrip(overrides: Partial<Omit<Trip, 'id'>> = {}): Omit<Trip, 'id'> {
@@ -82,18 +93,40 @@ export async function recomputeTripTotal(tripId: number): Promise<number> {
   return total
 }
 
-/**
- * The trip currently being shopped: the most recently created draft trip,
- * or a freshly created one if none exists. Assumes a single in-progress
- * shopping trip at a time, matching the in-store usage flow.
- */
-export async function getOrCreateActiveTrip(): Promise<Trip> {
-  const drafts = await db.trips.where('status').equals('draft').sortBy('createdAt')
-  const latest = drafts[drafts.length - 1]
-  if (latest) return latest
+export const ACTIVE_TRIP_KEY = 'activeTripId'
 
+async function createTrip(): Promise<Trip> {
   const id = await db.trips.add(newTrip())
   const created = await db.trips.get(id)
   if (!created) throw new Error('Failed to create trip')
   return created
+}
+
+/**
+ * The trip currently being shopped. Identity is a persisted pointer
+ * (appState.activeTripId), not "most recently created draft" — otherwise
+ * any other code path that creates a draft trip (the debug panel today,
+ * receipt capture in M3) would silently hijack the active trip out from
+ * under whatever the user is actively building.
+ *
+ * If the pointer is missing or stale (points at a trip that's gone or no
+ * longer a draft), we do NOT guess by grabbing "the latest draft" — that's
+ * the same fragile heuristic that caused the original bug, just moved one
+ * level down, and would misfire the moment something else (debug panel)
+ * has created a newer draft. We only auto-adopt an existing draft when
+ * there's exactly one unambiguous candidate (e.g. upgrading from before
+ * this pointer existed); otherwise we start a fresh trip rather than risk
+ * picking the wrong one.
+ */
+export async function getOrCreateActiveTrip(): Promise<Trip> {
+  const pointer = await db.appState.get(ACTIVE_TRIP_KEY)
+  if (typeof pointer?.value === 'number') {
+    const pinned = await db.trips.get(pointer.value)
+    if (pinned && pinned.status === 'draft') return pinned
+  }
+
+  const drafts = await db.trips.where('status').equals('draft').toArray()
+  const trip = drafts.length === 1 ? drafts[0] : await createTrip()
+  await db.appState.put({ key: ACTIVE_TRIP_KEY, value: trip.id })
+  return trip
 }

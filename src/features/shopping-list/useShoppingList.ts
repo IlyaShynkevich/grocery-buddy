@@ -1,19 +1,39 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
-import { db, getOrCreateActiveTrip, newItem } from '../../db/db'
+import { ACTIVE_TRIP_KEY, db, getOrCreateActiveTrip, newItem } from '../../db/db'
 
 export function useShoppingList() {
+  // Reactive: re-fires whenever appState.activeTripId changes, including
+  // from outside this hook (e.g. the debug panel's reset or "make active").
+  const pointerRow = useLiveQuery(() => db.appState.get(ACTIVE_TRIP_KEY), [])
+  const pointerTripId = typeof pointerRow?.value === 'number' ? pointerRow.value : undefined
+
   const [tripId, setTripId] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    getOrCreateActiveTrip().then((trip) => {
+
+    async function resolve() {
+      if (pointerTripId !== undefined) {
+        const pinned = await db.trips.get(pointerTripId)
+        if (pinned && pinned.status === 'draft') {
+          if (!cancelled) setTripId(pinned.id)
+          return
+        }
+      }
+
+      // Pointer missing or stale (e.g. the pinned trip was just deleted by
+      // a reset) — resolve and persist a valid one rather than continuing
+      // to write against a trip id that no longer exists.
+      const trip = await getOrCreateActiveTrip()
       if (!cancelled) setTripId(trip.id)
-    })
+    }
+
+    resolve()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [pointerTripId])
 
   const trip = useLiveQuery(() => (tripId ? db.trips.get(tripId) : undefined), [tripId])
 

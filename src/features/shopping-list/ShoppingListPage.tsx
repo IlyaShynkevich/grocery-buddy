@@ -12,7 +12,11 @@ export function ShoppingListPage() {
   }
 
   return (
-    <section style={{ maxWidth: 480, margin: '0 auto', padding: '1rem', textAlign: 'left' }}>
+    <section
+      data-testid="shopping-list"
+      data-trip-id={trip?.id ?? ''}
+      style={{ maxWidth: 480, margin: '0 auto', padding: '1rem', textAlign: 'left' }}
+    >
       <h1 style={{ fontSize: '1.5rem' }}>Shopping List</h1>
       <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>{trip ? trip.date : 'Loading trip…'}</p>
 
@@ -23,19 +27,21 @@ export function ShoppingListPage() {
           onChange={(e) => setDraftName(e.target.value)}
           placeholder="Add an item…"
           aria-label="Item name"
+          data-testid="add-item-input"
           style={{ flex: 1, padding: '0.6rem', fontSize: '1rem' }}
         />
-        <button type="submit" style={{ padding: '0.6rem 1rem', fontSize: '1rem' }}>
+        <button type="submit" data-testid="add-item-submit" style={{ padding: '0.6rem 1rem', fontSize: '1rem' }}>
           Add
         </button>
       </form>
 
       {items.length === 0 && <p style={{ opacity: 0.6 }}>No items yet — add what you're picking up.</p>}
 
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }} data-testid="shopping-list-items">
         {items.map((item) => (
           <li
             key={item.id}
+            data-testid="shopping-list-item"
             style={{
               display: 'flex',
               alignItems: 'center',
