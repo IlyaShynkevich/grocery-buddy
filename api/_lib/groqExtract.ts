@@ -1,4 +1,4 @@
-import { CATEGORIES } from '../../src/db/categories.ts'
+import { CATEGORIES } from '../../src/db/categories.js'
 
 const GROQ_MODEL = 'qwen/qwen3.6-27b'
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions'

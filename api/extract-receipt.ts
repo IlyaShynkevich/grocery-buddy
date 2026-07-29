@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { extractReceiptItems } from './_lib/groqExtract.ts'
+import { extractReceiptItems } from './_lib/groqExtract.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
