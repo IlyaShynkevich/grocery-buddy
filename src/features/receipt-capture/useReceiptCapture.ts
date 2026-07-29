@@ -54,6 +54,10 @@ export function useReceiptCapture() {
 
       await db.pendingReceipts.update(receipt.id, { status: 'done' })
     } catch (err) {
+      // Full raw error for our own diagnosis — the UI only ever shows a
+      // short, human-readable message derived from this (see errorMessage.ts).
+      console.error('RECEIPT_EXTRACTION_ERROR:', err)
+
       const message = err instanceof Error ? err.message : 'Unknown error'
       // If Groq gave us a rate-limit wait time (e.g. "...try again in 16.6s"),
       // schedule an automatic retry for then; otherwise leave retryAt unset
