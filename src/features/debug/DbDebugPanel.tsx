@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
 import { ACTIVE_TRIP_KEY, db, newItem, newTrip, recomputeTripTotal, type Item, type Trip } from '../../db/db'
 import { CATEGORIES, resolveEssential } from '../../db/categories'
+import { formatPrice } from '../../lib/formatPrice'
 
 interface TripWithItems extends Trip {
   items: Item[]
@@ -126,8 +127,8 @@ export function DbDebugPanel() {
               onChange={() => setSelectedTripId(trip.id)}
             />{' '}
             <strong>
-              Trip #{trip.id} — {trip.date} — {trip.store ?? '(no store)'} — total: $
-              {trip.total.toFixed(2)} — {trip.status}
+              Trip #{trip.id} — {trip.date} — {trip.store ?? '(no store)'} — total:{' '}
+              {formatPrice(trip.total)} — {trip.status}
               {trip.id === activePointer?.value ? ' — ACTIVE' : ''}
             </strong>
           </label>
@@ -139,7 +140,7 @@ export function DbDebugPanel() {
           <ul style={{ paddingLeft: '1.25rem' }}>
             {trip.items.map((item) => (
               <li key={item.id}>
-                {item.name} — {item.price === null ? '—' : `$${item.price.toFixed(2)}`} —{' '}
+                {item.name} — {formatPrice(item.price)} —{' '}
                 <select value={item.category} onChange={(e) => updateItemCategory(item, e.target.value)}>
                   {CATEGORIES.map((category) => (
                     <option key={category.key} value={category.key}>
