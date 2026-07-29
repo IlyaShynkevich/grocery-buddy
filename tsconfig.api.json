@@ -6,10 +6,12 @@
     "types": ["node"],
     "skipLibCheck": true,
 
-    /* Bundler mode */
+    /* nodenext resolution: relative imports must use the eventual .js
+       extension (not .ts) — Vercel's Node builder transpiles each traced
+       .ts file to .js individually and does not rewrite import specifiers,
+       so a literal ".ts" import breaks at runtime once deployed. */
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
