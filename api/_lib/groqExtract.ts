@@ -87,6 +87,9 @@ export async function extractReceiptItems(
     throw new Error('Groq response had no message content')
   }
 
+  // TEMPORARY DEBUG LOGGING — remove once the extraction issue is diagnosed.
+  console.log('RAW_GROQ_RESPONSE:', content)
+
   return parseExtractedItems(content)
 }
 
@@ -95,7 +98,9 @@ export function parseExtractedItems(content: string): ExtractedItem[] {
   let parsed: unknown
   try {
     parsed = JSON.parse(stripCodeFence(content))
-  } catch {
+  } catch (err) {
+    // TEMPORARY DEBUG LOGGING — remove once the extraction issue is diagnosed.
+    console.log('PARSE_ERROR:', err instanceof Error ? err.message : String(err))
     throw new Error('Groq response was not parseable JSON')
   }
 
@@ -115,6 +120,10 @@ export function parseExtractedItems(content: string): ExtractedItem[] {
     const category = CATEGORY_KEYS.includes(categoryRaw) ? categoryRaw : 'other'
     items.push({ name, price, category })
   }
+
+  // TEMPORARY DEBUG LOGGING — remove once the extraction issue is diagnosed.
+  console.log('PARSED_ITEMS_COUNT:', items.length)
+  console.log('PARSED_ITEMS:', JSON.stringify(items))
 
   return items
 }
