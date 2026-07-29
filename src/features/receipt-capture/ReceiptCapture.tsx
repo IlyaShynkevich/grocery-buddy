@@ -11,7 +11,7 @@ const STATUS_LABEL: Record<ReceiptStatus, string> = {
 }
 
 export function ReceiptCapture() {
-  const { pendingReceipts, captureReceipt, removeReceipt } = useReceiptCapture()
+  const { pendingReceipts, captureReceipt, removeReceipt, processReceipt } = useReceiptCapture()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -76,7 +76,21 @@ export function ReceiptCapture() {
               <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>
                 {new Date(receipt.capturedAt).toLocaleString()}
               </div>
+              {receipt.status === 'failed' && receipt.lastError && (
+                <div data-testid="receipt-error" style={{ fontSize: '0.75rem', color: '#c62828' }}>
+                  {receipt.lastError}
+                </div>
+              )}
             </div>
+            {(receipt.status === 'pending' || receipt.status === 'failed') && (
+              <button
+                type="button"
+                data-testid="receipt-process-button"
+                onClick={() => processReceipt(receipt)}
+              >
+                {receipt.status === 'failed' ? 'Retry' : 'Process'}
+              </button>
+            )}
             <button type="button" onClick={() => removeReceipt(receipt.id)} aria-label="Remove receipt">
               ✕
             </button>

@@ -21,6 +21,10 @@ repo. For each milestone or fix, Claude gives the exact branch name and
 commit message(s); the user creates the branch, commits, pushes, and merges
 themselves. This keeps GitHub history under the user's own authorship.
 
+Every commit message Claude gives — milestone or fix, no exceptions — must
+be a short title line plus a brief description (2-4 lines) explaining what
+changed and why. Never just a one-line title.
+
 Vercel auto-deploys: pushes to `main` trigger a Production deploy; pushes to
 any other branch (or open PR) get an automatic Preview deployment with its
 own URL — useful for testing a milestone branch before merging.

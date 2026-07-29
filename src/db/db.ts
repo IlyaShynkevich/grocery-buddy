@@ -35,6 +35,8 @@ export interface PendingReceipt {
   imageBlob: Blob
   capturedAt: number
   status: ReceiptStatus
+  /** message from the most recent failed extraction attempt, if any */
+  lastError?: string
 }
 
 /** Single-row-per-key table for small pointers like "which trip is active". */

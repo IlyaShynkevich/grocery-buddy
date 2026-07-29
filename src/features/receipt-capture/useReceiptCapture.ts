@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, getOrCreateActiveTrip } from '../../db/db'
+import { db, getOrCreateActiveTrip, newItem, recomputeTripTotal, type PendingReceipt } from '../../db/db'
+import { extractReceiptItems } from './extractReceipt'
 import { useActiveTripId } from '../trip/useActiveTripId'
 
 export function useReceiptCapture() {
@@ -33,5 +34,27 @@ export function useReceiptCapture() {
     await db.pendingReceipts.delete(id)
   }
 
-  return { pendingReceipts: pendingReceipts ?? [], captureReceipt, removeReceipt }
+  const processReceipt = async (receipt: PendingReceipt) => {
+    await db.pendingReceipts.update(receipt.id, { status: 'processing', lastError: undefined })
+
+    try {
+      const items = await extractReceiptItems(receipt.imageBlob)
+
+      if (receipt.tripId) {
+        for (const item of items) {
+          await db.items.add(newItem(receipt.tripId, { ...item, source: 'ai' }))
+        }
+        await recomputeTripTotal(receipt.tripId)
+      }
+
+      await db.pendingReceipts.update(receipt.id, { status: 'done' })
+    } catch (err) {
+      await db.pendingReceipts.update(receipt.id, {
+        status: 'failed',
+        lastError: err instanceof Error ? err.message : 'Unknown error',
+      })
+    }
+  }
+
+  return { pendingReceipts: pendingReceipts ?? [], captureReceipt, removeReceipt, processReceipt }
 }
