@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, getOrCreateActiveTrip, newItem, recomputeTripTotal, type PendingReceipt } from '../../db/db'
 import { extractReceiptItems } from './extractReceipt'
+import { parseRetryAfterSeconds } from './retryAfter'
 import { useActiveTripId } from '../trip/useActiveTripId'
 
 export function useReceiptCapture() {
@@ -35,7 +36,11 @@ export function useReceiptCapture() {
   }
 
   const processReceipt = async (receipt: PendingReceipt) => {
-    await db.pendingReceipts.update(receipt.id, { status: 'processing', lastError: undefined })
+    await db.pendingReceipts.update(receipt.id, {
+      status: 'processing',
+      lastError: undefined,
+      retryAt: undefined,
+    })
 
     try {
       const items = await extractReceiptItems(receipt.imageBlob)
@@ -49,9 +54,15 @@ export function useReceiptCapture() {
 
       await db.pendingReceipts.update(receipt.id, { status: 'done' })
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      // If Groq gave us a rate-limit wait time (e.g. "...try again in 16.6s"),
+      // schedule an automatic retry for then; otherwise leave retryAt unset
+      // and fall back to manual-retry-only, same as before this existed.
+      const retryAfterSeconds = parseRetryAfterSeconds(message)
       await db.pendingReceipts.update(receipt.id, {
         status: 'failed',
-        lastError: err instanceof Error ? err.message : 'Unknown error',
+        lastError: message,
+        retryAt: retryAfterSeconds !== null ? Date.now() + retryAfterSeconds * 1000 : undefined,
       })
     }
   }
