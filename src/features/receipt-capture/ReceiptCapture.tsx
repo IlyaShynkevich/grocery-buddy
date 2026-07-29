@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { PendingReceipt, ReceiptStatus } from '../../db/db'
+import { getUserFacingErrorMessage } from './errorMessage'
 import { ReceiptThumbnail } from './ReceiptThumbnail'
 import { useReceiptCapture } from './useReceiptCapture'
 
@@ -127,7 +128,7 @@ function ReceiptRow({
         </div>
         {receipt.status === 'failed' && receipt.lastError && (
           <div data-testid="receipt-error" style={{ fontSize: '0.75rem', color: '#c62828' }}>
-            {receipt.lastError}
+            {getUserFacingErrorMessage(receipt.lastError)}
           </div>
         )}
       </div>
