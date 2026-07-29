@@ -81,3 +81,19 @@ export async function recomputeTripTotal(tripId: number): Promise<number> {
   await db.trips.update(tripId, { total })
   return total
 }
+
+/**
+ * The trip currently being shopped: the most recently created draft trip,
+ * or a freshly created one if none exists. Assumes a single in-progress
+ * shopping trip at a time, matching the in-store usage flow.
+ */
+export async function getOrCreateActiveTrip(): Promise<Trip> {
+  const drafts = await db.trips.where('status').equals('draft').sortBy('createdAt')
+  const latest = drafts[drafts.length - 1]
+  if (latest) return latest
+
+  const id = await db.trips.add(newTrip())
+  const created = await db.trips.get(id)
+  if (!created) throw new Error('Failed to create trip')
+  return created
+}
