@@ -30,6 +30,7 @@ I don't have visibility into *what* I'm actually spending my grocery money on, c
 - Smarter essential vs. non-essential flagging and personalized nudges
 - Optional: photo-based item recognition while shopping (harder problem, lower payoff — only worth it if v1's typed list feels like friction in practice)
 - Optional: store-level tracking (price comparison across stores)
+- Visual identity / mascot: a small, minimalistic creature (similar spirit to Claude's own interface mascot) as the app icon and an in-app presence. Should appear specifically during the AI-driven moments — receipt scanning/extraction, maybe reacting to monthly stats — so the AI feels present rather than invisible. Include subtle motion/animation (not static), matching how Claude's mascot behaves. This is a design/polish pass to revisit once core functionality (M0-M8) is working and in daily use — not before.
 
 ## Suggested tech shape (for Claude Code to refine)
 - **Platform**: PWA (installable web app) rather than native iOS/Android — much lighter to build/iterate solo, still gives home-screen install + camera access + offline capability. Add to home screen via browser once; no app store.
