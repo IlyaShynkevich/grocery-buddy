@@ -4,6 +4,29 @@ Personal, mobile-first grocery budget tracker (PWA). See
 `DOCS/grocery-buddy-spec.md` for the full concept, v1/v2 scope, and data
 model.
 
+## Status
+
+- **M0–M3**: done (project scaffold, Dexie schema, typed shopping list,
+  receipt photo capture + offline pending queue).
+- **M4 (Groq receipt extraction)**: done and verified in production.
+  Getting here also required fixing several bugs found post-deploy:
+  - A broken relative import path that broke the deployed serverless
+    function — Vercel's Node builder renames traced `.ts` files to `.js`
+    without rewriting import specifiers, so relative imports under `api/`
+    must use `.js` extensions, not `.ts`.
+  - Groq output truncation on receipts with many line items — raised
+    `max_completion_tokens` to 4096.
+  - Prices were hardcoded to USD (`$`) — now formatted via the shared
+    `src/lib/formatPrice.ts` (German/EUR locale, comma decimals).
+  - Groq 429 rate limits now auto-retry with a parsed countdown ("retrying
+    in Xs"), falling back to manual-retry-only if the error message doesn't
+    match the expected format.
+
+## Known issues
+
+- **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
+  reload instead of zero. Not yet fixed.
+
 ## Commands
 
 - `npm run dev` — dev server (no service worker; PWA/offline features only
@@ -28,6 +51,12 @@ changed and why. Never just a one-line title.
 Vercel auto-deploys: pushes to `main` trigger a Production deploy; pushes to
 any other branch (or open PR) get an automatic Preview deployment with its
 own URL — useful for testing a milestone branch before merging.
+
+Before stating whether a branch is merged, or making any other claim about
+git state (what's on `origin/main`, whether a PR landed, what's currently
+deployed), always run `git fetch origin` then `git log origin/main --oneline`
+to verify first — never assume from local context or something established
+earlier in the session. This has been wrong multiple times this session.
 
 ## Testing
 
