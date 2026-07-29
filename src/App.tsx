@@ -1,10 +1,10 @@
 import { DbDebugPanel } from './features/debug/DbDebugPanel'
+import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
 
 function App() {
   return (
-    <main style={{ padding: '2rem', textAlign: 'center' }}>
-      <h1>Grocery Buddy</h1>
-      <p>Shopping list, receipt capture, and stats land in later milestones.</p>
+    <main>
+      <ShoppingListPage />
       <DbDebugPanel />
     </main>
   )
