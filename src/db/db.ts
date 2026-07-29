@@ -26,6 +26,12 @@ export interface Item {
   /** null = use the category's default essential/non-essential; else user override */
   essentialOverride: boolean | null
   source: ItemSource
+  /**
+   * A coupon/discount line from a receipt (negative price), not a
+   * purchasable product. Excluded from the shopping list but still counted
+   * in recomputeTripTotal so the trip total matches the receipt.
+   */
+  isDiscount: boolean
 }
 
 export interface PendingReceipt {
@@ -86,6 +92,7 @@ export function newItem(
     category: DEFAULT_CATEGORY_KEY,
     essentialOverride: null,
     source: 'typed',
+    isDiscount: false,
     ...overrides,
   }
 }

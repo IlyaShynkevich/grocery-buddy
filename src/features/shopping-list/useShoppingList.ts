@@ -7,8 +7,18 @@ export function useShoppingList() {
 
   const trip = useLiveQuery(() => (tripId ? db.trips.get(tripId) : undefined), [tripId])
 
+  // Discount/coupon lines are counted in the trip total (recomputeTripTotal
+  // sums every item's price) but aren't purchasable products, so they're
+  // excluded here rather than shown as something to buy again.
   const items = useLiveQuery(
-    () => (tripId ? db.items.where('tripId').equals(tripId).sortBy('id') : []),
+    () =>
+      tripId
+        ? db.items
+            .where('tripId')
+            .equals(tripId)
+            .sortBy('id')
+            .then((all) => all.filter((item) => !item.isDiscount))
+        : [],
     [tripId],
     [],
   )

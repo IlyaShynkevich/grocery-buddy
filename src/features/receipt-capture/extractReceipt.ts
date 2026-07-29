@@ -2,6 +2,8 @@ export interface ExtractedItem {
   name: string
   price: number
   category: string
+  /** true for a coupon/discount line, not a purchasable product */
+  isDiscount?: boolean
 }
 
 const MAX_DIMENSION = 1600
