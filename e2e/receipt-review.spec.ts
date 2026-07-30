@@ -22,8 +22,9 @@ async function addTypedItem(page: Page, name: string) {
 }
 
 async function itemNames(page: Page): Promise<string[]> {
-  const inputs = await page.getByTestId('shopping-list-item').locator('input[type="text"]').all()
-  return Promise.all(inputs.map((input) => input.inputValue()))
+  return page.getByTestId('shopping-list-item').locator('input[type="text"]').evaluateAll((inputs) =>
+    inputs.map((input) => (input as HTMLInputElement).value),
+  )
 }
 
 test('case A: no prior typed items — review panel shows a plain confirmation, edits apply on Confirm', async ({
