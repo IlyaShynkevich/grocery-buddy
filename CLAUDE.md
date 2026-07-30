@@ -433,6 +433,37 @@ model.
     the opposite (stays collapsed, toggle still present); added tests for
     a manually-expanded list staying expanded through a resolve, and for
     Save trip resetting a stale collapsed state on the new draft.
+- **App icon replaced with real mascot artwork**: done and verified in
+  production. The last placeholder touchpoint — the gray hand-drawn
+  shopping-bag glyph in `favicon.svg`/`icon-192.png`/`icon-512.png`/
+  `apple-touch-icon.png` — is now the same mascot art used everywhere
+  else, from a new front-facing source image (`MASCOT/Mascot_icon.png`).
+  - Same transparency pipeline as the in-app poses (connected-components
+    background/handle-hole removal, HSV color-match correction toward
+    idle's fill — this source's fill color didn't match out of the box
+    either, as expected by now).
+  - Unlike the mascot poses, these are real app icons, and `icon-512.png`
+    is also declared `purpose: maskable` in the manifest (`vite.config.ts`)
+    — OS launchers can crop a maskable icon to any shape, so content needs
+    to stay inside the safe zone (roughly the inner 80%-diameter circle)
+    and the canvas needs an opaque background rather than relying on
+    transparency. Composited the transparent mascot onto the same solid
+    `#1e1f27` background the placeholder icons already used, scaled so the
+    glyph's longer side fills ~62% of the canvas (similar proportions to
+    the old placeholder, comfortably inside the safe zone) — generated at
+    512×512, 192×192, and 180×180 (apple-touch) from one shared crop.
+  - `favicon.svg` stays an SVG file (so nothing referencing it needs to
+    change) but now just wraps a `<image>` embedding a small (128px)
+    version of the same processed PNG as a base64 data URI, with
+    `image-rendering: pixelated` — hand-tracing this pixel-art mascot as
+    vector paths the way the flat-shape placeholder was written isn't
+    practical. Used 128px rather than the full 512px render to keep the
+    embedded SVG's file size reasonable (~8KB rather than ~90KB).
+  - Verified at actual favicon size (32px, 16px) — reads clearly as a
+    smiling bag down to 32px; 16px is soft but still recognizable, which
+    is normal for a detailed icon at that size (the old flat-shape
+    placeholder had an easier time here precisely because it was simpler,
+    not because detailed icons are expected to stay crisp at 16px).
 
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
