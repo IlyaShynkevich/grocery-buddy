@@ -83,8 +83,17 @@ function App() {
 
       {view.name === 'stats' && <StatsPage />}
 
-      <DbDebugPanel />
-      <Footer />
+      {/*
+        Debug tools + footer are one bottom-anchored group, not two
+        independently-pinned pieces — marginTop: 'auto' on the group (not
+        on the footer alone) is what makes them sit flush together at the
+        true bottom of the viewport on short pages, with the actual page
+        content above filling the rest of the space.
+      */}
+      <div style={{ marginTop: 'auto' }}>
+        <DbDebugPanel />
+        <Footer />
+      </div>
     </main>
   )
 }
