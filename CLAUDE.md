@@ -42,6 +42,17 @@ model.
   excludes, or filtering them out of any item-list/category display
   entirely.
 
+## Known limitations
+
+- **Receipt-review item matching is not translation-aware.** The matching in
+  `src/lib/itemMatch.ts` compares text similarity only. Typed items in
+  English will only match German receipt text when the words happen to look
+  similar as text (e.g. "tomato" matches "Tomaten", but "eggs" does not
+  match "Eier"). This is a known, acceptable limitation for now — unmatched
+  items just appear as separate entries and can be manually
+  removed/reconciled. Revisit only if this becomes a real usability problem
+  in practice.
+
 ## Commands
 
 - `npm run dev` — dev server (no service worker; PWA/offline features only
