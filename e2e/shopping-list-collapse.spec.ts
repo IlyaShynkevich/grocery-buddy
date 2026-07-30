@@ -70,7 +70,7 @@ test('the collapsed shopping list can be manually expanded while a review is sti
   await expect(page.getByTestId('add-item-input')).toBeHidden()
 })
 
-test('confirming the review returns the shopping list to visible by default', async ({ page }) => {
+test('confirming the review keeps the shopping list collapsed, not re-expanded', async ({ page }) => {
   await page.goto('/')
   await captureAndProcess(page)
   await expect(page.getByTestId('add-item-input')).toBeHidden()
@@ -78,12 +78,17 @@ test('confirming the review returns the shopping list to visible by default', as
   await page.getByTestId('receipt-review-confirm').click()
   await expect(page.getByTestId('receipt-review-panel')).toHaveCount(0)
 
-  await expect(page.getByTestId('shopping-list-toggle')).toHaveCount(0)
+  // Still collapsed — the toggle affordance stays around specifically so
+  // the user can expand it themselves, which is the only thing that should.
+  await expect(page.getByTestId('shopping-list-toggle')).toHaveText('Show shopping list')
+  await expect(page.getByTestId('add-item-input')).toBeHidden()
+  await expect(page.getByTestId('shopping-list-items')).toBeHidden()
+
+  await page.getByTestId('shopping-list-toggle').click()
   await expect(page.getByTestId('add-item-input')).toBeVisible()
-  await expect(page.getByTestId('shopping-list-items')).toBeVisible()
 })
 
-test('dismissing the review (without confirming) also returns the shopping list to visible', async ({ page }) => {
+test('dismissing the review (without confirming) also keeps the shopping list collapsed', async ({ page }) => {
   await page.goto('/')
   await captureAndProcess(page)
   await expect(page.getByTestId('add-item-input')).toBeHidden()
@@ -91,7 +96,19 @@ test('dismissing the review (without confirming) also returns the shopping list 
   await page.getByTestId('receipt-review-dismiss').click()
   await expect(page.getByTestId('receipt-review-panel')).toHaveCount(0)
 
-  await expect(page.getByTestId('shopping-list-toggle')).toHaveCount(0)
+  await expect(page.getByTestId('shopping-list-toggle')).toHaveText('Show shopping list')
+  await expect(page.getByTestId('add-item-input')).toBeHidden()
+})
+
+test('a review resolving does not force-collapse a list the user had manually expanded', async ({ page }) => {
+  await page.goto('/')
+  await captureAndProcess(page)
+
+  await page.getByTestId('shopping-list-toggle').click()
+  await expect(page.getByTestId('add-item-input')).toBeVisible()
+
+  await page.getByTestId('receipt-review-confirm').click()
+  await expect(page.getByTestId('receipt-review-panel')).toHaveCount(0)
   await expect(page.getByTestId('add-item-input')).toBeVisible()
 })
 
@@ -101,7 +118,8 @@ test('a fresh receipt review after a previous one starts collapsed again, ignori
   await page.goto('/')
   await captureAndProcess(page)
 
-  // Manually expand, then confirm — list becomes visible-by-default again.
+  // Manually expand, then confirm — stays expanded (the user's own choice
+  // is respected across the review resolving).
   await page.getByTestId('shopping-list-toggle').click()
   await expect(page.getByTestId('add-item-input')).toBeVisible()
   await page.getByTestId('receipt-review-confirm').click()
@@ -113,4 +131,19 @@ test('a fresh receipt review after a previous one starts collapsed again, ignori
   await captureAndProcess(page)
   await expect(page.getByTestId('shopping-list-toggle')).toHaveText('Show shopping list')
   await expect(page.getByTestId('add-item-input')).toBeHidden()
+})
+
+test('saving the trip starts the fresh draft uncollapsed, not inheriting the finished trip\'s collapsed state', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await captureAndProcess(page)
+
+  // Leave it collapsed (don't manually expand) through to Save trip.
+  await page.getByTestId('receipt-review-confirm').click()
+  await expect(page.getByTestId('shopping-list-toggle')).toHaveText('Show shopping list')
+
+  await page.getByTestId('save-trip-button').click()
+  await expect(page.getByTestId('shopping-list-toggle')).toHaveCount(0)
+  await expect(page.getByTestId('add-item-input')).toBeVisible()
 })

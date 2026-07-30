@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { usePendingReceipt } from '../receipt-review/usePendingReceipt'
 import { formatDate } from '../../lib/formatDate'
 import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
@@ -12,16 +12,34 @@ export function ShoppingListPage() {
   // button need to both be visible without scrolling past the full item
   // list — so the list (not the header/date/Save trip button, which stay
   // put) collapses by default, same idea as the DB Debug Panel's
-  // <details>. Any manual toggle is deliberately forgotten across a
-  // pending-review transition in either direction, so the next receipt
-  // always starts collapsed again rather than inheriting a stale choice.
+  // <details>. Once the review resolves (confirmed or dismissed), the
+  // collapsed/open state is left exactly as it was — it does not force
+  // back open — so a still-collapsed list stays collapsed until the user
+  // expands it themselves via the toggle. Only a *new* pending review
+  // (the false -> true rising edge) forces a fresh collapse, deliberately
+  // discarding whatever was left over from the previous one.
   const pendingReceipt = usePendingReceipt()
   const hasPendingReview = !!pendingReceipt
-  const [manualOpen, setManualOpen] = useState<boolean | null>(null)
+  const [isOpen, setIsOpen] = useState(true)
+  const wasPendingReview = useRef(hasPendingReview)
   useEffect(() => {
-    setManualOpen(null)
+    if (!wasPendingReview.current && hasPendingReview) setIsOpen(false)
+    wasPendingReview.current = hasPendingReview
   }, [hasPendingReview])
-  const isOpen = manualOpen ?? !hasPendingReview
+  // Saving the trip starts a fresh empty draft — that new trip has no
+  // history of its own, so it shouldn't inherit a collapsed state left
+  // over from whatever the previous trip's review was doing.
+  const tripId = trip?.id
+  const lastTripId = useRef(tripId)
+  useEffect(() => {
+    if (lastTripId.current === tripId) return
+    lastTripId.current = tripId
+    setIsOpen(true)
+  }, [tripId])
+  // The collapse affordance itself only needs to exist while there's an
+  // active review, or while a past one left the list collapsed — a fresh
+  // trip that's never had a review shows the plain, always-visible list.
+  const showCollapsible = hasPendingReview || !isOpen
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -98,11 +116,11 @@ export function ShoppingListPage() {
         {trip ? formatDate(trip.date) : 'Loading trip…'}
       </p>
 
-      {hasPendingReview ? (
+      {showCollapsible ? (
         <details
           data-testid="shopping-list-collapsible"
           open={isOpen}
-          onToggle={(e) => setManualOpen(e.currentTarget.open)}
+          onToggle={(e) => setIsOpen(e.currentTarget.open)}
           style={{ marginTop: '0.5rem' }}
         >
           <summary data-testid="shopping-list-toggle" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
