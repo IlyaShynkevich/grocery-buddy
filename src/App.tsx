@@ -23,7 +23,12 @@ function App() {
   const activeTab = view.name === 'trip-detail' ? 'history' : view.name
 
   return (
-    <main>
+    // flow-root establishes a block formatting context so <nav>'s top
+    // margin can't collapse through main/#root/body and leak above the
+    // viewport — without it, the page gained a few px of unreachable
+    // scroll (html.scrollHeight > its clientHeight) with nothing visually
+    // different, which read as a small jittery vertical scroll.
+    <main style={{ display: 'flow-root' }}>
       <nav
         data-testid="app-nav"
         style={{
