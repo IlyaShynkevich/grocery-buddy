@@ -24,12 +24,15 @@ function App() {
   const activeTab = view.name === 'trip-detail' ? 'history' : view.name
 
   return (
-    // flow-root establishes a block formatting context so <nav>'s top
-    // margin can't collapse through main/#root/body and leak above the
-    // viewport — without it, the page gained a few px of unreachable
-    // scroll (html.scrollHeight > its clientHeight) with nothing visually
-    // different, which read as a small jittery vertical scroll.
-    <main style={{ display: 'flow-root' }}>
+    // A column flex layout at least one viewport tall, combined with the
+    // footer's own marginTop: 'auto' (see Footer.tsx), pins the footer to
+    // the true bottom of the screen — flush against the last content item
+    // when content overflows the viewport, pushed down to the bottom edge
+    // via the flex auto-margin when it doesn't. This also incidentally
+    // keeps the earlier flow-root fix: a flex container is its own block
+    // formatting context too, so <nav>'s top margin still can't collapse
+    // through main/#root/body and leak above the viewport.
+    <main style={{ display: 'flex', flexDirection: 'column', minHeight: '100svh' }}>
       <nav
         data-testid="app-nav"
         style={{
