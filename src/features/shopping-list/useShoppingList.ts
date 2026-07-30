@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, newItem } from '../../db/db'
+import { completeTrip, db, newItem } from '../../db/db'
 import { useActiveTripId } from '../trip/useActiveTripId'
 
 export function useShoppingList() {
@@ -37,5 +37,10 @@ export function useShoppingList() {
     await db.items.delete(itemId)
   }
 
-  return { trip, items: items ?? [], addItem, renameItem, removeItem }
+  const saveTrip = async () => {
+    if (!tripId) return
+    await completeTrip(tripId)
+  }
+
+  return { trip, items: items ?? [], addItem, renameItem, removeItem, saveTrip }
 }

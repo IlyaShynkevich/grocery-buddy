@@ -13,6 +13,8 @@ export interface Trip {
   total: number
   status: TripStatus
   createdAt: number
+  /** set when status becomes 'complete' — history is sorted by this, not date (same-day trips tie on date) */
+  completedAt?: number
 }
 
 export interface Item {
@@ -176,4 +178,21 @@ export async function getOrCreateActiveTrip(): Promise<Trip> {
   })()
 
   return pendingActiveTripCreation
+}
+
+/**
+ * Marks a trip complete and immediately starts a fresh empty draft as the
+ * new active trip, so the user never has to manually set one up before
+ * their next shopping run. The completed trip's items/total are untouched
+ * — nothing here mutates them, "saving" only changes the trip's own status.
+ */
+export async function completeTrip(tripId: number): Promise<Trip> {
+  await db.trips.update(tripId, { status: 'complete', completedAt: Date.now() })
+
+  const newId = await db.trips.add(newTrip())
+  await db.appState.put({ key: ACTIVE_TRIP_KEY, value: newId })
+
+  const created = await db.trips.get(newId)
+  if (!created) throw new Error('Failed to create new trip')
+  return created
 }
