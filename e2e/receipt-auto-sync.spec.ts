@@ -90,10 +90,7 @@ test('multiple pending receipts sync one at a time on reconnect, not simultaneou
   expect(maxConcurrent).toBe(1)
 })
 
-test('a failed receipt (no rate-limit wait parsed) is retried automatically on reconnect', async ({
-  page,
-  context,
-}) => {
+test('a failed receipt (no rate-limit wait parsed) is retried automatically on reconnect', async ({ page }) => {
   let callCount = 0
   await page.route('**/api/extract-receipt', (route) => {
     callCount += 1

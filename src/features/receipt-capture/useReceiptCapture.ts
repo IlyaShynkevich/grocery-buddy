@@ -1,6 +1,14 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef } from 'react'
-import { db, getOrCreateActiveTrip, newItem, recomputeTripTotal, type PendingReceipt } from '../../db/db'
+import {
+  db,
+  getOrCreateActiveTrip,
+  newItem,
+  recomputeTripTotal,
+  type PendingReceipt,
+  type SuggestedItemMatch,
+} from '../../db/db'
+import { isLikelyMatch } from '../../lib/itemMatch'
 import { extractReceiptItems } from './extractReceipt'
 import { parseRetryAfterSeconds } from './retryAfter'
 import { useActiveTripId } from '../trip/useActiveTripId'
@@ -44,16 +52,52 @@ export function useReceiptCapture() {
     })
 
     try {
-      const items = await extractReceiptItems(receipt.imageBlob)
+      const extractedItems = await extractReceiptItems(receipt.imageBlob)
+
+      const addedItemIds: number[] = []
+      const suggestedMatches: SuggestedItemMatch[] = []
 
       if (receipt.tripId) {
-        for (const item of items) {
-          await db.items.add(newItem(receipt.tripId, { ...item, source: 'ai' }))
+        const tripId = receipt.tripId
+
+        // Snapshot of what was typed before this scan — used to suggest
+        // merges in the review panel. Discounts are internal accounting
+        // lines, never a match candidate for a typed product.
+        const typedItems = await db.items
+          .where('tripId')
+          .equals(tripId)
+          .filter((item) => item.source === 'typed' && !item.isDiscount)
+          .toArray()
+        const matchedTypedIds = new Set<number>()
+
+        for (const extracted of extractedItems) {
+          const newId = await db.items.add(newItem(tripId, { ...extracted, source: 'ai' }))
+          addedItemIds.push(newId)
+
+          if (!extracted.isDiscount) {
+            const match = typedItems.find(
+              (typed) => !matchedTypedIds.has(typed.id) && isLikelyMatch(typed.name, extracted.name),
+            )
+            if (match) {
+              matchedTypedIds.add(match.id)
+              suggestedMatches.push({ typedItemId: match.id, extractedItemId: newId })
+            }
+          }
         }
-        await recomputeTripTotal(receipt.tripId)
+
+        await recomputeTripTotal(tripId)
       }
 
-      await db.pendingReceipts.update(receipt.id, { status: 'done' })
+      // The review panel (see receipt-review feature) shows automatically
+      // for any 'done' receipt with reviewed: false — items are already
+      // added at this point either way, so ignoring the panel never loses
+      // anything, it just leaves the (harmless) duplicates/typos for later.
+      await db.pendingReceipts.update(receipt.id, {
+        status: 'done',
+        addedItemIds,
+        suggestedMatches,
+        reviewed: addedItemIds.length === 0,
+      })
     } catch (err) {
       // Full raw error for our own diagnosis — the UI only ever shows a
       // short, human-readable message derived from this (see errorMessage.ts).
