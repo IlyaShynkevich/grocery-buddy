@@ -14,7 +14,9 @@ const STATUS_LABEL: Record<ReceiptStatus, string> = {
 
 export function ReceiptCapture() {
   const { pendingReceipts, captureReceipt, removeReceipt, processReceipt } = useReceiptCapture()
-  const inputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -29,30 +31,101 @@ export function ReceiptCapture() {
     <section data-testid="receipt-capture" style={pageStyle}>
       <h2 style={{ fontSize: '1.1rem' }}>Receipt</h2>
 
-      <label
-        style={{
-          display: 'inline-block',
-          marginTop: '0.6rem',
-          padding: '0.5rem 0.9rem',
-          fontWeight: 600,
-          background: 'var(--accent)',
-          color: 'var(--accent-contrast)',
-          border: '1px solid var(--accent)',
-          borderRadius: 'var(--radius-sm)',
-          cursor: 'pointer',
-        }}
-      >
-        Take receipt photo
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          data-testid="receipt-capture-input"
-          onChange={handleFileChange}
-          style={{ display: 'none' }}
-        />
-      </label>
+      <div style={{ position: 'relative', display: 'inline-block', marginTop: '0.6rem' }}>
+        <button
+          type="button"
+          data-testid="receipt-add-button"
+          onClick={() => setMenuOpen((open) => !open)}
+          style={{
+            padding: '0.5rem 0.9rem',
+            fontWeight: 600,
+            background: 'var(--accent)',
+            color: 'var(--accent-contrast)',
+            border: '1px solid var(--accent)',
+            borderRadius: 'var(--radius-sm)',
+          }}
+        >
+          Add receipt photo
+        </button>
+
+        {menuOpen && (
+          <>
+            {/* Invisible backdrop — closes the menu on outside click/tap. */}
+            <div
+              onClick={() => setMenuOpen(false)}
+              style={{ position: 'fixed', inset: 0, zIndex: 1 }}
+            />
+            <div
+              data-testid="receipt-source-menu"
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 0.4rem)',
+                left: 0,
+                zIndex: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.35rem',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+                padding: '0.4rem',
+                minWidth: '13rem',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+              }}
+            >
+              <button
+                type="button"
+                data-testid="receipt-camera-option"
+                onClick={() => {
+                  setMenuOpen(false)
+                  cameraInputRef.current?.click()
+                }}
+                style={{ textAlign: 'left', width: '100%' }}
+              >
+                📷 Camera
+              </button>
+              <button
+                type="button"
+                data-testid="receipt-gallery-option"
+                onClick={() => {
+                  setMenuOpen(false)
+                  galleryInputRef.current?.click()
+                }}
+                style={{ textAlign: 'left', width: '100%' }}
+              >
+                🖼️ Choose from Photos
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/*
+        Two inputs, not one: `capture="environment"` is the only reliable
+        cross-browser way to force the native camera app open directly, and
+        it has to be present at trigger time — toggling it on/off the same
+        input is flaky on mobile Safari. Omitting `capture` entirely is the
+        standard way to get the OS photo/gallery picker instead. Both feed
+        the exact same handleFileChange -> captureReceipt pipeline, so
+        there's no divergence downstream of the input itself.
+      */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        data-testid="receipt-capture-input"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        data-testid="receipt-gallery-input"
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
 
       {pendingReceipts.length === 0 && (
         <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>No receipts captured yet.</p>
