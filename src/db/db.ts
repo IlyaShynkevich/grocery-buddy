@@ -34,6 +34,11 @@ export interface Item {
   isDiscount: boolean
 }
 
+export interface SuggestedItemMatch {
+  typedItemId: number
+  extractedItemId: number
+}
+
 export interface PendingReceipt {
   id: number
   /** null if captured before being attached to a trip */
@@ -45,6 +50,16 @@ export interface PendingReceipt {
   lastError?: string
   /** timestamp to auto-retry at, when lastError parsed a rate-limit wait time */
   retryAt?: number
+  /**
+   * Ids of the Item rows created from this receipt's extraction, once
+   * status is 'done' — items are added immediately (see M5 part 1), this
+   * just tracks which ones came from this receipt for the review panel.
+   */
+  addedItemIds?: number[]
+  /** Best-effort typed/extracted item pairs the review panel offers to merge. */
+  suggestedMatches?: SuggestedItemMatch[]
+  /** Whether the user has confirmed/dismissed the post-scan review panel. */
+  reviewed?: boolean
 }
 
 /** Single-row-per-key table for small pointers like "which trip is active". */
