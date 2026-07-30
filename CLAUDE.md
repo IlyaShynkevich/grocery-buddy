@@ -170,17 +170,50 @@ model.
     with the regular page content above, so on short pages there's a gap
     between Debug tools and the footer instead of them sitting together.
     See Known issues below.
+- **Layout width consistency pass**: done and verified in production.
+  Root cause of several reported width bugs (Receipt section on Shopping
+  List rendering centered/narrower than the rest of the page; History and
+  Stats feeling squeezed; Debug tools a different width than the page
+  content) was the same in every case: `pageStyle` (`src/lib/ui.ts`) sets
+  `maxWidth: 480` plus `margin: '0 auto'`, and every page section is a flex
+  item of `App.tsx`'s column-flex `<main>` — but a flex item with auto
+  cross-axis margins opts out of the default stretch-to-container sizing
+  and instead shrinks to fit its own content, so each section ended up a
+  different width depending on how wide its content happened to be, only
+  coincidentally matching. Fixed by adding an explicit `width: '100%'` to
+  `pageStyle` (and the equivalent inline style in `ReceiptReviewPanel`) so
+  each section has a definite width to stretch to before `maxWidth` clamps
+  it — this alone made Shopping List, History, Stats, and Trip Detail
+  consistent since they already shared `pageStyle`. The DB Debug Panel
+  wasn't using `pageStyle` at all (just an ad hoc `margin: '1rem'`), so it
+  now imports and uses it like every other page section. The footer got
+  the opposite treatment — it dropped `maxWidth`/`margin: auto` entirely in
+  favor of `width: '100%'`, so it reads as a true full-bleed footer bar
+  instead of a small centered block, distinct from the capped-width page
+  content above it. The top nav bar was deliberately left alone — it's
+  meant to stay a centered, content-width pill, not stretch to the page
+  width. Confirmed via computed-style + screenshot checks in a real
+  browser (desktop viewport) at each affected page, plus the full
+  Playwright suite (still passing, 51/51).
+- **Debug tools grouped with the footer at the true bottom**: done and
+  verified in production. Previously only the footer had `marginTop:
+  auto`, so it alone got pushed to the bottom of the column-flex layout
+  while Debug tools was left directly after the page content above it —
+  fine on tall pages (content already reached the bottom) but leaving a
+  visible gap between Debug tools and the footer on short pages (empty
+  Shopping List, History with few trips). Fixed by moving `marginTop:
+  auto` off the footer and onto a wrapping `<div>` in `App.tsx` that
+  contains both `<DbDebugPanel />` and `<Footer />` — the group as a whole
+  is what's pushed to the bottom now, so the two always sit flush together
+  regardless of how little page content there is above. Confirmed via
+  bounding-box checks (Debug tools' bottom edge exactly meets the footer's
+  top edge, both flush against the viewport bottom on the shortest pages)
+  plus the full Playwright suite (51/51).
 
 ## Known issues
 
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
-- **Debug tools isn't grouped with the footer.** They should sit together
-  at the true bottom of the screen with no gap between them, regardless of
-  content length (same bottom-pinning the footer already got via the
-  column-flex layout in `App.tsx`) — currently Debug tools is left with the
-  regular page content above, so short pages show a gap between it and the
-  footer. Not yet fixed.
 
 ## Known limitations
 
