@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { PendingReceipt, ReceiptStatus } from '../../db/db'
+import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { getUserFacingErrorMessage } from './errorMessage'
 import { ReceiptThumbnail } from './ReceiptThumbnail'
 import { useReceiptCapture } from './useReceiptCapture'
@@ -25,19 +26,19 @@ export function ReceiptCapture() {
   }
 
   return (
-    <section
-      data-testid="receipt-capture"
-      style={{ maxWidth: 480, margin: '0 auto', padding: '1rem', textAlign: 'left' }}
-    >
-      <h2 style={{ fontSize: '1.2rem' }}>Receipt</h2>
+    <section data-testid="receipt-capture" style={pageStyle}>
+      <h2 style={{ fontSize: '1.1rem' }}>Receipt</h2>
 
       <label
         style={{
           display: 'inline-block',
-          padding: '0.6rem 1rem',
-          fontSize: '1rem',
-          border: '1px solid #2e7d32',
-          borderRadius: 4,
+          marginTop: '0.6rem',
+          padding: '0.5rem 0.9rem',
+          fontWeight: 600,
+          background: 'var(--accent)',
+          color: 'var(--accent-contrast)',
+          border: '1px solid var(--accent)',
+          borderRadius: 'var(--radius-sm)',
           cursor: 'pointer',
         }}
       >
@@ -54,10 +55,13 @@ export function ReceiptCapture() {
       </label>
 
       {pendingReceipts.length === 0 && (
-        <p style={{ opacity: 0.6, marginTop: '0.75rem' }}>No receipts captured yet.</p>
+        <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>No receipts captured yet.</p>
       )}
 
-      <ul style={{ listStyle: 'none', padding: 0, margin: '0.75rem 0 0' }} data-testid="receipt-list">
+      <ul
+        style={{ listStyle: 'none', padding: 0, margin: '0.75rem 0 0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+        data-testid="receipt-list"
+      >
         {pendingReceipts.map((receipt) => (
           <ReceiptRow
             key={receipt.id}
@@ -112,32 +116,24 @@ function ReceiptRow({
     <li
       data-testid="receipt-item"
       data-status={receipt.status}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem',
-        padding: '0.5rem 0',
-        borderBottom: '1px solid #e0e0e0',
-      }}
+      style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.75rem' }}
     >
       <ReceiptThumbnail blob={receipt.imageBlob} />
       <div style={{ flex: 1 }}>
         <div data-testid="receipt-status">{statusText}</div>
-        <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>
-          {new Date(receipt.capturedAt).toLocaleString()}
-        </div>
+        <div style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>{new Date(receipt.capturedAt).toLocaleString()}</div>
         {receipt.status === 'failed' && receipt.lastError && (
-          <div data-testid="receipt-error" style={{ fontSize: '0.75rem', color: '#c62828' }}>
+          <div data-testid="receipt-error" style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>
             {getUserFacingErrorMessage(receipt.lastError)}
           </div>
         )}
       </div>
       {(receipt.status === 'pending' || receipt.status === 'failed') && (
-        <button type="button" data-testid="receipt-process-button" onClick={() => onProcess(receipt)}>
+        <button type="button" data-testid="receipt-process-button" onClick={() => onProcess(receipt)} style={primaryButtonStyle}>
           {receipt.status === 'failed' ? 'Retry' : 'Process'}
         </button>
       )}
-      <button type="button" onClick={() => onRemove(receipt.id)} aria-label="Remove receipt">
+      <button type="button" onClick={() => onRemove(receipt.id)} aria-label="Remove receipt" style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}>
         ✕
       </button>
     </li>

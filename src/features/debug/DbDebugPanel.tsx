@@ -96,10 +96,13 @@ export function DbDebugPanel() {
     // rendered until opened, so e2e tests just need to click the toggle
     // first before interacting with anything inside.
     <details data-testid="debug-panel" style={{ margin: '1rem', textAlign: 'left' }}>
-      <summary data-testid="debug-panel-toggle" style={{ cursor: 'pointer', padding: '0.4rem 0.6rem', border: '1px dashed #999', borderRadius: 4 }}>
+      <summary
+        data-testid="debug-panel-toggle"
+        style={{ padding: '0.4rem 0.6rem', border: '1px dashed var(--border-strong)', borderRadius: 4, color: 'var(--text-muted)' }}
+      >
         Debug tools ▸
       </summary>
-      <div style={{ padding: '1rem', border: '1px dashed #999', borderTop: 'none' }}>
+      <div style={{ padding: '1rem', border: '1px dashed var(--border-strong)', borderTop: 'none' }}>
         <h2>DB Debug Panel</h2>
         <p style={{ fontSize: '0.85rem', opacity: 0.75 }}>
           Temporary — for verifying the Dexie schema (M1). Removed once the real shopping-list /
@@ -127,7 +130,7 @@ export function DbDebugPanel() {
             data-trip-id={trip.id}
             data-active={trip.id === activePointer?.value}
             style={{
-              border: trip.id === selectedTripId ? '2px solid #2e7d32' : '1px solid #ccc',
+              border: trip.id === selectedTripId ? '2px solid var(--border-strong)' : '1px solid var(--border)',
               borderRadius: 4,
               padding: '0.5rem',
               marginBottom: '0.5rem',

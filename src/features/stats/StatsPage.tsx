@@ -1,13 +1,19 @@
 import { useState, type CSSProperties } from 'react'
 import { formatPrice } from '../../lib/formatPrice'
+import { cardStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
 import { useMonthlyStats, useStatsMonths } from './useMonthlyStats'
 
 const barTrackStyle: CSSProperties = {
   flex: 1,
-  background: '#eee',
-  borderRadius: 4,
+  background: 'var(--border)',
+  borderRadius: 999,
   overflow: 'hidden',
-  height: '1rem',
+  height: '0.6rem',
+}
+
+const barFillStyle: CSSProperties = {
+  height: '100%',
+  borderRadius: 999,
 }
 
 /**
@@ -34,25 +40,20 @@ export function StatsPage() {
   const maxSplitAmount = stats ? Math.max(0, stats.essential, stats.nonEssential) : 0
 
   return (
-    <section data-testid="stats-page" style={{ maxWidth: 480, margin: '0 auto', padding: '1rem', textAlign: 'left' }}>
+    <section data-testid="stats-page" style={pageStyle}>
       <h1 style={{ fontSize: '1.5rem' }}>Stats</h1>
 
       {groups.length === 0 && (
-        <p data-testid="stats-empty" style={{ opacity: 0.6 }}>
+        <p data-testid="stats-empty" style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>
           No completed trips yet — save a trip to see stats.
         </p>
       )}
 
       {groups.length > 0 && (
         <>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.75rem 0 1rem' }}>
             Month:
-            <select
-              data-testid="stats-month-select"
-              value={activeKey ?? ''}
-              onChange={(e) => setSelectedKey(e.target.value)}
-              style={{ padding: '0.3rem' }}
-            >
+            <select data-testid="stats-month-select" value={activeKey ?? ''} onChange={(e) => setSelectedKey(e.target.value)}>
               {groups.map((g) => (
                 <option key={g.key} value={g.key}>
                   {g.label}
@@ -62,83 +63,67 @@ export function StatsPage() {
           </label>
 
           {stats === null ? (
-            <p data-testid="stats-empty" style={{ opacity: 0.6 }}>
+            <p data-testid="stats-empty" style={mutedTextStyle}>
               No completed trips for this month.
             </p>
           ) : (
-            <>
-              <p data-testid="stats-total" style={{ fontWeight: 'bold' }}>
-                Total: {formatPrice(stats.total)}
-              </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={cardStyle}>
+                <span style={{ ...mutedTextStyle, fontSize: '0.8rem' }}>Total spend</span>
+                <p data-testid="stats-total" style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '0.15rem' }}>
+                  {formatPrice(stats.total)}
+                </p>
+              </div>
 
-              <h2 style={{ fontSize: '1.1rem', marginTop: '1rem' }}>Essential vs. non-essential</h2>
-              <div data-testid="stats-essential-split" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <div data-testid="stats-split-essential" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ width: '6.5rem', flexShrink: 0 }}>Essential</span>
-                  <div style={barTrackStyle}>
-                    <div
-                      style={{
-                        width: barWidth(stats.essential, maxSplitAmount),
-                        background: '#2e7d32',
-                        height: '100%',
-                      }}
-                    />
+              <div style={cardStyle}>
+                <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>Essential vs. non-essential</h2>
+                <div data-testid="stats-essential-split" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div data-testid="stats-split-essential" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ width: '6.5rem', flexShrink: 0 }}>Essential</span>
+                    <div style={barTrackStyle}>
+                      <div style={{ ...barFillStyle, width: barWidth(stats.essential, maxSplitAmount), background: 'var(--accent)' }} />
+                    </div>
+                    <span data-testid="stats-split-essential-amount" style={{ width: '5rem', textAlign: 'right' }}>
+                      {formatPrice(stats.essential)}
+                    </span>
                   </div>
-                  <span data-testid="stats-split-essential-amount" style={{ width: '5rem', textAlign: 'right' }}>
-                    {formatPrice(stats.essential)}
-                  </span>
-                </div>
-                <div data-testid="stats-split-non-essential" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ width: '6.5rem', flexShrink: 0 }}>Non-essential</span>
-                  <div style={barTrackStyle}>
-                    <div
-                      style={{
-                        width: barWidth(stats.nonEssential, maxSplitAmount),
-                        background: '#e65100',
-                        height: '100%',
-                      }}
-                    />
+                  <div data-testid="stats-split-non-essential" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ width: '6.5rem', flexShrink: 0, ...mutedTextStyle }}>Non-essential</span>
+                    <div style={barTrackStyle}>
+                      <div style={{ ...barFillStyle, width: barWidth(stats.nonEssential, maxSplitAmount), background: 'var(--border-strong)' }} />
+                    </div>
+                    <span data-testid="stats-split-non-essential-amount" style={{ width: '5rem', textAlign: 'right', ...mutedTextStyle }}>
+                      {formatPrice(stats.nonEssential)}
+                    </span>
                   </div>
-                  <span data-testid="stats-split-non-essential-amount" style={{ width: '5rem', textAlign: 'right' }}>
-                    {formatPrice(stats.nonEssential)}
-                  </span>
                 </div>
               </div>
 
-              <h2 style={{ fontSize: '1.1rem', marginTop: '1.25rem' }}>Spend by category</h2>
-              {stats.categories.length === 0 ? (
-                <p data-testid="stats-empty" style={{ opacity: 0.6 }}>
-                  No purchased items this month.
-                </p>
-              ) : (
-                <div data-testid="stats-category-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  {stats.categories.map((category) => (
-                    <div
-                      key={category.key}
-                      data-testid="stats-category-bar"
-                      data-category-key={category.key}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                    >
-                      <span data-testid="stats-category-label" style={{ width: '9rem', flexShrink: 0 }}>
-                        {category.label}
-                      </span>
-                      <div style={barTrackStyle}>
-                        <div
-                          style={{
-                            width: barWidth(category.amount, maxCategoryAmount),
-                            background: '#1565c0',
-                            height: '100%',
-                          }}
-                        />
+              <div style={cardStyle}>
+                <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>Spend by category</h2>
+                {stats.categories.length === 0 ? (
+                  <p data-testid="stats-empty" style={mutedTextStyle}>
+                    No purchased items this month.
+                  </p>
+                ) : (
+                  <div data-testid="stats-category-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {stats.categories.map((category) => (
+                      <div key={category.key} data-testid="stats-category-bar" data-category-key={category.key} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span data-testid="stats-category-label" style={{ width: '9rem', flexShrink: 0 }}>
+                          {category.label}
+                        </span>
+                        <div style={barTrackStyle}>
+                          <div style={{ ...barFillStyle, width: barWidth(category.amount, maxCategoryAmount), background: 'var(--accent)' }} />
+                        </div>
+                        <span data-testid="stats-category-amount" style={{ width: '5rem', textAlign: 'right' }}>
+                          {formatPrice(category.amount)}
+                        </span>
                       </div>
-                      <span data-testid="stats-category-amount" style={{ width: '5rem', textAlign: 'right' }}>
-                        {formatPrice(category.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </>
       )}

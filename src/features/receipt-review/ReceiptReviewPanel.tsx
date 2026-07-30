@@ -1,4 +1,5 @@
 import { formatPrice } from '../../lib/formatPrice'
+import { PAGE_MAX_WIDTH, primaryButtonStyle } from '../../lib/ui'
 import { useReceiptReview } from './useReceiptReview'
 
 // Deliberately not a blocking modal/backdrop — the rest of the app (shopping
@@ -16,16 +17,17 @@ export function ReceiptReviewPanel() {
     <section
       data-testid="receipt-review-panel"
       style={{
-        maxWidth: 480,
+        maxWidth: PAGE_MAX_WIDTH,
         margin: '0.75rem auto',
         padding: '1rem',
-        border: '2px solid #2e7d32',
-        borderRadius: 8,
+        background: 'var(--surface)',
+        border: '1px solid var(--border-strong)',
+        borderRadius: 'var(--radius)',
         textAlign: 'left',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 data-testid="receipt-review-title" style={{ fontSize: '1.1rem', margin: 0 }}>
+        <h2 data-testid="receipt-review-title" style={{ fontSize: '1.1rem' }}>
           {title}
         </h2>
         <button
@@ -33,7 +35,7 @@ export function ReceiptReviewPanel() {
           data-testid="receipt-review-dismiss"
           aria-label="Dismiss review"
           onClick={finishReview}
-          style={{ padding: '0.3rem 0.6rem' }}
+          style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
         >
           ✕
         </button>
@@ -45,7 +47,7 @@ export function ReceiptReviewPanel() {
             <li
               key={match.typedItemId}
               data-testid="receipt-review-match"
-              style={{ padding: '0.5rem 0', borderBottom: '1px solid #e0e0e0' }}
+              style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}
             >
               <div>
                 Is <strong>{match.typedItem.name}</strong> the same as{' '}
@@ -56,6 +58,7 @@ export function ReceiptReviewPanel() {
                   type="button"
                   data-testid="receipt-review-match-yes"
                   onClick={() => resolveMatch(match.typedItemId, 'merge')}
+                  style={primaryButtonStyle}
                 >
                   Yes, same item
                 </button>
@@ -77,7 +80,7 @@ export function ReceiptReviewPanel() {
           <li
             key={item.id}
             data-testid="receipt-review-item"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0', borderBottom: '1px solid var(--border)' }}
           >
             <span style={{ flex: 1 }}>{item.name}</span>
             <input
@@ -86,13 +89,14 @@ export function ReceiptReviewPanel() {
               value={item.price ?? ''}
               aria-label={`Price for ${item.name}`}
               onChange={(e) => updatePrice(item.id, Number(e.target.value))}
-              style={{ width: '5rem', padding: '0.3rem' }}
+              style={{ width: '5rem' }}
             />
             <button
               type="button"
               data-testid="receipt-review-item-remove"
               aria-label={`Remove ${item.name}`}
               onClick={() => removeItem(item.id)}
+              style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
             >
               ✕
             </button>
@@ -100,7 +104,7 @@ export function ReceiptReviewPanel() {
         ))}
       </ul>
 
-      <button type="button" data-testid="receipt-review-confirm" onClick={finishReview} style={{ padding: '0.5rem 1rem' }}>
+      <button type="button" data-testid="receipt-review-confirm" onClick={finishReview} style={{ ...primaryButtonStyle, marginTop: '0.5rem' }}>
         Confirm
       </button>
     </section>

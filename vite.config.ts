@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'Grocery Buddy',
         short_name: 'Groceries',
         description: 'Personal grocery budget tracker',
-        theme_color: '#2e7d32',
-        background_color: '#ffffff',
+        theme_color: '#16171d',
+        background_color: '#16171d',
         display: 'standalone',
         start_url: '/',
         icons: [

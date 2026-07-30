@@ -1,6 +1,22 @@
 :root {
+  /* Grayscale-only palette — no accent hue. "Accent" states (buttons,
+     highlights, focus rings, active nav) are distinguished purely by
+     lightness/shade, not by introducing color. */
   --text: #1a1a1a;
+  --text-muted: rgba(26, 26, 26, 0.62);
   --bg: #ffffff;
+  --surface: #f5f5f6;
+  --surface-hover: #ebebec;
+  --border: #e0e0e0;
+  --border-strong: #b7b7bc;
+  --accent: #3f3f46;
+  --accent-hover: #27272a;
+  --accent-contrast: #ffffff;
+  --danger: #c62828;
+  --danger-contrast: #ffffff;
+  --radius: 10px;
+  --radius-sm: 6px;
+
   color-scheme: light dark;
   font: 16px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
@@ -10,7 +26,17 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #f3f4f6;
+    --text-muted: rgba(243, 244, 246, 0.6);
     --bg: #16171d;
+    --surface: #1e1f27;
+    --surface-hover: #262733;
+    --border: #2d2e38;
+    --border-strong: #63646f;
+    --accent: #a1a1aa;
+    --accent-hover: #c3c3ca;
+    --accent-contrast: #16171d;
+    --danger: #f28b82;
+    --danger-contrast: #16171d;
   }
 }
 
@@ -24,4 +50,75 @@ body {
 
 #root {
   min-height: 100svh;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+button:active:not(:disabled) {
+  background: var(--border);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+input[type='text'],
+input[type='number'],
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.6rem;
+}
+
+input::placeholder {
+  color: var(--text-muted);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--border-strong);
+  outline-offset: 2px;
+}
+
+summary {
+  cursor: pointer;
 }
