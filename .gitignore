@@ -19,6 +19,9 @@ playwright-report
 blob-report
 playwright/.cache
 
+# Raw mascot source art (processed into public/mascot/*.png, not shipped as-is)
+/MASCOT
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

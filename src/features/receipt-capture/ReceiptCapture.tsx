@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { PendingReceipt, ReceiptStatus } from '../../db/db'
 import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
+import { Mascot } from '../mascot/Mascot'
+import { useMascotPose } from '../mascot/useMascotPose'
 import { getUserFacingErrorMessage } from './errorMessage'
 import { ReceiptThumbnail } from './ReceiptThumbnail'
 import { useReceiptCapture } from './useReceiptCapture'
@@ -17,6 +19,8 @@ export function ReceiptCapture() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const isProcessing = pendingReceipts.some((receipt) => receipt.status === 'processing')
+  const mascotPose = useMascotPose(isProcessing)
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -29,75 +33,81 @@ export function ReceiptCapture() {
 
   return (
     <section data-testid="receipt-capture" style={pageStyle}>
-      <h2 style={{ fontSize: '1.1rem' }}>Receipt</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.1rem' }}>Receipt</h2>
 
-      <div style={{ position: 'relative', display: 'inline-block', marginTop: '0.6rem' }}>
-        <button
-          type="button"
-          data-testid="receipt-add-button"
-          onClick={() => setMenuOpen((open) => !open)}
-          style={{
-            padding: '0.5rem 0.9rem',
-            fontWeight: 600,
-            background: 'var(--accent)',
-            color: 'var(--accent-contrast)',
-            border: '1px solid var(--accent)',
-            borderRadius: 'var(--radius-sm)',
-          }}
-        >
-          Add receipt photo
-        </button>
-
-        {menuOpen && (
-          <>
-            {/* Invisible backdrop — closes the menu on outside click/tap. */}
-            <div
-              onClick={() => setMenuOpen(false)}
-              style={{ position: 'fixed', inset: 0, zIndex: 1 }}
-            />
-            <div
-              data-testid="receipt-source-menu"
+          <div style={{ position: 'relative', display: 'inline-block', marginTop: '0.6rem' }}>
+            <button
+              type="button"
+              data-testid="receipt-add-button"
+              onClick={() => setMenuOpen((open) => !open)}
               style={{
-                position: 'absolute',
-                top: 'calc(100% + 0.4rem)',
-                left: 0,
-                zIndex: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.35rem',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: '0.4rem',
-                minWidth: '13rem',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                padding: '0.5rem 0.9rem',
+                fontWeight: 600,
+                background: 'var(--accent)',
+                color: 'var(--accent-contrast)',
+                border: '1px solid var(--accent)',
+                borderRadius: 'var(--radius-sm)',
               }}
             >
-              <button
-                type="button"
-                data-testid="receipt-camera-option"
-                onClick={() => {
-                  setMenuOpen(false)
-                  cameraInputRef.current?.click()
-                }}
-                style={{ textAlign: 'left', width: '100%' }}
-              >
-                📷 Camera
-              </button>
-              <button
-                type="button"
-                data-testid="receipt-gallery-option"
-                onClick={() => {
-                  setMenuOpen(false)
-                  galleryInputRef.current?.click()
-                }}
-                style={{ textAlign: 'left', width: '100%' }}
-              >
-                🖼️ Choose from Photos
-              </button>
-            </div>
-          </>
-        )}
+              Add receipt photo
+            </button>
+
+            {menuOpen && (
+              <>
+                {/* Invisible backdrop — closes the menu on outside click/tap. */}
+                <div
+                  onClick={() => setMenuOpen(false)}
+                  style={{ position: 'fixed', inset: 0, zIndex: 1 }}
+                />
+                <div
+                  data-testid="receipt-source-menu"
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 0.4rem)',
+                    left: 0,
+                    zIndex: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.35rem',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    padding: '0.4rem',
+                    minWidth: '13rem',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    data-testid="receipt-camera-option"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      cameraInputRef.current?.click()
+                    }}
+                    style={{ textAlign: 'left', width: '100%' }}
+                  >
+                    📷 Camera
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="receipt-gallery-option"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      galleryInputRef.current?.click()
+                    }}
+                    style={{ textAlign: 'left', width: '100%' }}
+                  >
+                    🖼️ Choose from Photos
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <Mascot pose={mascotPose} />
       </div>
 
       {/*
