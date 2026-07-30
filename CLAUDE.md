@@ -209,6 +209,36 @@ model.
   bounding-box checks (Debug tools' bottom edge exactly meets the footer's
   top edge, both flush against the viewport bottom on the shortest pages)
   plus the full Playwright suite (51/51).
+- **Swipe gesture navigation between tabs**: done and verified in
+  production. Swipe left/right on Shopping List/History/Stats moves
+  forward/backward through the tabs (`TAB_ORDER`, derived from the same
+  `TABS` array the nav bar renders — one source of truth), no wraparound
+  past either end. Purely additive: tapping the tab bar is untouched.
+  Implemented in `App.tsx` with raw `touchstart`/`touchmove`/`touchend`
+  listeners (not pointer/mouse events) on the `<main>` ref, since the
+  requirement was specifically to behave correctly for real touch input,
+  not a mouse-drag stand-in for it:
+  - A gesture only "commits" to horizontal once it has moved more
+    horizontally than vertically past a small lock threshold; a
+    vertical-dominant gesture is left alone from that point on, so normal
+    scrolling is never hijacked. Below the lock threshold (e.g. a tap) it
+    does nothing either way.
+  - Touches starting on an interactive element (`button`, `a`, `input`,
+    `textarea`, `select` — covers the tab bar buttons themselves, the
+    receipt source-picker menu, form controls) are ignored from
+    `touchstart`, so none of those existing interactions are affected.
+  - `touch-action: pan-y` on `<main>` leaves vertical panning to the
+    browser but stops it from also claiming horizontal panning, so the
+    JS handler isn't fighting the browser for the same gesture.
+  - `e.preventDefault()` is only called once a gesture has committed to
+    horizontal, not on every `touchmove` — this is what keeps vertical
+    scrolling untouched.
+  Verified with Playwright tests using real `Touch`/`TouchEvent` dispatch
+  under `hasTouch: true` emulation (`e2e/swipe-navigation.spec.ts`), not
+  mouse-simulated drags — covering swipe left/right through all three
+  tabs, no wraparound at either edge, a vertical scroll gesture not
+  triggering a tab change, and tapping the tab bar still working
+  alongside swipe. Full suite passing (56/56).
 
 ## Known issues
 
