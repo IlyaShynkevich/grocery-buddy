@@ -59,6 +59,17 @@ test('captures a receipt while offline, and it is still there after reconnecting
   page,
   context,
 }) => {
+  // Mocked so the post-reload auto-sync (see receipt-auto-sync.spec.ts) has
+  // something deterministic to resolve to — reconnecting is expected to
+  // kick off processing on its own now, not leave the receipt untouched.
+  await page.route('**/api/extract-receipt', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
+    }),
+  )
+
   await page.goto('/')
 
   // Let the service worker finish precaching the production build before
@@ -78,5 +89,14 @@ test('captures a receipt while offline, and it is still there after reconnecting
   await page.reload()
 
   await expect(page.getByTestId('receipt-item')).toHaveCount(1)
-  await expect(page.getByTestId('receipt-status').first()).toHaveText('Waiting to process')
+
+  // Playwright's setOffline(false) doesn't reliably dispatch the browser's
+  // 'online' event across a reload (it can fire before the new document's
+  // listeners attach, or not at all) — dispatch it explicitly, same as
+  // receipt-auto-sync.spec.ts, rather than depend on that race.
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+
+  // The receipt survives the reload, and reconnecting auto-syncs it without
+  // any click — it should no longer be sitting idle at "Waiting to process".
+  await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed', { timeout: 5000 })
 })
