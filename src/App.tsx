@@ -6,27 +6,54 @@ import { ReceiptCapture } from './features/receipt-capture/ReceiptCapture'
 import { ReceiptReviewPanel } from './features/receipt-review/ReceiptReviewPanel'
 import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
 import { StatsPage } from './features/stats/StatsPage'
+import { PAGE_MAX_WIDTH } from './lib/ui'
 
 type View = { name: 'shopping' } | { name: 'history' } | { name: 'trip-detail'; tripId: number } | { name: 'stats' }
 
+const TABS: Array<{ name: View['name']; label: string; testId: string }> = [
+  { name: 'shopping', label: 'Shopping List', testId: 'nav-shopping' },
+  { name: 'history', label: 'History', testId: 'nav-history' },
+  { name: 'stats', label: 'Stats', testId: 'nav-stats' },
+]
+
 function App() {
   const [view, setView] = useState<View>({ name: 'shopping' })
+  // trip-detail isn't its own tab — it's reached via History, so it keeps
+  // the History tab highlighted rather than showing no active tab at all.
+  const activeTab = view.name === 'trip-detail' ? 'history' : view.name
 
   return (
     <main>
       <nav
         data-testid="app-nav"
-        style={{ display: 'flex', gap: '0.5rem', maxWidth: 480, margin: '0.5rem auto 0', padding: '0 1rem' }}
+        style={{
+          display: 'flex',
+          gap: '0.25rem',
+          maxWidth: PAGE_MAX_WIDTH,
+          margin: '0.75rem auto 0',
+          padding: '0 1rem 0.75rem',
+          borderBottom: '1px solid var(--border)',
+        }}
       >
-        <button type="button" data-testid="nav-shopping" onClick={() => setView({ name: 'shopping' })}>
-          Shopping List
-        </button>
-        <button type="button" data-testid="nav-history" onClick={() => setView({ name: 'history' })}>
-          History
-        </button>
-        <button type="button" data-testid="nav-stats" onClick={() => setView({ name: 'stats' })}>
-          Stats
-        </button>
+        {TABS.map((tab) => {
+          const active = tab.name === activeTab
+          return (
+            <button
+              key={tab.name}
+              type="button"
+              data-testid={tab.testId}
+              onClick={() => setView({ name: tab.name } as View)}
+              style={{
+                background: active ? 'var(--accent)' : 'transparent',
+                color: active ? 'var(--accent-contrast)' : 'inherit',
+                borderColor: active ? 'var(--accent)' : 'transparent',
+                fontWeight: active ? 600 : 400,
+              }}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
       </nav>
 
       {view.name === 'shopping' && (

@@ -76,8 +76,8 @@ model.
     `api/_lib/groqExtract.ts`) — so guessing a distribution across
     categories wasn't an option; in practice this means discounts land
     under "Other" (essential by default), reducing the essential total.
-- **Delete trip + debug panel collapsed by default**: implemented, not yet
-  merged/deployed.
+- **Delete trip + debug panel collapsed by default**: done and merged to
+  production.
   - Trip detail has a "Delete trip" action (`deleteTrip` in `src/db/db.ts`),
     gated behind an inline confirm/cancel step since it's destructive and
     irreversible. Deletes the trip's items and any pending receipts still
@@ -91,6 +91,46 @@ model.
     of the real app. Its contents stay in the DOM either way (just not
     rendered until opened), so e2e tests only need to click
     `debug-panel-toggle` once before interacting with anything inside.
+- **Frontend design pass**: implemented, not yet merged/deployed. Checked
+  the available skills first (`ui-styling`, `design-system`) — both assume a
+  Tailwind/shadcn stack, which this project deliberately doesn't use (plain
+  React + inline styles, zero UI dependencies), so pulling either in would
+  have been a stack change, not a styling pass. Instead applied the same
+  primitive→semantic token idea natively:
+  - `src/index.css` now defines the actual design tokens (light + dark, via
+    `prefers-color-scheme`) as CSS custom properties: `--bg`/`--surface`,
+    `--border`/`--border-strong`, `--text`/`--text-muted`, `--accent`,
+    `--danger`, plus `--radius`/`--radius-sm`. The dark `--bg` (`#16171d`)
+    is unchanged from before this pass — only the accent/border language
+    around it changed. Also adds base styling for `button`/`input`/`select`
+    (padding, radius, hover/active/disabled, `:focus-visible` ring) so
+    every page gets consistent form-control styling without repeating it.
+  - `src/lib/ui.ts` holds shared style-object building blocks (`pageStyle`,
+    `cardStyle`, `mutedTextStyle`, `primaryButtonStyle`,
+    `dangerButtonStyle`/`dangerFilledButtonStyle`) so pages compose from the
+    same tokens instead of hand-rolling similar-but-slightly-different
+    inline styles.
+  - The green accent (`#2e7d32`, used for the PWA theme-color, button/panel
+    borders, and — since it turned out to be the same literal color — the
+    "essential" badges/bars too) is gone everywhere, replaced by shade/
+    weight differences within the gray palette (e.g. essential = solid
+    `--accent` fill, non-essential = outlined/muted; category bars all one
+    consistent accent color, differentiated by length/label like a real
+    chart rather than by hue). `index.html` now sets light/dark
+    `theme-color` via media-query'd `<meta>` tags; the PWA manifest
+    (`vite.config.ts`, single static value, no media-query support) uses the
+    dark background color since dark is the primary theme.
+  - Destructive/error red (delete trip, receipt error text) was deliberately
+    kept — that's a semantic safety convention, not "the accent," and the
+    dark-mode danger red was also swapped to a lighter shade
+    (`#c62828` → `#f28b82` in dark) for adequate contrast against the near-
+    black background, which the original hardcoded red didn't have.
+  - List rows (shopping list, receipts, history, trip detail) moved from
+    plain border-bottom dividers to individual rounded `--surface` cards
+    with gaps between them; the nav bar now highlights the active tab.
+    No behavior changes — verified via the full Playwright suite (still
+    passing) plus a manual pass through Shopping List, History, Trip
+    Detail, and Stats in a real browser.
 
 ## Known issues
 

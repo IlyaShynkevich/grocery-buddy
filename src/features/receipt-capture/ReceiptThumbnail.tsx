@@ -19,8 +19,8 @@ export function ReceiptThumbnail({ blob }: { blob: Blob }) {
         width: 48,
         height: 48,
         objectFit: 'cover',
-        borderRadius: 4,
-        border: '1px solid #ccc',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--border)',
         flexShrink: 0,
       }}
     />
