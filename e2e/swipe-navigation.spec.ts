@@ -55,6 +55,15 @@ async function contentPoint(page: Page, testId: string): Promise<{ x: number; y:
   return { x: box.x + box.width / 2, y: box.y + box.height * 0.8 }
 }
 
+// The incoming page is still mid-slide (translated, not yet at rest) for the
+// ~220ms the tab-switch animation runs — boundingBox() reports its current
+// (moving) position, not its resting one, and doesn't wait for the animation
+// to settle the way Playwright's own actionability checks do. Chaining
+// another swipe off that box would compute touch coordinates from wherever
+// the page happened to be mid-slide. Waiting the animation out first is what
+// a real, not-superhumanly-fast swipe-swipe-swipe would do anyway.
+const ANIMATION_SETTLE_MS = 300
+
 test('swipe left moves forward through the tabs in order', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByTestId('shopping-list')).toBeVisible()
@@ -62,6 +71,7 @@ test('swipe left moves forward through the tabs in order', async ({ page }) => {
   let point = await contentPoint(page, 'shopping-list')
   await touchSwipe(page, { x1: point.x + 150, y1: point.y, x2: point.x - 150, y2: point.y })
   await expect(page.getByTestId('history-page')).toBeVisible()
+  await page.waitForTimeout(ANIMATION_SETTLE_MS)
 
   point = await contentPoint(page, 'history-page')
   await touchSwipe(page, { x1: point.x + 150, y1: point.y, x2: point.x - 150, y2: point.y })
@@ -72,10 +82,12 @@ test('swipe right moves backward through the tabs in order', async ({ page }) =>
   await page.goto('/')
   await page.getByTestId('nav-stats').click()
   await expect(page.getByTestId('stats-page')).toBeVisible()
+  await page.waitForTimeout(ANIMATION_SETTLE_MS)
 
   let point = await contentPoint(page, 'stats-page')
   await touchSwipe(page, { x1: point.x - 150, y1: point.y, x2: point.x + 150, y2: point.y })
   await expect(page.getByTestId('history-page')).toBeVisible()
+  await page.waitForTimeout(ANIMATION_SETTLE_MS)
 
   point = await contentPoint(page, 'history-page')
   await touchSwipe(page, { x1: point.x - 150, y1: point.y, x2: point.x + 150, y2: point.y })
@@ -94,6 +106,7 @@ test('swiping past either edge does not wrap around', async ({ page }) => {
   // Move to the last tab, then swiping left (forward) must do nothing.
   await page.getByTestId('nav-stats').click()
   await expect(page.getByTestId('stats-page')).toBeVisible()
+  await page.waitForTimeout(ANIMATION_SETTLE_MS)
   point = await contentPoint(page, 'stats-page')
   await touchSwipe(page, { x1: point.x + 150, y1: point.y, x2: point.x - 150, y2: point.y })
   await expect(page.getByTestId('stats-page')).toBeVisible()

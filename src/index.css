@@ -122,3 +122,29 @@ summary:focus-visible {
 summary {
   cursor: pointer;
 }
+
+/* Tab-switch slide transition (App.tsx's TabTransition) — direction-aware
+   so it can play as "slide out to the left, in from the right" (forward)
+   or the mirror (backward), matching the swipe/nav direction. */
+@keyframes gb-slide-in-from-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes gb-slide-in-from-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes gb-slide-out-to-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+@keyframes gb-slide-out-to-right {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gb-tab-slide {
+    animation: none !important;
+  }
+}
