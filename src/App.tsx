@@ -5,8 +5,9 @@ import { TripDetailPage } from './features/history/TripDetailPage'
 import { ReceiptCapture } from './features/receipt-capture/ReceiptCapture'
 import { ReceiptReviewPanel } from './features/receipt-review/ReceiptReviewPanel'
 import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
+import { StatsPage } from './features/stats/StatsPage'
 
-type View = { name: 'shopping' } | { name: 'history' } | { name: 'trip-detail'; tripId: number }
+type View = { name: 'shopping' } | { name: 'history' } | { name: 'trip-detail'; tripId: number } | { name: 'stats' }
 
 function App() {
   const [view, setView] = useState<View>({ name: 'shopping' })
@@ -22,6 +23,9 @@ function App() {
         </button>
         <button type="button" data-testid="nav-history" onClick={() => setView({ name: 'history' })}>
           History
+        </button>
+        <button type="button" data-testid="nav-stats" onClick={() => setView({ name: 'stats' })}>
+          Stats
         </button>
       </nav>
 
@@ -40,6 +44,8 @@ function App() {
       {view.name === 'trip-detail' && (
         <TripDetailPage tripId={view.tripId} onBack={() => setView({ name: 'history' })} />
       )}
+
+      {view.name === 'stats' && <StatsPage />}
 
       <DbDebugPanel />
     </main>
