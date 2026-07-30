@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, recomputeTripTotal, type Item } from '../../db/db'
-import { useActiveTripId } from '../trip/useActiveTripId'
+import { usePendingReceipt } from './usePendingReceipt'
 
 export interface ResolvedMatch {
   typedItemId: number
@@ -17,17 +17,7 @@ export interface ResolvedMatch {
  * duplicate against something the user had already typed in).
  */
 export function useReceiptReview() {
-  const tripId = useActiveTripId()
-
-  const receipt = useLiveQuery(async () => {
-    if (!tripId) return undefined
-    const candidates = await db.pendingReceipts
-      .where('tripId')
-      .equals(tripId)
-      .filter((r) => r.status === 'done' && r.reviewed === false)
-      .sortBy('capturedAt')
-    return candidates[0]
-  }, [tripId])
+  const receipt = usePendingReceipt()
 
   const addedItems = useLiveQuery(async () => {
     if (!receipt?.addedItemIds?.length) return []
