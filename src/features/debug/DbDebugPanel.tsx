@@ -89,99 +89,110 @@ export function DbDebugPanel() {
   }
 
   return (
-    <section style={{ padding: '1rem', border: '1px dashed #999', margin: '1rem', textAlign: 'left' }}>
-      <h2>DB Debug Panel</h2>
-      <p style={{ fontSize: '0.85rem', opacity: 0.75 }}>
-        Temporary — for verifying the Dexie schema (M1). Removed once the real shopping-list /
-        review UI lands.
-      </p>
+    // Collapsed by default (no `open` attribute) — this is a developer tool,
+    // not part of the real app, so it shouldn't take up visual space or look
+    // like a shipped feature. Still fully reachable for our own testing:
+    // native <details> keeps its children in the DOM either way, just not
+    // rendered until opened, so e2e tests just need to click the toggle
+    // first before interacting with anything inside.
+    <details data-testid="debug-panel" style={{ margin: '1rem', textAlign: 'left' }}>
+      <summary data-testid="debug-panel-toggle" style={{ cursor: 'pointer', padding: '0.4rem 0.6rem', border: '1px dashed #999', borderRadius: 4 }}>
+        Debug tools ▸
+      </summary>
+      <div style={{ padding: '1rem', border: '1px dashed #999', borderTop: 'none' }}>
+        <h2>DB Debug Panel</h2>
+        <p style={{ fontSize: '0.85rem', opacity: 0.75 }}>
+          Temporary — for verifying the Dexie schema (M1). Removed once the real shopping-list /
+          review UI lands.
+        </p>
 
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-        <button type="button" data-testid="debug-create-trip" onClick={createTrip}>
-          Create test trip
-        </button>
-        <button type="button" onClick={addRandomItem} disabled={selectedTripId === null}>
-          Add random item to selected trip
-        </button>
-        <button type="button" data-testid="debug-reset-all" onClick={resetAll}>
-          Reset all data
-        </button>
-      </div>
-
-      {trips.length === 0 && <p>No trips yet — create one to test.</p>}
-
-      {trips.map((trip) => (
-        <div
-          key={trip.id}
-          data-testid="debug-trip"
-          data-trip-id={trip.id}
-          data-active={trip.id === activePointer?.value}
-          style={{
-            border: trip.id === selectedTripId ? '2px solid #2e7d32' : '1px solid #ccc',
-            borderRadius: 4,
-            padding: '0.5rem',
-            marginBottom: '0.5rem',
-          }}
-        >
-          <label style={{ display: 'block', marginBottom: '0.25rem' }}>
-            <input
-              type="radio"
-              name="selected-trip"
-              checked={trip.id === selectedTripId}
-              onChange={() => setSelectedTripId(trip.id)}
-            />{' '}
-            <strong>
-              Trip #{trip.id} — {trip.date} — {trip.store ?? '(no store)'} — total:{' '}
-              {formatPrice(trip.items.reduce((sum, item) => sum + (item.price ?? 0), 0))} — {trip.status}
-              {trip.id === activePointer?.value ? ' — ACTIVE' : ''}
-            </strong>
-          </label>
-          {trip.id !== activePointer?.value && (
-            <button type="button" onClick={() => makeActive(trip)} style={{ marginBottom: '0.5rem' }}>
-              Make active
-            </button>
-          )}
-          <ul style={{ paddingLeft: '1.25rem' }}>
-            {trip.items.map((item) =>
-              item.isDiscount ? (
-                // Discount/coupon lines are internal accounting entries, not
-                // purchased products — no category or essential/non-essential
-                // concept applies, so they get a plain deduction row instead
-                // of the item controls below.
-                <li key={item.id} data-testid="debug-discount-item">
-                  {item.name} — {formatPrice(item.price)} (discount){' '}
-                  <button type="button" onClick={() => removeItem(item)}>
-                    remove
-                  </button>
-                </li>
-              ) : (
-                <li key={item.id} data-testid="debug-item">
-                  {item.name} — {formatPrice(item.price)} —{' '}
-                  <select
-                    data-testid="debug-item-category"
-                    value={item.category}
-                    onChange={(e) => updateItemCategory(item, e.target.value)}
-                  >
-                    {CATEGORIES.map((category) => (
-                      <option key={category.key} value={category.key}>
-                        {category.label}
-                      </option>
-                    ))}
-                  </select>{' '}
-                  — essential: {String(resolveEssential(item))}{' '}
-                  {item.essentialOverride !== null ? '(overridden)' : '(default)'}{' '}
-                  <button type="button" data-testid="debug-item-essential-toggle" onClick={() => toggleEssentialOverride(item)}>
-                    toggle override
-                  </button>{' '}
-                  <button type="button" onClick={() => removeItem(item)}>
-                    remove
-                  </button>
-                </li>
-              ),
-            )}
-          </ul>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <button type="button" data-testid="debug-create-trip" onClick={createTrip}>
+            Create test trip
+          </button>
+          <button type="button" onClick={addRandomItem} disabled={selectedTripId === null}>
+            Add random item to selected trip
+          </button>
+          <button type="button" data-testid="debug-reset-all" onClick={resetAll}>
+            Reset all data
+          </button>
         </div>
-      ))}
-    </section>
+
+        {trips.length === 0 && <p>No trips yet — create one to test.</p>}
+
+        {trips.map((trip) => (
+          <div
+            key={trip.id}
+            data-testid="debug-trip"
+            data-trip-id={trip.id}
+            data-active={trip.id === activePointer?.value}
+            style={{
+              border: trip.id === selectedTripId ? '2px solid #2e7d32' : '1px solid #ccc',
+              borderRadius: 4,
+              padding: '0.5rem',
+              marginBottom: '0.5rem',
+            }}
+          >
+            <label style={{ display: 'block', marginBottom: '0.25rem' }}>
+              <input
+                type="radio"
+                name="selected-trip"
+                checked={trip.id === selectedTripId}
+                onChange={() => setSelectedTripId(trip.id)}
+              />{' '}
+              <strong>
+                Trip #{trip.id} — {trip.date} — {trip.store ?? '(no store)'} — total:{' '}
+                {formatPrice(trip.items.reduce((sum, item) => sum + (item.price ?? 0), 0))} — {trip.status}
+                {trip.id === activePointer?.value ? ' — ACTIVE' : ''}
+              </strong>
+            </label>
+            {trip.id !== activePointer?.value && (
+              <button type="button" data-testid="debug-make-active" onClick={() => makeActive(trip)} style={{ marginBottom: '0.5rem' }}>
+                Make active
+              </button>
+            )}
+            <ul style={{ paddingLeft: '1.25rem' }}>
+              {trip.items.map((item) =>
+                item.isDiscount ? (
+                  // Discount/coupon lines are internal accounting entries, not
+                  // purchased products — no category or essential/non-essential
+                  // concept applies, so they get a plain deduction row instead
+                  // of the item controls below.
+                  <li key={item.id} data-testid="debug-discount-item">
+                    {item.name} — {formatPrice(item.price)} (discount){' '}
+                    <button type="button" onClick={() => removeItem(item)}>
+                      remove
+                    </button>
+                  </li>
+                ) : (
+                  <li key={item.id} data-testid="debug-item">
+                    {item.name} — {formatPrice(item.price)} —{' '}
+                    <select
+                      data-testid="debug-item-category"
+                      value={item.category}
+                      onChange={(e) => updateItemCategory(item, e.target.value)}
+                    >
+                      {CATEGORIES.map((category) => (
+                        <option key={category.key} value={category.key}>
+                          {category.label}
+                        </option>
+                      ))}
+                    </select>{' '}
+                    — essential: {String(resolveEssential(item))}{' '}
+                    {item.essentialOverride !== null ? '(overridden)' : '(default)'}{' '}
+                    <button type="button" data-testid="debug-item-essential-toggle" onClick={() => toggleEssentialOverride(item)}>
+                      toggle override
+                    </button>{' '}
+                    <button type="button" onClick={() => removeItem(item)}>
+                      remove
+                    </button>
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </details>
   )
 }

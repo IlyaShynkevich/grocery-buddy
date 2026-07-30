@@ -72,6 +72,7 @@ test('coupon/discount lines reduce the trip total but do not appear as shopping 
   )
 
   await page.goto('/')
+  await page.getByTestId('debug-panel-toggle').click()
   await captureReceipt(page)
 
   await page.getByTestId('receipt-process-button').click()

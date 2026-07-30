@@ -76,6 +76,21 @@ model.
     `api/_lib/groqExtract.ts`) — so guessing a distribution across
     categories wasn't an option; in practice this means discounts land
     under "Other" (essential by default), reducing the essential total.
+- **Delete trip + debug panel collapsed by default**: implemented, not yet
+  merged/deployed.
+  - Trip detail has a "Delete trip" action (`deleteTrip` in `src/db/db.ts`),
+    gated behind an inline confirm/cancel step since it's destructive and
+    irreversible. Deletes the trip's items and any pending receipts still
+    pointing at it along with the trip row itself. If the deleted trip is
+    the one the active-trip pointer refers to (normally only possible for a
+    draft, but the debug panel's "Make active" can point it at a completed
+    trip too), a fresh empty draft is created and pinned active in its
+    place — same idea as `completeTrip`.
+  - The DB Debug Panel is now a collapsed-by-default `<details>`/`<summary>`
+    ("Debug tools ▸") instead of always-visible — it's a dev tool, not part
+    of the real app. Its contents stay in the DOM either way (just not
+    rendered until opened), so e2e tests only need to click
+    `debug-panel-toggle` once before interacting with anything inside.
 
 ## Known issues
 

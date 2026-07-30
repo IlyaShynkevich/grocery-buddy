@@ -13,8 +13,16 @@ async function itemNames(page: import('@playwright/test').Page): Promise<string[
   return Promise.all(inputs.map((input) => input.inputValue()))
 }
 
+// The debug panel is collapsed by default (native <details>) — its contents
+// stay in the DOM either way, but any button inside needs the panel opened
+// first or Playwright's actionability check on .click() fails as "hidden".
+async function openDebugPanel(page: import('@playwright/test').Page) {
+  await page.getByTestId('debug-panel-toggle').click()
+}
+
 test('debug-panel trip creation does not steal the active trip, even across reload', async ({ page }) => {
   await page.goto('/')
+  await openDebugPanel(page)
 
   await addItem(page, 'Milk')
   await addItem(page, 'Eggs')
@@ -39,6 +47,7 @@ test('debug-panel trip creation does not steal the active trip, even across relo
 
 test('root cause: reset-then-create-trip-then-reload does not orphan the active pointer', async ({ page }) => {
   await page.goto('/')
+  await openDebugPanel(page)
 
   // start clean, exactly like the user's "fresh database" starting point
   await page.getByTestId('debug-reset-all').click()
@@ -62,6 +71,7 @@ test('root cause: reset-then-create-trip-then-reload does not orphan the active 
 
 test('reset all data then reload bootstraps exactly one trip, not phantom duplicates', async ({ page }) => {
   await page.goto('/')
+  await openDebugPanel(page)
 
   await page.getByTestId('debug-reset-all').click()
   await expect(page.getByTestId('debug-trip')).toHaveCount(0)
