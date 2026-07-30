@@ -1,3 +1,4 @@
+import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
 import { useHistory } from './useHistory'
 
@@ -29,7 +30,7 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
               }}
             >
               <span>
-                {trip.date}
+                {formatDate(trip.date)}
                 {trip.store ? ` — ${trip.store}` : ''}
               </span>
               <span>

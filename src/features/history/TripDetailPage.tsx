@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../../db/db'
+import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
 
 // Read-only by construction: no inputs, no remove buttons, nothing that
@@ -24,7 +25,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
         ← Back to history
       </button>
 
-      <h1 style={{ fontSize: '1.5rem', marginTop: '0.75rem' }}>{trip?.date ?? 'Loading…'}</h1>
+      <h1 style={{ fontSize: '1.5rem', marginTop: '0.75rem' }}>{trip ? formatDate(trip.date) : 'Loading…'}</h1>
       {trip?.store && <p style={{ opacity: 0.7 }}>{trip.store}</p>}
       <p data-testid="trip-detail-total" style={{ fontWeight: 'bold' }}>
         Total: {formatPrice(trip?.total ?? null)}
