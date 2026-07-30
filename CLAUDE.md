@@ -21,6 +21,29 @@ model.
   - Groq 429 rate limits now auto-retry with a parsed countdown ("retrying
     in Xs"), falling back to manual-retry-only if the error message doesn't
     match the expected format.
+- **M5 (auto-sync + receipt review/merge)**: done and verified in
+  production.
+  - Part 1: pending receipts auto-process on reconnect (`online` listener),
+    one at a time, reusing the same extraction/retry logic as manual
+    processing. A stranded `processing` receipt (tab closed/reloaded
+    mid-extraction) is reclaimed back to `pending` on next load rather than
+    getting stuck forever.
+  - Part 2: a non-blocking review/merge panel shown after extraction —
+    lets the user edit/remove scanned items and, if the trip already had
+    typed items, confirm or reject best-effort fuzzy-matched duplicates
+    (`src/lib/itemMatch.ts`) before they'd otherwise sit as separate
+    entries. Ignoring the panel loses nothing — items are already added;
+    review is a reconciliation step, not a gate.
+- **M6 (save trip / history)**: done and verified in production. "Save
+  trip" marks the active trip complete and auto-starts a new empty draft;
+  a basic History list (date, item count, total; sorted by completion time)
+  and a read-only trip detail view were built as part of this. Trip dates
+  display in German `DD.MM.YYYY` format throughout.
+
+**M7 (history) / M8 (monthly stats)**: not yet started. Note: M6 already
+delivered a basic history list + read-only trip detail view, so M7's
+actual remaining scope (what it adds beyond what M6 already built) needs
+to be clarified before starting it.
 
 ## Known issues
 
