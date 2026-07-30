@@ -290,6 +290,52 @@ model.
     cause not investigated; likely a reactivity gap between
     `db.appState.put` and the panel's `activePointer` live query. See Known
     issues below.
+- **Mascot poses (idle/scanning/happy) on the Shopping List page**: done and
+  verified in production. Real posed artwork (`MASCOT/Mascot_main.png`,
+  `Mascot_analysing.png`, `Mascot_happy.png` at the project root, provided by
+  the user) replaces the old placeholder in this one spot — the shared
+  shopping-bag glyph used for the favicon/app icons/footer is untouched.
+  - Source PNGs had a flat black background baked in, not real alpha — and,
+    trickier, the mascot's own black facial features (eyes/mouth/eyebrows)
+    are the *same* black, so a naive "make all near-black pixels
+    transparent" pass would have deleted the face along with the
+    background. Processed with a connected-components approach instead
+    (Python/Pillow/scipy, one-off, not a project dependency): flood-fill
+    the near-black mask, transparent = the region touching the image
+    border (true background) plus any enclosed near-black region large
+    enough to be the gap under the bag's carry handle (~25k px) rather
+    than a small facial feature (largest is the happy pose's open mouth
+    at ~9.8k px) — that size gap cleanly separates the two across all
+    three images.
+  - The scanning pose's magnifying glass was the one case this couldn't
+    resolve automatically: its ring is genuinely contiguous with the true
+    background in the source pixels (confirmed via connected-component
+    analysis — the pose has 5 near-black components total where the other
+    two poses have 12+, because the ring merged into the border-touching
+    background component instead of being its own shape), so flood-fill
+    alone would have erased it. Fixed by measuring the ring's true
+    center/radii from its one fully-bounded reference point (the isolated
+    tan lens disk, found the same connected-components way) and forcing
+    that annulus opaque regardless of what the flood-fill decided.
+  - Saved as 256×256 RGBA PNGs at `public/mascot/{idle,scanning,happy}.png`
+    (~29-30KB each) — resized down from the 1254×1254 source, which was
+    far larger than this pixel-art needs at the size it's actually shown.
+  - `src/features/mascot/useMascotPose.ts` derives the pose: `scanning`
+    whenever any pending receipt is `processing` (passed in as a plain
+    boolean by the caller, deliberately not read via its own
+    `useReceiptCapture()` call — that hook also wires up the online-sync
+    effect and stranded-processing reclaim, which must stay singletons);
+    otherwise a brief `happy` pulse (~1.8s) the first time a new
+    done-and-unreviewed receipt shows up (`usePendingReceipt`, the same
+    signal the review panel itself uses), then back to `idle`.
+    `src/features/mascot/Mascot.tsx` is just the `<img>` for a given pose.
+  - Rendered in `ReceiptCapture.tsx`, to the right of the "Receipt"
+    heading/"Add receipt photo" button column (a flex row wrapping what
+    used to be the section's direct children).
+  - Covered by `e2e/mascot-pose.spec.ts` (idle -> scanning -> happy ->
+    back to idle, using a delayed mocked extraction response so the
+    scanning window is actually observable) — extends the same
+    stateful-flow coverage philosophy as the M4/M5 receipt tests.
 
 ## Known issues
 
