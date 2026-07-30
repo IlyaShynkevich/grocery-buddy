@@ -325,17 +325,52 @@ model.
     boolean by the caller, deliberately not read via its own
     `useReceiptCapture()` call — that hook also wires up the online-sync
     effect and stranded-processing reclaim, which must stay singletons);
-    otherwise a brief `happy` pulse (~1.8s) the first time a new
-    done-and-unreviewed receipt shows up (`usePendingReceipt`, the same
-    signal the review panel itself uses), then back to `idle`.
+    otherwise `happy` once a done-and-unreviewed receipt shows up
+    (`usePendingReceipt`, the same signal the review panel itself uses),
+    persisting until the trip is saved, then `idle`.
     `src/features/mascot/Mascot.tsx` is just the `<img>` for a given pose.
   - Rendered in `ReceiptCapture.tsx`, to the right of the "Receipt"
     heading/"Add receipt photo" button column (a flex row wrapping what
     used to be the section's direct children).
-  - Covered by `e2e/mascot-pose.spec.ts` (idle -> scanning -> happy ->
-    back to idle, using a delayed mocked extraction response so the
-    scanning window is actually observable) — extends the same
-    stateful-flow coverage philosophy as the M4/M5 receipt tests.
+  - Covered by `e2e/mascot-pose.spec.ts` — extends the same stateful-flow
+    coverage philosophy as the M4/M5 receipt tests.
+- **Mascot pose follow-ups (ring legibility, color match, happy
+  persistence)**: done and verified in production.
+  - The scanning pose's magnifying glass read as a plain blurry circle at
+    the ~64px size it's actually displayed at — its ring was only ~48px
+    thick in the 1254px source (already thin relative to the whole
+    graphic), which shrinks to under 3px by the time it's scaled down.
+    Fixed at the processing-pipeline level (not by changing the app's
+    display size): the ring is now repainted thicker — inner/outer radius
+    80/178px instead of the original ~88/136px, mostly expanded outward so
+    the lens' negative space stays recognizable — directly in the source
+    raster before the 256×256 resize, so it stays legible once scaled down
+    to display size.
+  - The three poses' fill colors didn't actually match — confirmed this
+    was a real inconsistency in the user's three separately-generated
+    source images (measured via HSV: all three have near-identical
+    brightness/value ~98%, but the scanning pose's fill is both more
+    saturated and more orange-shifted in hue than idle's), not anything
+    introduced by the transparency/resize pipeline. Fixed with a
+    brightness-weighted hue/saturation correction — shift scanning's and
+    happy's fill hue/saturation toward idle's (the reference), with the
+    correction strength ramping from 0 at outline-dark brightness to full
+    strength at fill-bright brightness, so the already-consistent brown
+    outline color is left alone while the mismatched fill gets corrected.
+  - The happy pose was originally a ~1.8s pulse that auto-reverted to
+    idle — easy to miss. Changed to persist indefinitely once triggered,
+    only clearing on Save trip (a new active trip id, tracked in
+    `useMascotPose` via `useActiveTripId`) rather than on a timer;
+    dismissing/confirming the review panel no longer affects it. If a
+    second receipt gets captured and processed while already happy,
+    `scanning` still takes priority for that window (the `isProcessing`
+    check runs first) and it reverts to `happy` once that one finishes too
+    — the happy state itself was never cleared in between, so there's
+    nothing to "return to" so much as it was never interrupted.
+  - `e2e/mascot-pose.spec.ts` rewritten: covers happy persisting well past
+    the old pulse duration and through dismissing the review panel, only
+    clearing on Save trip; plus a second test for the
+    scanning-while-already-happy interruption case.
 
 ## Known issues
 

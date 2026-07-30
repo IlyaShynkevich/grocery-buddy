@@ -1,37 +1,43 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePendingReceipt } from '../receipt-review/usePendingReceipt'
+import { useActiveTripId } from '../trip/useActiveTripId'
 
 export type MascotPose = 'idle' | 'scanning' | 'happy'
 
-// Long enough to register as a reaction, short enough not to overstay once
-// the user's attention has already moved to the review panel.
-const HAPPY_POSE_DURATION_MS = 1800
-
 /**
- * scanning while a receipt is actively being extracted, a brief happy pulse
- * the moment a *new* done-and-unreviewed receipt shows up (extraction
- * succeeded, items are ready for review), idle otherwise. `isProcessing` is
- * passed in rather than derived here from another `useReceiptCapture()` call
- * — that hook also wires up the online-sync effect and stranded-processing
- * reclaim, which must stay singletons; this hook only needs the boolean its
- * caller already has.
+ * scanning while a receipt is actively being extracted, happy once
+ * extraction succeeds (a done-and-unreviewed receipt shows up) — and happy
+ * *stays* until the trip is saved, not a brief pulse. If another receipt
+ * gets captured and processed while already happy (e.g. a second scan),
+ * scanning takes priority for that window and it reverts to happy once that
+ * one finishes too — reviewing/dismissing the panel does not clear it,
+ * only actually saving the trip (a new active tripId) does, since that's
+ * the point a fresh, not-yet-successful trip begins.
+ *
+ * `isProcessing` is passed in rather than derived here from another
+ * `useReceiptCapture()` call — that hook also wires up the online-sync
+ * effect and stranded-processing reclaim, which must stay singletons; this
+ * hook only needs the boolean its caller already has.
  */
 export function useMascotPose(isProcessing: boolean): MascotPose {
+  const tripId = useActiveTripId()
   const pendingReceipt = usePendingReceipt()
   const [showHappy, setShowHappy] = useState(false)
   const lastSeenReceiptId = useRef<number | null>(null)
+  const lastTripId = useRef(tripId)
 
   useEffect(() => {
-    if (!pendingReceipt) {
-      lastSeenReceiptId.current = null
-      return
-    }
+    if (tripId === lastTripId.current) return
+    lastTripId.current = tripId
+    setShowHappy(false)
+    lastSeenReceiptId.current = null
+  }, [tripId])
+
+  useEffect(() => {
+    if (!pendingReceipt) return
     if (lastSeenReceiptId.current === pendingReceipt.id) return
     lastSeenReceiptId.current = pendingReceipt.id
-
     setShowHappy(true)
-    const timeout = setTimeout(() => setShowHappy(false), HAPPY_POSE_DURATION_MS)
-    return () => clearTimeout(timeout)
   }, [pendingReceipt])
 
   if (isProcessing) return 'scanning'
