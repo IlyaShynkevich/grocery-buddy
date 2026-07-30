@@ -39,31 +39,27 @@ model.
   a basic History list (date, item count, total; sorted by completion time)
   and a read-only trip detail view were built as part of this. Trip dates
   display in German `DD.MM.YYYY` format throughout.
+- **M7 (history improvements)**: done and verified in production.
+  - Trip detail now shows each item's resolved essential/non-essential
+    status (category default unless overridden — `resolveEssential` in
+    `src/db/categories.ts`, the same logic the DB Debug Panel already used)
+    as a small badge next to name/price.
+  - History is grouped by calendar month of the trip's shopping date, most
+    recent month first, trips within a month most-recently-completed first
+    (`groupTripsByMonth` in `src/features/history/useHistory.ts`); a month
+    dropdown (shown once there's more than one month) filters the list down
+    to a single month.
+  - Fixed the discount/coupon display issue below: discount lines now
+    render as a distinct deduction row (no category or essential control)
+    everywhere they're shown, instead of only being filtered out of some
+    views and displayed as a regular item in others.
 
-**M7 (history) / M8 (monthly stats)**: not yet started. Note: M6 already
-delivered a basic history list + read-only trip detail view, so M7's
-actual remaining scope (what it adds beyond what M6 already built) needs
-to be clarified before starting it.
+**M8 (monthly stats)**: not yet started.
 
 ## Known issues
 
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
-
-## Known follow-ups
-
-- **Discount/coupon entries displayed as regular items in the DB Debug
-  Panel.** Discount/coupon entries (from receipt extraction) currently
-  display in the DB Debug Panel as if they were regular items — with a
-  category dropdown and essential/non-essential toggle — when they're
-  really internal accounting entries, not purchased products. This is
-  currently harmless since the debug panel is temporary, but must be
-  addressed before M8 (monthly stats), since discount entries should never
-  count as category spending (e.g. shouldn't inflate "Others" or any
-  category's essential/non-essential totals). Fix by either tagging
-  discount entries with a distinct type that stats/UI code explicitly
-  excludes, or filtering them out of any item-list/category display
-  entirely.
 
 ## Known limitations
 

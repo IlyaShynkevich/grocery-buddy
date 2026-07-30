@@ -142,26 +142,43 @@ export function DbDebugPanel() {
             </button>
           )}
           <ul style={{ paddingLeft: '1.25rem' }}>
-            {trip.items.map((item) => (
-              <li key={item.id}>
-                {item.name} — {formatPrice(item.price)} —{' '}
-                <select value={item.category} onChange={(e) => updateItemCategory(item, e.target.value)}>
-                  {CATEGORIES.map((category) => (
-                    <option key={category.key} value={category.key}>
-                      {category.label}
-                    </option>
-                  ))}
-                </select>{' '}
-                — essential: {String(resolveEssential(item))}{' '}
-                {item.essentialOverride !== null ? '(overridden)' : '(default)'}{' '}
-                <button type="button" onClick={() => toggleEssentialOverride(item)}>
-                  toggle override
-                </button>{' '}
-                <button type="button" onClick={() => removeItem(item)}>
-                  remove
-                </button>
-              </li>
-            ))}
+            {trip.items.map((item) =>
+              item.isDiscount ? (
+                // Discount/coupon lines are internal accounting entries, not
+                // purchased products — no category or essential/non-essential
+                // concept applies, so they get a plain deduction row instead
+                // of the item controls below.
+                <li key={item.id} data-testid="debug-discount-item">
+                  {item.name} — {formatPrice(item.price)} (discount){' '}
+                  <button type="button" onClick={() => removeItem(item)}>
+                    remove
+                  </button>
+                </li>
+              ) : (
+                <li key={item.id} data-testid="debug-item">
+                  {item.name} — {formatPrice(item.price)} —{' '}
+                  <select
+                    data-testid="debug-item-category"
+                    value={item.category}
+                    onChange={(e) => updateItemCategory(item, e.target.value)}
+                  >
+                    {CATEGORIES.map((category) => (
+                      <option key={category.key} value={category.key}>
+                        {category.label}
+                      </option>
+                    ))}
+                  </select>{' '}
+                  — essential: {String(resolveEssential(item))}{' '}
+                  {item.essentialOverride !== null ? '(overridden)' : '(default)'}{' '}
+                  <button type="button" data-testid="debug-item-essential-toggle" onClick={() => toggleEssentialOverride(item)}>
+                    toggle override
+                  </button>{' '}
+                  <button type="button" onClick={() => removeItem(item)}>
+                    remove
+                  </button>
+                </li>
+              ),
+            )}
           </ul>
         </div>
       ))}
