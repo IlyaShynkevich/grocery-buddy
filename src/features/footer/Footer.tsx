@@ -20,10 +20,6 @@ export function Footer() {
         // of the page chrome, not another content column, so it spans edge
         // to edge like a typical site footer.
         width: '100%',
-        // marginTop: 'auto' is what pins this to the bottom of the page's
-        // column-flex layout (see App.tsx) — it consumes any leftover
-        // vertical space instead of the footer just following the content.
-        marginTop: 'auto',
         padding: '0.75rem 1rem',
         borderTop: '1px solid var(--border)',
       }}
