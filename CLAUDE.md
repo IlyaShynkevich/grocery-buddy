@@ -371,8 +371,34 @@ model.
     the old pulse duration and through dismissing the review panel, only
     clearing on Save trip; plus a second test for the
     scanning-while-already-happy interruption case.
-
-## Known issues
+- **Scanning pose replaced with an improved source image**: done and
+  verified in production. The user provided a redrawn `MASCOT/
+  Mascot_analysing.png` — same ring-and-lens motif as before, but now with
+  an actual handle held up to the eye (much more recognizable as a
+  magnifying glass than the previous handle-less ring) — regenerated
+  `public/mascot/scanning.png` from it through the same pipeline.
+  - This source image has the same "prop is genuinely pixel-contiguous
+    with the true background" property as the original ring did, just
+    more so: connected-component analysis again shows only 5 near-black
+    components (background+ring+handle merged into one, plus the
+    isolated lens reflection dot, the other eye, and the mouth) — nothing
+    new here, same category of problem as before, solved the same way
+    (measure true geometry from the one bounded reference point — the
+    isolated lens disk — then force that region opaque regardless of
+    what flood-fill decided).
+  - The handle itself doesn't reduce to a simple annulus like the ring
+    does. Traced its silhouette from the source pixels (row-by-row
+    tan/black transition scans across the region between the ring and the
+    bag's left edge) and modeled it as a straight thick capsule from where
+    it meets the ring down to a modest overhang past the bag's own edge —
+    good enough at the size this is actually displayed, not intended as
+    pixel-perfect vector tracing.
+  - Same ring-boldening treatment as before (thickened beyond the source's
+    actual line weight so it stays legible once scaled down to display
+    size) and the same brightness-weighted hue/saturation color-match
+    correction toward idle's fill (this source image's own fill color
+    again didn't match idle/happy out of the box — expected at this point,
+    since each pose is still an independently-generated image).
 
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
