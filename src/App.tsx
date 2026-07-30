@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { DbDebugPanel } from './features/debug/DbDebugPanel'
 import { Footer } from './features/footer/Footer'
 import { HistoryPage } from './features/history/HistoryPage'
 import { TripDetailPage } from './features/history/TripDetailPage'
+import { TabTransition, type SlideDirection } from './features/navigation/TabTransition'
 import { ReceiptCapture } from './features/receipt-capture/ReceiptCapture'
 import { ReceiptReviewPanel } from './features/receipt-review/ReceiptReviewPanel'
 import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
@@ -10,15 +11,16 @@ import { StatsPage } from './features/stats/StatsPage'
 import { PAGE_MAX_WIDTH } from './lib/ui'
 
 type View = { name: 'shopping' } | { name: 'history' } | { name: 'trip-detail'; tripId: number } | { name: 'stats' }
+type TabName = Exclude<View['name'], 'trip-detail'>
 
-const TABS: Array<{ name: View['name']; label: string; testId: string }> = [
+const TABS: Array<{ name: TabName; label: string; testId: string }> = [
   { name: 'shopping', label: 'Shopping List', testId: 'nav-shopping' },
   { name: 'history', label: 'History', testId: 'nav-history' },
   { name: 'stats', label: 'Stats', testId: 'nav-stats' },
 ]
 
-// Single source of truth for swipe order, shared with the tab bar above.
-const TAB_ORDER = TABS.map((tab) => tab.name)
+// Single source of truth for swipe/tab order, shared with the tab bar above.
+const TAB_ORDER: TabName[] = TABS.map((tab) => tab.name)
 
 // Minimum horizontal travel (px) before a gesture counts as an intentional
 // swipe, versus being e.g. a static tap or a proceeded-but-quickly-released
@@ -34,6 +36,10 @@ function App() {
   // the History tab highlighted rather than showing no active tab at all.
   const activeTab = view.name === 'trip-detail' ? 'history' : view.name
   const mainRef = useRef<HTMLElement>(null)
+  // Which way the last tab switch happened, for TabTransition's slide
+  // direction — updated by both the swipe handler and the tab-bar taps
+  // below, so either input path gets the same directional animation.
+  const [direction, setDirection] = useState<SlideDirection>('forward')
 
   // Swipe-to-switch-tabs: left advances (Shopping List -> History -> Stats),
   // right goes back, no wraparound past either end. Raw touch events only
@@ -90,10 +96,12 @@ function App() {
       const dx = e.changedTouches[0].clientX - startX
       if (Math.abs(dx) < SWIPE_MIN_DISTANCE) return
 
-      const currentIndex = TAB_ORDER.indexOf(activeTab as View['name'])
+      const currentIndex = TAB_ORDER.indexOf(activeTab)
       if (currentIndex === -1) return // e.g. trip detail — not one of the 3 swipeable tabs
-      const nextIndex = currentIndex + (dx < 0 ? 1 : -1)
+      const swipeDirection: SlideDirection = dx < 0 ? 'forward' : 'backward'
+      const nextIndex = currentIndex + (swipeDirection === 'forward' ? 1 : -1)
       if (nextIndex < 0 || nextIndex >= TAB_ORDER.length) return // no wraparound at the edges
+      setDirection(swipeDirection)
       setView({ name: TAB_ORDER[nextIndex] } as View)
     }
 
@@ -106,6 +114,23 @@ function App() {
       el.removeEventListener('touchend', onTouchEnd)
     }
   }, [activeTab])
+
+  const renderTab = (tab: TabName): ReactNode => {
+    switch (tab) {
+      case 'shopping':
+        return (
+          <>
+            <ShoppingListPage />
+            <ReceiptReviewPanel />
+            <ReceiptCapture />
+          </>
+        )
+      case 'history':
+        return <HistoryPage onSelectTrip={(tripId) => setView({ name: 'trip-detail', tripId })} />
+      case 'stats':
+        return <StatsPage />
+    }
+  }
 
   return (
     // A column flex layout at least one viewport tall, combined with the
@@ -141,7 +166,14 @@ function App() {
               key={tab.name}
               type="button"
               data-testid={tab.testId}
-              onClick={() => setView({ name: tab.name } as View)}
+              onClick={() => {
+                const fromIndex = TAB_ORDER.indexOf(activeTab)
+                const toIndex = TAB_ORDER.indexOf(tab.name)
+                if (fromIndex !== -1 && toIndex !== -1 && toIndex !== fromIndex) {
+                  setDirection(toIndex > fromIndex ? 'forward' : 'backward')
+                }
+                setView({ name: tab.name } as View)
+              }}
               style={{
                 background: active ? 'var(--accent)' : 'transparent',
                 color: active ? 'var(--accent-contrast)' : 'inherit',
@@ -155,23 +187,11 @@ function App() {
         })}
       </nav>
 
-      {view.name === 'shopping' && (
-        <>
-          <ShoppingListPage />
-          <ReceiptReviewPanel />
-          <ReceiptCapture />
-        </>
-      )}
-
-      {view.name === 'history' && (
-        <HistoryPage onSelectTrip={(tripId) => setView({ name: 'trip-detail', tripId })} />
-      )}
-
-      {view.name === 'trip-detail' && (
+      {view.name === 'trip-detail' ? (
         <TripDetailPage tripId={view.tripId} onBack={() => setView({ name: 'history' })} />
+      ) : (
+        <TabTransition activeTab={activeTab} direction={direction} renderTab={renderTab} />
       )}
-
-      {view.name === 'stats' && <StatsPage />}
 
       {/*
         Debug tools + footer are one bottom-anchored group, not two
@@ -181,7 +201,13 @@ function App() {
         content above filling the rest of the space.
       */}
       <div style={{ marginTop: 'auto' }}>
-        <DbDebugPanel />
+        {/*
+          Stats is a pure read-only report — there's nothing there to debug,
+          unlike Shopping List/History where trip and receipt data is
+          actively worked with. `activeTab` (not view.name) so trip detail,
+          reached via History, still counts as "in History" here too.
+        */}
+        {activeTab !== 'stats' && <DbDebugPanel />}
         <Footer />
       </div>
     </main>

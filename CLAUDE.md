@@ -239,11 +239,69 @@ model.
   tabs, no wraparound at either edge, a vertical scroll gesture not
   triggering a tab change, and tapping the tab bar still working
   alongside swipe. Full suite passing (56/56).
+- **Slide animation for tab transitions + Debug tools hidden on Stats**:
+  done and verified in production, two follow-ups to swipe navigation.
+  - Tab switches (swipe or tap) now slide the outgoing tab out and the
+    incoming tab in — direction matching the swipe/nav direction — instead
+    of an instant hard-cut, via a new `TabTransition` component
+    (`src/features/navigation/TabTransition.tsx`) wrapping the three tab
+    views in `App.tsx`. Kept snappy on purpose: 220ms, `ease-out`.
+    `prefers-reduced-motion: reduce` disables the animation entirely
+    (`.gb-tab-slide` in `src/index.css`).
+  - Two real bugs surfaced and got fixed while building this, both worth
+    remembering if this component is touched again:
+    1. The outgoing/incoming state was first computed in a `useEffect`,
+       which runs one render *after* the prop change — on a quick
+       back-and-forth (A -> B -> A) there was a one-render window where
+       `outgoing` still held the previous switch's value while `activeTab`
+       had already moved on, and on that exact tab it's momentarily the
+       *same* tab as the new `activeTab`, so both rendered at once (e.g.
+       two `data-testid="shopping-list"` elements — a real Playwright
+       strict-mode violation). Fixed by computing it synchronously during
+       render (the "adjusting state during rendering" React pattern, ref
+       comparison, not an effect).
+    2. The wrapper's DOM shape differed between "no transition in
+       flight" (no wrapper at all) and "transition in flight" (wrapper +
+       sibling) — so every time a transition *ended*, React saw the shape
+       change and remounted the current tab's entire subtree, which could
+       detach a DOM node mid-interaction (an e2e click landing right as
+       the 220ms elapsed would hit an element that had just been torn
+       down). Fixed by always rendering the same wrapper/current-tab
+       shape; only the outgoing sibling and the current tab's `animation`
+       style are conditional.
+  - Debug tools is now hidden entirely on the Stats tab (`activeTab !==
+    'stats'` in `App.tsx`, not `view.name`, so trip detail — reached via
+    History — still counts as "in History") — Stats is a read-only report
+    with nothing to debug, unlike Shopping List/History where trip/receipt
+    data is actively worked with.
+  - `e2e/swipe-navigation.spec.ts`'s swipe tests needed a settle wait
+    (~300ms) after any transition-triggering action before computing the
+    next swipe's touch coordinates from a `boundingBox()` — the incoming
+    page is still mid-slide (translated) for the ~220ms the animation
+    runs, and `boundingBox()` reports wherever it currently is, not its
+    resting position; it doesn't wait for animations the way Playwright's
+    own actionability checks do.
+  - **Pre-existing bug found while testing, not caused by this work, not
+    fixed**: `e2e/trip-delete.spec.ts`'s "deleting the trip currently
+    pinned as active starts a fresh empty draft" test fails deterministically
+    (confirmed by re-running against the prior commit with none of this
+    session's changes applied) — clicking a trip's "Make active" in the DB
+    Debug Panel doesn't reflect `data-active="true"` on that row. Root
+    cause not investigated; likely a reactivity gap between
+    `db.appState.put` and the panel's `activePointer` live query. See Known
+    issues below.
 
 ## Known issues
 
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
+- **DB Debug Panel "Make active" doesn't reliably reflect as active.**
+  `e2e/trip-delete.spec.ts`'s "deleting the trip currently pinned as
+  active..." test fails deterministically: after clicking a trip row's
+  "Make active", `data-active` on that row stays `"false"` instead of
+  flipping to `"true"`. Reproduces on a clean checkout with no unrelated
+  changes applied, so this isn't test flakiness. Not yet investigated or
+  fixed.
 
 ## Known limitations
 
