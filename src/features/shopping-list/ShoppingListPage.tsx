@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useShoppingList } from './useShoppingList'
 
 export function ShoppingListPage() {
-  const { trip, items, addItem, renameItem, removeItem } = useShoppingList()
+  const { trip, items, addItem, renameItem, removeItem, saveTrip } = useShoppingList()
   const [draftName, setDraftName] = useState('')
 
   const handleSubmit = async (event: FormEvent) => {
@@ -17,7 +17,14 @@ export function ShoppingListPage() {
       data-trip-id={trip?.id ?? ''}
       style={{ maxWidth: 480, margin: '0 auto', padding: '1rem', textAlign: 'left' }}
     >
-      <h1 style={{ fontSize: '1.5rem' }}>Shopping List</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <h1 style={{ fontSize: '1.5rem' }}>Shopping List</h1>
+        {trip && (
+          <button type="button" data-testid="save-trip-button" onClick={saveTrip} style={{ padding: '0.4rem 0.8rem' }}>
+            Save trip
+          </button>
+        )}
+      </div>
       <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>{trip ? trip.date : 'Loading trip…'}</p>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
