@@ -17,6 +17,13 @@ async function itemNames(page: Page): Promise<string[]> {
   return Promise.all(inputs.map((input) => input.inputValue()))
 }
 
+// The debug panel is collapsed by default (native <details>) — its contents
+// stay in the DOM either way, but any button inside needs the panel opened
+// first or Playwright's actionability check on .click() fails as "hidden".
+async function openDebugPanel(page: Page) {
+  await page.getByTestId('debug-panel-toggle').click()
+}
+
 /** Saves the active trip and returns the id of the trip that was just completed. */
 async function saveAndGetCompletedTripId(page: Page): Promise<string> {
   const tripId = await page.getByTestId('shopping-list').getAttribute('data-trip-id')
@@ -65,6 +72,7 @@ test('trip detail shows each item\'s resolved essential/non-essential status, in
   page,
 }) => {
   await page.goto('/')
+  await openDebugPanel(page)
 
   await addItem(page, 'Bread')
   await addItem(page, 'Chips')
@@ -149,6 +157,7 @@ test('discount entries no longer show category/essential controls anywhere', asy
   )
 
   await page.goto('/')
+  await openDebugPanel(page)
   await page.getByTestId('receipt-capture-input').setInputFiles({
     name: 'receipt.png',
     mimeType: 'image/png',

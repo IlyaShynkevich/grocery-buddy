@@ -196,3 +196,26 @@ export async function completeTrip(tripId: number): Promise<Trip> {
   if (!created) throw new Error('Failed to create new trip')
   return created
 }
+
+/**
+ * Permanently removes a trip and everything attached to it (items, any
+ * pending receipts still pointing at it). If the trip being deleted is the
+ * one the active-trip pointer refers to — normally only possible for a
+ * draft, but the debug panel's "Make active" can point it at a completed
+ * trip too — a fresh empty draft is created and pinned as active in its
+ * place, same as completeTrip does, so the app is never left without an
+ * active trip to shop into.
+ */
+export async function deleteTrip(tripId: number): Promise<void> {
+  await db.transaction('rw', db.trips, db.items, db.pendingReceipts, db.appState, async () => {
+    await db.items.where('tripId').equals(tripId).delete()
+    await db.pendingReceipts.where('tripId').equals(tripId).delete()
+    await db.trips.delete(tripId)
+
+    const pointer = await db.appState.get(ACTIVE_TRIP_KEY)
+    if (pointer?.value === tripId) {
+      const newId = await db.trips.add(newTrip())
+      await db.appState.put({ key: ACTIVE_TRIP_KEY, value: newId })
+    }
+  })
+}
