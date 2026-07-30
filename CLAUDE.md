@@ -54,7 +54,18 @@ model.
     everywhere they're shown, instead of only being filtered out of some
     views and displayed as a regular item in others.
 
-**M8 (monthly stats)**: not yet started.
+- **M8 (monthly stats)**: implemented, not yet merged/deployed. A new Stats
+  section reuses M7's `groupTripsByMonth` for its month selector; for the
+  selected month it computes total spend (sum of each trip's already-net
+  `total`, same convention as History/trip detail), an essential vs.
+  non-essential split, and spend per category — all from that month's
+  non-discount items, via `resolveEssential`
+  (`src/features/stats/useMonthlyStats.ts`). Discount/coupon lines are
+  excluded from the essential/category breakdowns but still net out of the
+  total. Two plain inline-styled bar visualizations (category breakdown,
+  essential/non-essential split) — no charting library added, consistent
+  with the rest of the app. A month with no completed trips (including "no
+  trips at all yet") shows an empty state instead of an empty chart.
 
 ## Known issues
 
