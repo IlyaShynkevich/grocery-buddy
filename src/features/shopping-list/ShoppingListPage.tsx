@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { formatDate } from '../../lib/formatDate'
 import { useShoppingList } from './useShoppingList'
 
 export function ShoppingListPage() {
@@ -25,7 +26,7 @@ export function ShoppingListPage() {
           </button>
         )}
       </div>
-      <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>{trip ? trip.date : 'Loading trip…'}</p>
+      <p style={{ fontSize: '0.85rem', opacity: 0.7 }}>{trip ? formatDate(trip.date) : 'Loading trip…'}</p>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <input
