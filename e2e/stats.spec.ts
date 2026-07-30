@@ -31,6 +31,13 @@ function categoryBar(page: Page, key: string) {
   return page.locator(`[data-testid="stats-category-bar"][data-category-key="${key}"]`)
 }
 
+/** Parses a German-locale currency string ("1.234,56 €", "-0,68 €") to a number. */
+function parseEuro(text: string): number {
+  const match = text.match(/-?[\d.]+,\d{2}/)
+  if (!match) throw new Error(`No euro amount found in "${text}"`)
+  return Number(match[0].replace(/\./g, '').replace(',', '.'))
+}
+
 test('stats show correct spend per category for a month with known items', async ({ page }) => {
   await captureAndProcess(page, [
     { name: 'Milk', price: 3.0, category: 'dairy', isDiscount: false },
@@ -77,7 +84,7 @@ test('stats show the correct essential vs. non-essential split', async ({ page }
   await expect(page.getByTestId('stats-split-non-essential-amount')).toContainText('4,00')
 })
 
-test('discount entries reduce the total but do not inflate category or essential/non-essential totals', async ({
+test('discount entries reduce the total via their own category ("Other", essential by default), not silently', async ({
   page,
 }) => {
   await captureAndProcess(page, [
@@ -93,16 +100,43 @@ test('discount entries reduce the total but do not inflate category or essential
   // Total nets the discount out: 3.00 + 1.50 - 1.00 = 3.50.
   await expect(page.getByTestId('stats-total')).toContainText('3,50')
 
-  // But the discount contributes to neither the category breakdown...
-  await expect(page.getByTestId('stats-category-bar')).toHaveCount(2)
+  // The discount lands in its own recorded category ("Other", -1.00) rather
+  // than being dropped — that's what keeps the category breakdown summing
+  // to the same Total shown above (3.00 + 1.50 - 1.00 = 3.50).
+  await expect(page.getByTestId('stats-category-bar')).toHaveCount(3)
   await expect(categoryBar(page, 'dairy').getByTestId('stats-category-amount')).toContainText('3,00')
   await expect(categoryBar(page, 'snacks').getByTestId('stats-category-amount')).toContainText('1,50')
-  await expect(categoryBar(page, 'other')).toHaveCount(0)
+  await expect(categoryBar(page, 'other').getByTestId('stats-category-amount')).toContainText('-1,00')
 
-  // ...nor the essential/non-essential split — dairy is essential (3.00),
-  // snacks is non-essential (1.50), neither reduced by the -1.00 discount.
-  await expect(page.getByTestId('stats-split-essential-amount')).toContainText('3,00')
+  // "Other" defaults to essential, so the discount reduces the essential
+  // total (3.00 - 1.00 = 2.00), not the non-essential one (1.50 untouched).
+  await expect(page.getByTestId('stats-split-essential-amount')).toContainText('2,00')
   await expect(page.getByTestId('stats-split-non-essential-amount')).toContainText('1,50')
+})
+
+test('essential + non-essential always equals the month total, including when discounts are present', async ({
+  page,
+}) => {
+  await captureAndProcess(page, [
+    { name: 'Milk', price: 3.49, category: 'dairy', isDiscount: false },
+    { name: 'Bread', price: 2.29, category: 'bakery', isDiscount: false },
+    { name: 'Chips', price: 1.99, category: 'snacks', isDiscount: false },
+    { name: 'Soda', price: 2.49, category: 'drinks', isDiscount: false },
+    { name: 'Coupon', price: -0.68, category: 'other', isDiscount: true },
+  ])
+  await saveTrip(page)
+
+  await page.getByTestId('nav-stats').click()
+  await expect(page.getByTestId('stats-page')).toBeVisible()
+
+  const total = parseEuro(await page.getByTestId('stats-total').innerText())
+  const essential = parseEuro(await page.getByTestId('stats-split-essential-amount').innerText())
+  const nonEssential = parseEuro(await page.getByTestId('stats-split-non-essential-amount').innerText())
+  expect(essential + nonEssential).toBeCloseTo(total, 2)
+
+  const categoryAmounts = await page.getByTestId('stats-category-amount').allInnerTexts()
+  const categoryTotal = categoryAmounts.reduce((sum, text) => sum + parseEuro(text), 0)
+  expect(categoryTotal).toBeCloseTo(total, 2)
 })
 
 test('stats show an empty state when there are no completed trips yet', async ({ page }) => {

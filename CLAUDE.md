@@ -54,18 +54,28 @@ model.
     everywhere they're shown, instead of only being filtered out of some
     views and displayed as a regular item in others.
 
-- **M8 (monthly stats)**: implemented, not yet merged/deployed. A new Stats
-  section reuses M7's `groupTripsByMonth` for its month selector; for the
-  selected month it computes total spend (sum of each trip's already-net
-  `total`, same convention as History/trip detail), an essential vs.
-  non-essential split, and spend per category — all from that month's
-  non-discount items, via `resolveEssential`
-  (`src/features/stats/useMonthlyStats.ts`). Discount/coupon lines are
-  excluded from the essential/category breakdowns but still net out of the
-  total. Two plain inline-styled bar visualizations (category breakdown,
-  essential/non-essential split) — no charting library added, consistent
-  with the rest of the app. A month with no completed trips (including "no
-  trips at all yet") shows an empty state instead of an empty chart.
+- **M8 (monthly stats)**: done and merged to production. A new Stats section
+  reuses M7's `groupTripsByMonth` for its month selector; for the selected
+  month it computes total spend (sum of each trip's already-net `total`,
+  same convention as History/trip detail), an essential vs. non-essential
+  split, and spend per category, via `resolveEssential`
+  (`src/features/stats/useMonthlyStats.ts`). Two plain inline-styled bar
+  visualizations (category breakdown, essential/non-essential split) — no
+  charting library added, consistent with the rest of the app. A month with
+  no completed trips (including "no trips at all yet") shows an empty state
+  instead of an empty chart.
+  - Post-deploy fix: Essential + Non-essential didn't sum to the displayed
+    Total (off by the month's total discount amount) — discounts were
+    excluded from both the essential and category breakdowns entirely while
+    still netting out of Total, so the two didn't reconcile. Fixed by
+    folding each discount's (negative) amount into its own recorded
+    category and resolved essential status, same as any other item, rather
+    than skipping it. Discount/coupon lines have no reliable link back to
+    which purchased item they discounted — the receipt extraction prompt
+    just tags every discount with category "other" (see
+    `api/_lib/groqExtract.ts`) — so guessing a distribution across
+    categories wasn't an option; in practice this means discounts land
+    under "Other" (essential by default), reducing the essential total.
 
 ## Known issues
 

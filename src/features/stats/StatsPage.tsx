@@ -10,6 +10,18 @@ const barTrackStyle: CSSProperties = {
   height: '1rem',
 }
 
+/**
+ * Bar width as a percentage of `max`, clamped to [0, 100] — a category or
+ * essential/non-essential bucket can go negative when a discount outweighs
+ * the real purchases folded into it (see useMonthlyStats), and a negative
+ * CSS width is invalid, so that just renders as an empty bar rather than
+ * something broken.
+ */
+function barWidth(amount: number, max: number): string {
+  if (max <= 0) return '0%'
+  return `${Math.min(100, Math.max(0, (amount / max) * 100))}%`
+}
+
 export function StatsPage() {
   const groups = useStatsMonths()
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
@@ -19,7 +31,7 @@ export function StatsPage() {
   const stats = useMonthlyStats(group)
 
   const maxCategoryAmount = stats ? Math.max(0, ...stats.categories.map((c) => c.amount)) : 0
-  const maxSplitAmount = stats ? Math.max(stats.essential, stats.nonEssential) : 0
+  const maxSplitAmount = stats ? Math.max(0, stats.essential, stats.nonEssential) : 0
 
   return (
     <section data-testid="stats-page" style={{ maxWidth: 480, margin: '0 auto', padding: '1rem', textAlign: 'left' }}>
@@ -66,7 +78,7 @@ export function StatsPage() {
                   <div style={barTrackStyle}>
                     <div
                       style={{
-                        width: maxSplitAmount > 0 ? `${(stats.essential / maxSplitAmount) * 100}%` : '0%',
+                        width: barWidth(stats.essential, maxSplitAmount),
                         background: '#2e7d32',
                         height: '100%',
                       }}
@@ -81,7 +93,7 @@ export function StatsPage() {
                   <div style={barTrackStyle}>
                     <div
                       style={{
-                        width: maxSplitAmount > 0 ? `${(stats.nonEssential / maxSplitAmount) * 100}%` : '0%',
+                        width: barWidth(stats.nonEssential, maxSplitAmount),
                         background: '#e65100',
                         height: '100%',
                       }}
@@ -113,7 +125,7 @@ export function StatsPage() {
                       <div style={barTrackStyle}>
                         <div
                           style={{
-                            width: maxCategoryAmount > 0 ? `${(category.amount / maxCategoryAmount) * 100}%` : '0%',
+                            width: barWidth(category.amount, maxCategoryAmount),
                             background: '#1565c0',
                             height: '100%',
                           }}
