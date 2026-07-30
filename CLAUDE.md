@@ -131,6 +131,21 @@ model.
     No behavior changes — verified via the full Playwright suite (still
     passing) plus a manual pass through Shopping List, History, Trip
     Detail, and Stats in a real browser.
+- **App name consistency + placeholder icon**: implemented, not yet merged/
+  deployed.
+  - The PWA manifest's `short_name` was still `"Groceries"` (used for
+    home-screen/task-switcher labels) while `index.html`'s `<title>` and the
+    manifest's `name` already said "Grocery Buddy" — now all three agree.
+  - Replaced the placeholder app icons (`public/favicon.svg`,
+    `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`),
+    which were flat green squares/an unrelated purple graphic left over from
+    scaffolding, with a simple hand-drawn gray-toned shopping-bag glyph
+    matching the app's actual dark `--surface`/`--accent` tokens (`#1e1f27`
+    bg, `#a1a1aa` glyph) — consistent across every icon touchpoint now. The
+    PNGs were generated via a one-off PowerShell/`System.Drawing` script
+    (no new dependency added); the SVG favicon is hand-written to match the
+    same coordinates. This is still a placeholder — swap for real mascot
+    artwork once it's ready.
 
 ## Known issues
 

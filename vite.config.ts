@@ -11,7 +11,7 @@ export default defineConfig({
       includeAssets: ['icons/apple-touch-icon.png'],
       manifest: {
         name: 'Grocery Buddy',
-        short_name: 'Groceries',
+        short_name: 'Grocery Buddy',
         description: 'Personal grocery budget tracker',
         theme_color: '#16171d',
         background_color: '#16171d',
