@@ -17,6 +17,7 @@ export function ReceiptReviewPanel() {
     <section
       data-testid="receipt-review-panel"
       style={{
+        width: '100%',
         maxWidth: PAGE_MAX_WIDTH,
         margin: '0.75rem auto',
         padding: '1rem',
