@@ -1,5 +1,5 @@
 import packageJson from '../../../package.json'
-import { mutedTextStyle, PAGE_MAX_WIDTH } from '../../lib/ui'
+import { mutedTextStyle } from '../../lib/ui'
 
 // Placeholder mascot — same shopping-bag glyph already used for the
 // favicon/app icons (see public/favicon.svg). Swap this one path for real
@@ -15,11 +15,15 @@ export function Footer() {
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: '0.75rem',
-        maxWidth: PAGE_MAX_WIDTH,
+        // Deliberately full-width, unlike the page content above (which
+        // caps at PAGE_MAX_WIDTH and centers) — a footer bar reads as part
+        // of the page chrome, not another content column, so it spans edge
+        // to edge like a typical site footer.
+        width: '100%',
         // marginTop: 'auto' is what pins this to the bottom of the page's
         // column-flex layout (see App.tsx) — it consumes any leftover
         // vertical space instead of the footer just following the content.
-        margin: 'auto auto 0',
+        marginTop: 'auto',
         padding: '0.75rem 1rem',
         borderTop: '1px solid var(--border)',
       }}

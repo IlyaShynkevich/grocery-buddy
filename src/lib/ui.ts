@@ -11,6 +11,14 @@ import type { CSSProperties } from 'react'
 export const PAGE_MAX_WIDTH = 480
 
 export const pageStyle: CSSProperties = {
+  // Explicit width (not just maxWidth) matters here: these sections are
+  // flex items in App.tsx's column layout, and a flex item with auto
+  // cross-axis margins (the `margin: '0 auto'` below) opts out of the
+  // default stretch-to-container sizing, shrinking to its own content's
+  // width instead — which made every page section a different width
+  // depending on how wide its content happened to be. `width: '100%'`
+  // gives it a definite size to stretch to before maxWidth clamps it.
+  width: '100%',
   maxWidth: PAGE_MAX_WIDTH,
   margin: '0 auto',
   padding: '1rem',

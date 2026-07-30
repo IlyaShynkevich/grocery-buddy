@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { ACTIVE_TRIP_KEY, db, newItem, newTrip, recomputeTripTotal, type Item, type Trip } from '../../db/db'
 import { CATEGORIES, resolveEssential } from '../../db/categories'
 import { formatPrice } from '../../lib/formatPrice'
+import { pageStyle } from '../../lib/ui'
 
 interface TripWithItems extends Trip {
   items: Item[]
@@ -95,7 +96,7 @@ export function DbDebugPanel() {
     // native <details> keeps its children in the DOM either way, just not
     // rendered until opened, so e2e tests just need to click the toggle
     // first before interacting with anything inside.
-    <details data-testid="debug-panel" style={{ margin: '1rem', textAlign: 'left' }}>
+    <details data-testid="debug-panel" style={pageStyle}>
       <summary
         data-testid="debug-panel-toggle"
         style={{ padding: '0.4rem 0.6rem', border: '1px dashed var(--border-strong)', borderRadius: 4, color: 'var(--text-muted)' }}
