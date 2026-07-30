@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { DbDebugPanel } from './features/debug/DbDebugPanel'
+import { Footer } from './features/footer/Footer'
 import { HistoryPage } from './features/history/HistoryPage'
 import { TripDetailPage } from './features/history/TripDetailPage'
 import { ReceiptCapture } from './features/receipt-capture/ReceiptCapture'
@@ -80,6 +81,7 @@ function App() {
       {view.name === 'stats' && <StatsPage />}
 
       <DbDebugPanel />
+      <Footer />
     </main>
   )
 }
