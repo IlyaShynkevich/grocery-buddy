@@ -91,9 +91,10 @@ model.
     of the real app. Its contents stay in the DOM either way (just not
     rendered until opened), so e2e tests only need to click
     `debug-panel-toggle` once before interacting with anything inside.
-- **Frontend design pass**: implemented, not yet merged/deployed. Checked
-  the available skills first (`ui-styling`, `design-system`) — both assume a
-  Tailwind/shadcn stack, which this project deliberately doesn't use (plain
+- **Frontend design pass (grayscale palette)**: done and verified in
+  production. Checked the available skills first (`ui-styling`,
+  `design-system`) — both assume a Tailwind/shadcn stack, which this
+  project deliberately doesn't use (plain
   React + inline styles, zero UI dependencies), so pulling either in would
   have been a stack change, not a styling pass. Instead applied the same
   primitive→semantic token idea natively:
@@ -131,8 +132,9 @@ model.
     No behavior changes — verified via the full Playwright suite (still
     passing) plus a manual pass through Shopping List, History, Trip
     Detail, and Stats in a real browser.
-- **App name consistency + placeholder icon**: implemented, not yet merged/
-  deployed.
+- **App name consistency + placeholder icon**: done and verified in
+  production. Still using a placeholder icon — a full mascot/icon redesign
+  is planned for later, pending custom artwork.
   - The PWA manifest's `short_name` was still `"Groceries"` (used for
     home-screen/task-switcher labels) while `index.html`'s `<title>` and the
     manifest's `name` already said "Grocery Buddy" — now all three agree.
@@ -144,8 +146,7 @@ model.
     bg, `#a1a1aa` glyph) — consistent across every icon touchpoint now. The
     PNGs were generated via a one-off PowerShell/`System.Drawing` script
     (no new dependency added); the SVG favicon is hand-written to match the
-    same coordinates. This is still a placeholder — swap for real mascot
-    artwork once it's ready.
+    same coordinates.
 
 ## Known issues
 
