@@ -133,8 +133,8 @@ model.
     passing) plus a manual pass through Shopping List, History, Trip
     Detail, and Stats in a real browser.
 - **App name consistency + placeholder icon**: done and verified in
-  production. Still using a placeholder icon — a full mascot/icon redesign
-  is planned for later, pending custom artwork.
+  production. Still using a placeholder icon (see Planned section below for
+  the full mascot/icon redesign).
   - The PWA manifest's `short_name` was still `"Groceries"` (used for
     home-screen/task-switcher labels) while `index.html`'s `<title>` and the
     manifest's `name` already said "Grocery Buddy" — now all three agree.
@@ -147,11 +147,40 @@ model.
     PNGs were generated via a one-off PowerShell/`System.Drawing` script
     (no new dependency added); the SVG favicon is hand-written to match the
     same coordinates.
+- **Footer + README rewrite**: done and merged to production.
+  - Added a simple footer (mascot icon + "Ilya Shynkevich" + app version,
+    read from `package.json`) shown below the primary content on every
+    page, sitting just below the DB Debug Panel. The mascot icon reuses the
+    same placeholder shopping-bag glyph as the app icon/favicon
+    (`public/favicon.svg`) via one swappable constant, rather than being
+    baked in, so the later mascot redesign is a one-file swap.
+  - `<main>` switched from `display: flow-root` to a column flex layout
+    (`min-height: 100svh`) with the footer given `margin-top: auto`, so it
+    pins to the true bottom of the viewport on short pages instead of
+    leaving empty space below it, while still sitting flush after content
+    that overflows the viewport. (The flex container is its own block
+    formatting context too, so this keeps the earlier flow-root fix for the
+    `<nav>` top-margin collapse bug.)
+  - README.md rewritten to describe the app as it actually is now
+    (receipt scanning via Groq, offline support, trip history, monthly
+    stats) instead of the leaner pre-M4 description, plus added the
+    missing Testing section and `lint` command.
+  - **Post-merge bug found, not yet fixed**: the DB Debug Panel isn't
+    grouped with the footer at the true bottom of the screen — it's left
+    with the regular page content above, so on short pages there's a gap
+    between Debug tools and the footer instead of them sitting together.
+    See Known issues below.
 
 ## Known issues
 
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
+- **Debug tools isn't grouped with the footer.** They should sit together
+  at the true bottom of the screen with no gap between them, regardless of
+  content length (same bottom-pinning the footer already got via the
+  column-flex layout in `App.tsx`) — currently Debug tools is left with the
+  regular page content above, so short pages show a gap between it and the
+  footer. Not yet fixed.
 
 ## Known limitations
 
@@ -163,6 +192,17 @@ model.
   items just appear as separate entries and can be manually
   removed/reconciled. Revisit only if this becomes a real usability problem
   in practice.
+
+## Planned (not started)
+
+- **Auto-scroll to top after confirming/dismissing a receipt review.**
+  Right now the user has to manually scroll up to reach Save trip after a
+  review resolves. Related to (but distinct from) the Debug tools/footer
+  grouping bug above — this one is about scroll position after an action,
+  not layout.
+- **Full mascot/icon redesign**, waiting on custom artwork. Currently a
+  placeholder gray shopping-bag icon is used everywhere it appears: the app
+  icon, the favicon, and the footer.
 
 ## Commands
 
