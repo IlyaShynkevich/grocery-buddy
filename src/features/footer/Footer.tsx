@@ -16,7 +16,10 @@ export function Footer() {
         justifyContent: 'space-between',
         gap: '0.75rem',
         maxWidth: PAGE_MAX_WIDTH,
-        margin: '1rem auto 0',
+        // marginTop: 'auto' is what pins this to the bottom of the page's
+        // column-flex layout (see App.tsx) — it consumes any leftover
+        // vertical space instead of the footer just following the content.
+        margin: 'auto auto 0',
         padding: '0.75rem 1rem',
         borderTop: '1px solid var(--border)',
       }}
