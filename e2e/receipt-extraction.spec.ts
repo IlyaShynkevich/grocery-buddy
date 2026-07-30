@@ -25,8 +25,9 @@ async function captureReceipt(page: Page) {
 }
 
 async function itemNames(page: Page): Promise<string[]> {
-  const inputs = await page.getByTestId('shopping-list-item').locator('input[type="text"]').all()
-  return Promise.all(inputs.map((input) => input.inputValue()))
+  return page.getByTestId('shopping-list-item').locator('input[type="text"]').evaluateAll((inputs) =>
+    inputs.map((input) => (input as HTMLInputElement).value),
+  )
 }
 
 test('successful extraction adds items to the shopping list and marks the receipt processed', async ({

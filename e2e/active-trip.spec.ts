@@ -9,8 +9,9 @@ async function addItem(page: import('@playwright/test').Page, name: string) {
 }
 
 async function itemNames(page: import('@playwright/test').Page): Promise<string[]> {
-  const inputs = await page.getByTestId('shopping-list-item').locator('input[type="text"]').all()
-  return Promise.all(inputs.map((input) => input.inputValue()))
+  return page.getByTestId('shopping-list-item').locator('input[type="text"]').evaluateAll((inputs) =>
+    inputs.map((input) => (input as HTMLInputElement).value),
+  )
 }
 
 // The debug panel is collapsed by default (native <details>) — its contents

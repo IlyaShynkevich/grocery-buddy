@@ -7,8 +7,9 @@ async function addItem(page: Page, name: string) {
 }
 
 async function itemNames(page: Page): Promise<string[]> {
-  const inputs = await page.getByTestId('shopping-list-item').locator('input[type="text"]').all()
-  return Promise.all(inputs.map((input) => input.inputValue()))
+  return page.getByTestId('shopping-list-item').locator('input[type="text"]').evaluateAll((inputs) =>
+    inputs.map((input) => (input as HTMLInputElement).value),
+  )
 }
 
 /** Saves the active trip and returns the id of the trip that was just completed. */
