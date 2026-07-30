@@ -399,6 +399,40 @@ model.
     correction toward idle's fill (this source image's own fill color
     again didn't match idle/happy out of the box — expected at this point,
     since each pose is still an independently-generated image).
+- **Scanning ring thickness dialed back + shopping list no longer
+  re-expands after a review resolves**: done and verified in production.
+  - The v2 ring-boldening (inner/outer radius 85/190, ~2.5x the source's
+    own ~41px thickness) read as over-bolded/blobby compared to the
+    reference art once seen live. Rendered several thickness options side
+    by side at the actual ~64px display size (including the raw,
+    unboldened source thickness) to compare rather than guessing — the
+    unboldened ring already read reasonably clearly on this v2 image
+    (unlike the v1 ring-only art, the added handle gives it context), so
+    only a small bump was kept: inner/outer 93/140 (~47px thick, barely
+    more than the source's own ~41px) instead of the previous 85/190.
+  - Separately, confirming or dismissing a receipt review was force
+    re-expanding the shopping list even if it had been left collapsed —
+    caused by `ShoppingListPage`'s old collapse logic deriving `isOpen` as
+    `manualOpen ?? !hasPendingReview`: once `hasPendingReview` flipped back
+    to `false` on resolve, that fallback expression itself evaluated to
+    `true` regardless of anything else, no matter what `manualOpen` was
+    reset to. Replaced with a single persistent `isOpen` state that only
+    gets forced `false` on the *rising* edge of `hasPendingReview` (a new
+    review becoming pending) — resolving a review no longer touches it at
+    all, so a still-collapsed list stays collapsed until the user expands
+    it via the toggle themselves. The toggle affordance itself now also
+    stays visible whenever the list is currently collapsed (not only while
+    a review is actively pending), since otherwise there'd be no way to
+    manually reopen a list left collapsed after the review closed.
+  - Also added: saving the trip (a new active tripId) now resets this
+    state back to expanded — a fresh empty draft has no review history of
+    its own, so it shouldn't inherit whatever collapsed state the just-
+    finished trip's review left behind.
+  - `e2e/shopping-list-collapse.spec.ts` updated: the two tests
+    encoding the old "always re-expands on resolve" behavior now assert
+    the opposite (stays collapsed, toggle still present); added tests for
+    a manually-expanded list staying expanded through a resolve, and for
+    Save trip resetting a stale collapsed state on the new draft.
 
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
