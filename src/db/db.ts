@@ -72,11 +72,28 @@ export interface AppStateEntry {
   value: number | string | null
 }
 
+/**
+ * A free-text personal note under one category (see src/db/categories.ts),
+ * describing what the user personally considers essential/non-essential
+ * within it (e.g. under "Frozen": "nuggets, frozen pizza"). Written and
+ * managed on the Customize page; feeding these into the Groq extraction
+ * prompt so the AI can use them is a separate follow-up, not implemented
+ * here — this table is just the storage + CRUD surface for them.
+ */
+export interface CategoryNote {
+  id: number
+  /** key into CATEGORIES */
+  categoryKey: string
+  text: string
+  createdAt: number
+}
+
 export const db = new Dexie('grocery-buddy') as Dexie & {
   trips: EntityTable<Trip, 'id'>
   items: EntityTable<Item, 'id'>
   pendingReceipts: EntityTable<PendingReceipt, 'id'>
   appState: EntityTable<AppStateEntry, 'key'>
+  categoryNotes: EntityTable<CategoryNote, 'id'>
 }
 
 db.version(1).stores({
@@ -87,6 +104,10 @@ db.version(1).stores({
 
 db.version(2).stores({
   appState: '&key',
+})
+
+db.version(3).stores({
+  categoryNotes: '++id, categoryKey',
 })
 
 function todayDateString(): string {
@@ -118,6 +139,10 @@ export function newItem(
     isDiscount: false,
     ...overrides,
   }
+}
+
+export function newCategoryNote(categoryKey: string, text: string): Omit<CategoryNote, 'id'> {
+  return { categoryKey, text, createdAt: Date.now() }
 }
 
 export async function recomputeTripTotal(tripId: number): Promise<number> {
@@ -263,11 +288,12 @@ export async function deleteTrip(tripId: number): Promise<void> {
  * on, never calling getOrCreateActiveTrip() at all.
  */
 export async function resetAllData(): Promise<void> {
-  await db.transaction('rw', db.trips, db.items, db.pendingReceipts, db.appState, async () => {
+  await db.transaction('rw', db.trips, db.items, db.pendingReceipts, db.appState, db.categoryNotes, async () => {
     await db.trips.clear()
     await db.items.clear()
     await db.pendingReceipts.clear()
     await db.appState.clear()
+    await db.categoryNotes.clear()
     const newId = await db.trips.add(newTrip())
     await db.appState.put({ key: ACTIVE_TRIP_KEY, value: newId })
   })
