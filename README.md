@@ -19,11 +19,20 @@ concept spec and data model.
   no connection. A receipt taken offline goes into a visible pending queue
   and is automatically sent for extraction once you're back online, with no
   action needed.
-- **Trip history** — completed trips are saved and browsable by month, each
-  with a read-only detail view (items, prices, essential/non-essential
-  status, discounts, total).
+- **Trip history** — completed trips are saved and grouped by month, most
+  recent first; the month label sticks to the top of the list as you scroll
+  and swaps to the next month automatically, and the list scrolls
+  internally (about 9 trips visible at once) instead of growing the page.
+  Each trip has a read-only detail view (items, prices, essential/
+  non-essential status, discounts, total).
 - **Monthly stats** — total spend, an essential vs. non-essential split, and
   spend broken down by category, for any month with completed trips.
+- **Mascot** — a small hand-drawn companion on the Shopping List page shows
+  what's going on: idle normally, scanning while a receipt is being
+  processed, and happy once results are ready to review.
+- **Tab navigation** — Shopping List, History, and Stats are reachable from
+  the tab bar or by swiping left/right between them, with a slide
+  transition either way.
 - **Installable PWA** — add to your phone's home screen for offline-capable,
   app-like use; no app store involved.
 
@@ -48,6 +57,11 @@ npm run dev
 `npm run dev` does **not** include the service worker or offline behavior —
 those only build in production. See [Testing](#testing) below for how to
 exercise them locally.
+
+A **DB Debug Panel** (dev-only, collapsed by default) is available on the
+Shopping List tab for inspecting and mutating the Dexie data directly —
+create/reset trips, edit item categories, toggle essential overrides, pin
+an arbitrary trip as "active." It's hidden on History and Stats.
 
 ## Environment variables
 
