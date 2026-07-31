@@ -266,15 +266,70 @@ test('the outgoing page keeps its DOM node identity instead of remounting when a
   await expect(page.locator('[data-canary="no-remount"]')).toHaveCount(0)
 })
 
-test('content below the transitioning tabs does not jump position mid-transition when the two pages differ in height', async ({
+// Generous, but data-driven, not arbitrary: measured live (see CLAUDE.md,
+// "Stats<->History height animation") max single-frame jumps of ~18px for
+// Shopping List<->History and ~44px for History<->Stats (which also toggles
+// Debug tools' visibility, a separate, accepted, un-animated ~70px show/hide
+// — see the same entry) under a single serial run. Both pages' natural
+// heights come from Dexie's useLiveQuery, which can resolve mid-transition
+// and re-target the still-in-flight height animation (see the doc comment
+// in TabTransition.tsx) — under a full parallel test run's CPU contention,
+// that re-target landing late enough to be caught in one sampled frame was
+// observed up to ~140px. Still far below the original bug's ~285px single-
+// frame snap, so this stays a meaningful regression check without being
+// flaky under parallel load.
+const MAX_ACCEPTABLE_FRAME_JUMP_PX = 180
+
+/**
+ * Samples `app-footer`'s position every animation frame through a tab
+ * switch and returns the largest single-frame jump while both panels are
+ * mounted (`.gb-tab-slide` count === 2) — i.e. while the transition is
+ * actually in flight, not before it starts or after it's fully settled.
+ */
+async function maxFooterJumpDuringTransition(page: Page, toTab: string): Promise<number> {
+  await page.evaluate(() => {
+    ;(window as unknown as { __tops: Array<{ footer: number; slides: number }> }).__tops = []
+    const tops = (window as unknown as { __tops: Array<{ footer: number; slides: number }> }).__tops
+    const start = performance.now()
+    function tick() {
+      const footer = document.querySelector('[data-testid="app-footer"]')
+      if (footer) {
+        tops.push({ footer: footer.getBoundingClientRect().top, slides: document.querySelectorAll('.gb-tab-slide').length })
+      }
+      if (performance.now() - start < 450) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
+
+  await page.getByTestId('nav-' + toTab).click()
+  await page.waitForTimeout(500)
+
+  const tops = await page.evaluate(() => (window as unknown as { __tops: Array<{ footer: number; slides: number }> }).__tops)
+  const duringTransition = tops.filter((t) => t.slides === 2)
+  expect(duringTransition.length).toBeGreaterThan(0)
+
+  let maxJump = 0
+  let prev: number | null = null
+  for (const t of duringTransition) {
+    if (prev !== null) maxJump = Math.max(maxJump, Math.abs(t.footer - prev))
+    prev = t.footer
+  }
+  return maxJump
+}
+
+test('content below the transitioning tabs animates smoothly, no single-frame jump, when the two pages differ in height', async ({
   page,
 }) => {
-  // Regression test for a second, separate flick: the outgoing panel used
-  // to be `position: absolute` (contributing zero height to its container),
-  // so the wrapper's height snapped *instantly* to the incoming page's
-  // height the moment a transition started, independent of the slide's own
-  // progress — jumping Debug tools/the footer to their final position in a
-  // single frame instead of only once the transition actually finished.
+  // Regression test for two flicks fixed in the same area: the outgoing
+  // panel used to be `position: absolute` (contributing zero height to its
+  // container), so the wrapper's height snapped *instantly* to the incoming
+  // page's height the moment a transition started. A later fix (CSS Grid,
+  // sizing to the max of both panels while mounted) only deferred that snap
+  // to the moment the outgoing panel unmounted, which was still clearly
+  // visible for page pairs with a large height difference (Stats, by far
+  // the tallest page, <-> History) — see CLAUDE.md. The wrapper's height is
+  // now explicitly animated alongside the slide instead, so there's no
+  // single large jump at either end, just smooth interpolation throughout.
   // Seed enough items that Shopping List is visibly taller than an empty
   // History so the height mismatch this depends on is real.
   await page.goto('/')
@@ -283,45 +338,53 @@ test('content below the transitioning tabs does not jump position mid-transition
     await page.getByTestId('add-item-submit').click()
   }
 
-  // Start a rAF sampler before the switch so every frame of the ~300ms
-  // transition is captured with no round-trip latency between samples.
-  await page.evaluate(() => {
-    ;(window as unknown as { __tops: Array<{ footer: number; debug: number; slides: number }> }).__tops = []
-    const tops = (window as unknown as { __tops: Array<{ footer: number; debug: number; slides: number }> }).__tops
-    const start = performance.now()
-    function tick() {
-      const footer = document.querySelector('[data-testid="app-footer"]')
-      const debugToggle = document.querySelector('[data-testid="debug-panel-toggle"]')
-      if (footer && debugToggle) {
-        tops.push({
-          footer: footer.getBoundingClientRect().top,
-          debug: debugToggle.getBoundingClientRect().top,
-          slides: document.querySelectorAll('.gb-tab-slide').length,
-        })
-      }
-      if (performance.now() - start < 400) requestAnimationFrame(tick)
-    }
-    requestAnimationFrame(tick)
+  const maxJump = await maxFooterJumpDuringTransition(page, 'history')
+  expect(maxJump).toBeLessThan(MAX_ACCEPTABLE_FRAME_JUMP_PX)
+})
+
+test('Stats <-> History transitions animate smoothly in both directions, despite Stats being much taller', async ({
+  page,
+}) => {
+  // Stats is by far the app's tallest page (multiple bar-chart cards) —
+  // build it up with items across several categories via the receipt mock
+  // (same fixture the other receipt specs use) so the height mismatch this
+  // depends on is real, not just an empty page.
+  await page.route('**/api/extract-receipt', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        items: [
+          { name: 'Milk', price: 3.49, category: 'dairy', isDiscount: false },
+          { name: 'Bread', price: 2.29, category: 'bakery', isDiscount: false },
+          { name: 'Apples', price: 4.99, category: 'produce', isDiscount: false },
+          { name: 'Chicken', price: 8.49, category: 'meat', isDiscount: false },
+          { name: 'Chips', price: 3.29, category: 'snacks', isDiscount: false },
+          { name: 'Soap', price: 2.49, category: 'household', isDiscount: false },
+        ],
+      }),
+    }),
+  )
+  await page.goto('/')
+  await page.getByTestId('receipt-capture-input').setInputFiles({
+    name: 'receipt.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    ),
   })
+  await page.getByTestId('receipt-process-button').click()
+  await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed')
+  await page.getByTestId('receipt-review-confirm').click()
+  await page.getByTestId('save-trip-button').click()
 
   await page.getByTestId('nav-history').click()
-  await page.waitForTimeout(450)
+  await page.waitForTimeout(ANIMATION_SETTLE_MS)
+  const historyToStatsJump = await maxFooterJumpDuringTransition(page, 'stats')
+  expect(historyToStatsJump).toBeLessThan(MAX_ACCEPTABLE_FRAME_JUMP_PX)
 
-  const tops = await page.evaluate(
-    () => (window as unknown as { __tops: Array<{ footer: number; debug: number; slides: number }> }).__tops,
-  )
-  expect(tops.length).toBeGreaterThan(0)
-
-  // While both panels are present (the transition is actually in flight),
-  // the footer/debug-toggle position must stay completely still — any
-  // movement in that window is a snap, not the (purely horizontal) slide
-  // animation, which doesn't touch vertical layout at all.
-  const duringTransition = tops.filter((t) => t.slides === 2)
-  expect(duringTransition.length).toBeGreaterThan(0)
-  const firstFooterTop = duringTransition[0].footer
-  const firstDebugTop = duringTransition[0].debug
-  for (const t of duringTransition) {
-    expect(t.footer).toBe(firstFooterTop)
-    expect(t.debug).toBe(firstDebugTop)
-  }
+  await page.waitForTimeout(ANIMATION_SETTLE_MS)
+  const statsToHistoryJump = await maxFooterJumpDuringTransition(page, 'history')
+  expect(statsToHistoryJump).toBeLessThan(MAX_ACCEPTABLE_FRAME_JUMP_PX)
 })

@@ -40,6 +40,14 @@ function App() {
   // direction — updated by both the swipe handler and the tab-bar taps
   // below, so either input path gets the same directional animation.
   const [direction, setDirection] = useState<SlideDirection>('forward')
+  // Lags `activeTab` on purpose: only updates once a transition genuinely
+  // finishes (TabTransition's onSettle), not the instant one starts. Debug
+  // tools is gated on this, not `activeTab` directly — Stats is the only
+  // tab that hides it, and gating on `activeTab` made it pop in/out mid-
+  // transition (the moment a swipe/tap fires, before the slide has even
+  // started), adding an extra, slide-unrelated layout jump on top of the
+  // panels' own height animation.
+  const [settledTab, setSettledTab] = useState<TabName>(activeTab)
 
   // Swipe-to-switch-tabs: left advances (Shopping List -> History -> Stats),
   // right goes back, no wraparound past either end. Raw touch events only
@@ -212,7 +220,12 @@ function App() {
       {view.name === 'trip-detail' ? (
         <TripDetailPage tripId={view.tripId} onBack={() => setView({ name: 'history' })} />
       ) : (
-        <TabTransition activeTab={activeTab} direction={direction} renderTab={renderTab} />
+        <TabTransition
+          activeTab={activeTab}
+          direction={direction}
+          renderTab={renderTab}
+          onSettle={() => setSettledTab(activeTab)}
+        />
       )}
 
       {/*
@@ -226,10 +239,12 @@ function App() {
         {/*
           Stats is a pure read-only report — there's nothing there to debug,
           unlike Shopping List/History where trip and receipt data is
-          actively worked with. `activeTab` (not view.name) so trip detail,
-          reached via History, still counts as "in History" here too.
+          actively worked with. `settledTab` (not `activeTab`/view.name) so
+          trip detail, reached via History, still counts as "in History"
+          here too, and so this only flips once a transition actually
+          settles (see the `settledTab` comment above).
         */}
-        {activeTab !== 'stats' && <DbDebugPanel />}
+        {settledTab !== 'stats' && <DbDebugPanel />}
         <Footer />
       </div>
     </main>

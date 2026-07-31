@@ -706,6 +706,87 @@ model.
     footer/debug-toggle position every animation frame, and asserts zero
     movement for as long as both panels are present (any movement in that
     window would be a snap, since the slide itself is purely horizontal).
+- **Stats<->History height animation (direction-specific jump, superseding
+  the CSS-Grid-only approach above)**: done and verified in production, one
+  more follow-up on the transition-flick work. The previous fix (grid
+  sizing to `max(outgoing, incoming)` while both panels are mounted) only
+  *deferred* a height-driven snap to the moment the outgoing panel
+  unmounts, rather than eliminating it — fine for small height differences,
+  but Stats (by far the app's tallest page: two bar-chart cards) is ~430px
+  taller than an empty History, and Stats -> History (Stats as the
+  *outgoing*, taller panel) showed a real, ~285px jump a full 300ms *after*
+  the slide had already visually finished — confirmed via a frame-by-frame
+  trace. History -> Stats (Stats as *incoming*) didn't show this, since the
+  wrapper was already sized to Stats' height from the transition's first
+  frame — nothing left to defer.
+  - Also found, same investigation: `App.tsx`'s
+    `{activeTab !== 'stats' && <DbDebugPanel />}` — Stats is the only tab
+    that hides Debug tools, and `activeTab` updates synchronously the
+    instant a transition *starts*, not when it settles, adding an
+    unrelated ~70px jump on top of the height-snap, at the wrong moment.
+  - Fixed by replacing grid-only auto-sizing with an *animated* wrapper
+    height: `TabTransition.tsx` captures the wrapper's current height synchronously
+    (`fromHeight`) in the same state update that starts a transition, then a
+    `useLayoutEffect` animates the wrapper's explicit `height` from that to
+    the incoming panel's natural height via a CSS transition timed to
+    `TRANSITION_MS` — the wrapper's existing `overflow: hidden` clips
+    whichever panel is taller as it interpolates, so it reads as one
+    continuous motion. Both panels also got `alignSelf: 'start'` so each
+    one's own measured height is never inflated by the grid's default
+    stretch-to-row-height behavior.
+  - **A real complication, worth remembering if this is touched again**:
+    most pages (including Stats and History) read their data via Dexie's
+    `useLiveQuery`, which returns an empty/default value synchronously on
+    first mount and only renders the real (often much taller) content once
+    the async query resolves a beat later — confirmed live, Stats mounts at
+    ~102px (0 category bars) and only becomes ~590px (real data) ~20-40ms
+    after mount. Measuring the incoming panel's height only once (at
+    transition start) reliably captured the wrong, too-short target for
+    Stats specifically. Fixed with a `ResizeObserver` on the incoming panel
+    that re-targets the still-in-flight height animation whenever its
+    natural height actually changes, not just once — and each re-target
+    does a full clean restart (snap to the current interpolated value with
+    no transition, forced reflow, then re-enable the transition to the new
+    target) rather than just changing the destination of an
+    already-active transition, which was observed to overshoot past the
+    final value when two re-targets landed close together (a restarted
+    `ease-in-out` curve's velocity artifact).
+  - **DbDebugPanel visibility gating (`App.tsx`) is settle-gated
+    (`settledTab`, updated via a new `onSettle` callback from
+    `TabTransition`), not `activeTab`-gated** — deliberately keeps it
+    visible until a transition actually finishes rather than flipping
+    the instant one starts.
+  - **Known residual, not fully eliminated, worth being upfront about**:
+    Debug tools' own show/hide is still a discrete, un-animated toggle —
+    tested both `activeTab`-gating (instant, at transition start) and
+    `settledTab`-gating (instant, at transition end) live, and neither
+    eliminates its ~70px single-frame contribution, just relocates it to
+    one end of the transition or the other. `settledTab` was kept since
+    between the two, it puts that residual jump at the point where a
+    smooth, already-in-motion animation has already made the layout shift
+    feel mostly "expected" rather than as an isolated static-then-sudden
+    jump. Fully eliminating it would mean animating Debug tools' own
+    height too (real added scope, not attempted here) — flagged to the
+    user as a known, accepted trade-off rather than silently claiming a
+    fully perfect fix. The large, original content-height snap (the actual
+    complaint) is fully resolved; this residual is far smaller (~70px vs.
+    the original ~285px) and only visible on the one page pair that
+    both differs hugely in height *and* toggles Debug tools' visibility.
+  - Verified live (frame-by-frame trace, both directions, before/after):
+    max single-frame jump during a Stats<->History transition dropped from
+    ~285px (single large snap, old behavior) to ~44px (smooth
+    interpolation plus the accepted Debug-tools residual) in a serial
+    single-browser run. Covered by
+    `e2e/swipe-navigation.spec.ts`'s "Stats <-> History transitions animate
+    smoothly in both directions" test (max single-frame footer jump
+    threshold, data-driven from these measurements — see the test file's
+    own comment for the exact numbers and the reasoning for the threshold
+    chosen, including extra margin observed under full parallel-test-run
+    CPU contention) and the updated "content below the transitioning tabs
+    animates smoothly" test (same threshold, for the pre-existing Shopping
+    List<->History case, whose old "zero movement while mounted" assertion
+    no longer holds now that height is deliberately animated throughout
+    rather than held flat).
 
 ## Known limitations
 
