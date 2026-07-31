@@ -49,6 +49,30 @@ interface TabTransitionProps<T extends string> {
  * state. `outgoing.tab` and `activeTab` are always different tabs while a
  * transition is in flight (see the synchronous state update above), so
  * these two keys never collide.
+ *
+ * The wrapper is `display: grid` with both panels placed in the same cell
+ * (`gridArea: '1 / 1'`), not `position: relative` + `position: absolute` on
+ * the outgoing panel. That distinction matters for height: an absolutely
+ * positioned element contributes nothing to its container's height, so with
+ * the old approach the wrapper's height snapped *instantly*, in the same
+ * commit that starts a transition, to just the incoming page's natural
+ * height — independent of and well before the slide animation had visibly
+ * progressed at all. If the two pages have different heights (e.g. a
+ * populated Shopping List vs. an empty History), everything below (Debug
+ * tools, the footer) jumped position in that same instant — a second,
+ * separate flick from the remount one above, measured directly via a
+ * frame-by-frame trace (a ~159px jump between two consecutive animation
+ * frames). With both panels as normal (non-absolute) grid items sharing one
+ * cell, the grid's auto-sized row height is the *max* of everything placed
+ * in it, so the wrapper reflects the taller of the two pages for as long as
+ * both are present, and only settles to the incoming page's height once the
+ * outgoing panel actually unmounts at the end of the transition — after the
+ * slide has already visually finished, a far less jarring moment for a
+ * layout shift. Since neither panel is positioned anymore, default paint
+ * order would otherwise flip to DOM order (the later-rendered incoming
+ * panel on top); the outgoing panel's explicit `zIndex: 1` keeps it
+ * painting above the incoming one, preserving the intended "outgoing slides
+ * away revealing incoming underneath" visual from the opaque-panels fix.
  */
 export function TabTransition<T extends string>({ activeTab, direction, renderTab }: TabTransitionProps<T>) {
   const [outgoing, setOutgoing] = useState<{ tab: T; direction: SlideDirection } | null>(null)
@@ -82,7 +106,10 @@ export function TabTransition<T extends string>({ activeTab, direction, renderTa
     // overflow only needs to clip while a slide is actually in flight —
     // left `visible` at rest so things like the receipt source-picker menu
     // (which pops open below its button) aren't clipped by this wrapper.
-    <div style={{ position: 'relative', overflow: outgoing ? 'hidden' : 'visible' }}>
+    // display: grid (not position: relative) is what lets both panels below
+    // share one cell and size the wrapper to the taller of the two — see
+    // the doc comment above.
+    <div style={{ display: 'grid', overflow: outgoing ? 'hidden' : 'visible' }}>
       {outgoing && (
         <div
           key={outgoing.tab}
@@ -90,18 +117,19 @@ export function TabTransition<T extends string>({ activeTab, direction, renderTa
           // pointer-events: none — this copy is on its way out, it shouldn't
           // still be tappable during the brief window it's animating away.
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
+            gridArea: '1 / 1',
+            // Explicit stacking, not relying on default paint order: with
+            // both panels as plain (non-positioned) grid items, DOM order
+            // would otherwise put the later-rendered incoming panel on top.
+            zIndex: 1,
             // Opaque, not transparent: the incoming/outgoing panels use
             // different (asymmetric) easing curves, so they don't stay a
             // constant panel-width apart mid-animation — they briefly
             // overlap geometrically. An opaque background here (this panel
-            // paints above the static-positioned current one by default
-            // stacking order) keeps that overlap from showing as both
-            // pages' text bleeding together; it just fully covers whatever
-            // is behind it until it slides out of the way.
+            // paints above the incoming one via the explicit zIndex above)
+            // keeps that overlap from showing as both pages' text bleeding
+            // together; it just fully covers whatever is behind it until it
+            // slides out of the way.
             background: 'var(--bg)',
             pointerEvents: 'none',
             animation: `${outgoingAnimation} ${TRANSITION_MS}ms ${EASE_OUTGOING} both`,
@@ -114,14 +142,18 @@ export function TabTransition<T extends string>({ activeTab, direction, renderTa
         key={activeTab}
         className={incomingAnimation ? 'gb-tab-slide' : undefined}
         // Opaque for the same reason as the outgoing panel above — this one
-        // isn't the layer doing the occluding (outgoing paints on top by
-        // default stacking), but giving it its own matching background too
-        // means that doesn't depend on which panel happens to stack above
-        // the other.
+        // isn't the layer doing the occluding (outgoing paints on top via
+        // its explicit zIndex), but giving it its own matching background
+        // too means that doesn't depend on which panel happens to stack
+        // above the other.
         style={
           incomingAnimation
-            ? { background: 'var(--bg)', animation: `${incomingAnimation} ${TRANSITION_MS}ms ${EASE_INCOMING} both` }
-            : undefined
+            ? {
+                gridArea: '1 / 1',
+                background: 'var(--bg)',
+                animation: `${incomingAnimation} ${TRANSITION_MS}ms ${EASE_INCOMING} both`,
+              }
+            : { gridArea: '1 / 1' }
         }
       >
         {renderTab(activeTab)}

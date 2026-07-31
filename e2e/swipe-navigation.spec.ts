@@ -265,3 +265,63 @@ test('the outgoing page keeps its DOM node identity instead of remounting when a
   await page.waitForTimeout(ANIMATION_SETTLE_MS)
   await expect(page.locator('[data-canary="no-remount"]')).toHaveCount(0)
 })
+
+test('content below the transitioning tabs does not jump position mid-transition when the two pages differ in height', async ({
+  page,
+}) => {
+  // Regression test for a second, separate flick: the outgoing panel used
+  // to be `position: absolute` (contributing zero height to its container),
+  // so the wrapper's height snapped *instantly* to the incoming page's
+  // height the moment a transition started, independent of the slide's own
+  // progress — jumping Debug tools/the footer to their final position in a
+  // single frame instead of only once the transition actually finished.
+  // Seed enough items that Shopping List is visibly taller than an empty
+  // History so the height mismatch this depends on is real.
+  await page.goto('/')
+  for (let i = 0; i < 10; i++) {
+    await page.getByTestId('add-item-input').fill(`Item ${i}`)
+    await page.getByTestId('add-item-submit').click()
+  }
+
+  // Start a rAF sampler before the switch so every frame of the ~300ms
+  // transition is captured with no round-trip latency between samples.
+  await page.evaluate(() => {
+    ;(window as unknown as { __tops: Array<{ footer: number; debug: number; slides: number }> }).__tops = []
+    const tops = (window as unknown as { __tops: Array<{ footer: number; debug: number; slides: number }> }).__tops
+    const start = performance.now()
+    function tick() {
+      const footer = document.querySelector('[data-testid="app-footer"]')
+      const debugToggle = document.querySelector('[data-testid="debug-panel-toggle"]')
+      if (footer && debugToggle) {
+        tops.push({
+          footer: footer.getBoundingClientRect().top,
+          debug: debugToggle.getBoundingClientRect().top,
+          slides: document.querySelectorAll('.gb-tab-slide').length,
+        })
+      }
+      if (performance.now() - start < 400) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
+
+  await page.getByTestId('nav-history').click()
+  await page.waitForTimeout(450)
+
+  const tops = await page.evaluate(
+    () => (window as unknown as { __tops: Array<{ footer: number; debug: number; slides: number }> }).__tops,
+  )
+  expect(tops.length).toBeGreaterThan(0)
+
+  // While both panels are present (the transition is actually in flight),
+  // the footer/debug-toggle position must stay completely still — any
+  // movement in that window is a snap, not the (purely horizontal) slide
+  // animation, which doesn't touch vertical layout at all.
+  const duringTransition = tops.filter((t) => t.slides === 2)
+  expect(duringTransition.length).toBeGreaterThan(0)
+  const firstFooterTop = duringTransition[0].footer
+  const firstDebugTop = duringTransition[0].debug
+  for (const t of duringTransition) {
+    expect(t.footer).toBe(firstFooterTop)
+    expect(t.debug).toBe(firstDebugTop)
+  }
+})
