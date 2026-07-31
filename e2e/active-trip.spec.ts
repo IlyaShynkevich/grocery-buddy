@@ -75,13 +75,16 @@ test('reset all data then reload bootstraps exactly one trip, not phantom duplic
   await openDebugPanel(page)
 
   await page.getByTestId('debug-reset-all').click()
-  await expect(page.getByTestId('debug-trip')).toHaveCount(0)
+  // resetAllData() (db.ts) wipes every table and pins one fresh empty draft
+  // as active atomically, in the same transaction — so this shows exactly
+  // one trip immediately, not a brief "0" that some other mounted
+  // component's own self-heal would otherwise race to fill in
+  // unpredictably (the actual bug this used to have: 1 or 2 trips,
+  // depending on timing, instead of a deterministic single draft).
+  await expect(page.getByTestId('debug-trip')).toHaveCount(1)
 
   await page.reload()
 
-  // ShoppingListPage and ReceiptCapture each resolve the active trip
-  // independently on mount; without a concurrency guard both would race
-  // past the "no active trip yet" check and create one each.
   await expect.poll(() => itemNames(page)).toEqual([])
   await expect(page.getByTestId('debug-trip')).toHaveCount(1)
 })

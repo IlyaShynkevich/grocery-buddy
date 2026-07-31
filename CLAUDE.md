@@ -165,11 +165,11 @@ model.
     (receipt scanning via Groq, offline support, trip history, monthly
     stats) instead of the leaner pre-M4 description, plus added the
     missing Testing section and `lint` command.
-  - **Post-merge bug found, not yet fixed**: the DB Debug Panel isn't
-    grouped with the footer at the true bottom of the screen — it's left
-    with the regular page content above, so on short pages there's a gap
-    between Debug tools and the footer instead of them sitting together.
-    See Known issues below.
+  - **Post-merge bug found**: the DB Debug Panel isn't grouped with the
+    footer at the true bottom of the screen — it's left with the regular
+    page content above, so on short pages there's a gap between Debug
+    tools and the footer instead of them sitting together. Fixed later —
+    see "Debug tools grouped with the footer at the true bottom" below.
 - **Layout width consistency pass**: done and verified in production.
   Root cause of several reported width bugs (Receipt section on Shopping
   List rendering centered/narrower than the rest of the page; History and
@@ -535,7 +535,8 @@ model.
   `swipe-navigation.spec.ts` settle-wait. Confirmed with `--repeat-each=3`
   before and after; full suite now 62/62, no known-flake carve-out needed.
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
-  reload instead of zero. Not yet fixed.
+  reload instead of zero. Fixed later — see "Reset all data leaves
+  phantom trips (root cause fixed)" near the end of this section.
 - **Swipe transition smoothing + swipe-from-scrollable-list fix**: fixed,
   not yet merged. Two follow-ups on the swipe/slide-transition work above.
   - The 220ms slide felt too fast/abrupt even after the earlier duration
@@ -927,6 +928,60 @@ model.
     yet — neither reads as "current" for a few pixels of scroll. Scrolling
     well past that boundary (+40px margin, not +5px) clears it reliably.
     Full suite: 70/70 passing.
+- **Reset all data leaves phantom trips (root cause fixed)**: done and
+  verified — this was long-standing (originally reported, never actually
+  fixed, back near the footer/README rewrite entry above). Root cause
+  confirmed by reproduction (a temporary Playwright script reading
+  IndexedDB directly, not guessed): `resetAll` (`DbDebugPanel.tsx`) cleared
+  `trips`/`items`/`pendingReceipts`/`appState` as four separate,
+  non-transactional `.clear()` calls. The moment `appState` (which holds
+  the active-trip pointer) was cleared, every currently-mounted
+  `useActiveTripId` consumer — Shopping List, receipt capture, the mascot,
+  none of which unmount here since Debug tools only renders on the
+  Shopping List tab (see the earlier "Debug tools removed from
+  History/Stats" entry) — reactively noticed the pointer disappear and
+  self-healed by creating its own replacement draft (the same "never leave
+  the app without something to shop into" invariant `deleteTrip`/
+  `completeTrip` rely on elsewhere). A module-level guard added in an
+  earlier session (`pendingActiveTripCreation` in `db.ts`) already
+  prevented multiple *concurrent* self-heals from producing 2 separate
+  trips in one wave — confirmed live across 12 serial repro runs, always
+  exactly 1 — but nothing prevented that one from happening at all, and
+  once created it's a completely ordinary draft, indistinguishable from a
+  real one and impossible to clean up after the fact.
+  - Presented the two real options to the user rather than picking
+    silently, since the original bug's wording ("...instead of zero")
+    implied literally zero trips, which turned out to require a much
+    larger change: making every `useActiveTripId` consumer tolerate a
+    null trip id and deferring creation to an actual user action, instead
+    of eagerly self-healing on mount. User chose the smaller, deterministic
+    fix instead: make Reset behave exactly like a fresh install (which also
+    isn't "zero trips" once bootstrapped) rather than truly empty.
+  - Fixed by adding `resetAllData()` (`db.ts`, next to `deleteTrip`): wipes
+    all four tables *and* immediately creates and pins one fresh empty
+    draft, all inside a single `db.transaction(...)` block. This isn't
+    just "fewer calls" — it's what actually closes the race: other
+    components' live queries only observe a transaction's effect once it
+    commits, so the pointer is never seen "missing" from outside at all —
+    it transitions directly from the old trip's id to the new one, which
+    `useActiveTripId`'s `resolve()` already treats as an ordinary valid
+    draft and returns early on, never calling `getOrCreateActiveTrip()` in
+    the first place. `DbDebugPanel.tsx`'s `resetAll` now just calls this
+    and refreshes its own display.
+  - One test needed updating, not just adding: `active-trip.spec.ts`'s
+    existing "reset all data then reload bootstraps exactly one trip, not
+    phantom duplicates" asserted 0 trips immediately after clicking
+    Reset (true under the old code, since the phantom trip only appeared
+    later via the async race) — now genuinely 1 immediately, since the
+    fresh draft is created synchronously as part of the same atomic
+    action. Updated the assertion rather than leaving it passing for the
+    wrong reason.
+  - Confirmed live: 15 serial repro repeats each produced exactly one
+    trip — a genuinely fresh, empty (0 items) draft — both immediately
+    after Reset and again after a full page reload. Also removed the
+    now-resolved "still-open... known issue" comment in
+    `DbDebugPanel.tsx` that this fix made stale. Full suite: 70/70
+    passing.
 
 ## Known limitations
 
@@ -943,9 +998,7 @@ model.
 
 - **Auto-scroll to top after confirming/dismissing a receipt review.**
   Right now the user has to manually scroll up to reach Save trip after a
-  review resolves. Related to (but distinct from) the Debug tools/footer
-  grouping bug above — this one is about scroll position after an action,
-  not layout.
+  review resolves.
 - **Full mascot/icon redesign**, waiting on custom artwork. Currently a
   placeholder gray shopping-bag icon is used everywhere it appears: the app
   icon, the favicon, and the footer.

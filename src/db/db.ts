@@ -241,3 +241,34 @@ export async function deleteTrip(tripId: number): Promise<void> {
     }
   })
 }
+
+/**
+ * Wipes every table (debug-only "start over" action), then immediately
+ * pins a single fresh empty draft as active — same "never leave the app
+ * without something to shop into" invariant deleteTrip/completeTrip
+ * already guarantee. This isn't optional here the way it might look: every
+ * useActiveTripId consumer (Shopping List, receipt capture, the mascot —
+ * none of which unmount during this, since Debug tools only renders on the
+ * Shopping List tab) self-heals the instant it notices the active-trip
+ * pointer go missing, so clearing appState as a separate step (the previous
+ * implementation) always raced at least one of them into creating its own
+ * replacement draft — nondeterministically 1 or 2, depending on timing,
+ * and impossible to clean up after the fact since a self-healed trip is a
+ * completely ordinary draft once created. Doing the wipe and the
+ * recreation inside one Dexie transaction closes that gap: other
+ * components' live queries only observe state once a transaction commits,
+ * so the pointer is never seen "missing" from outside — it transitions
+ * directly from the old trip's id to the new one, which useActiveTripId's
+ * own resolve() already treats as a normal, valid draft and returns early
+ * on, never calling getOrCreateActiveTrip() at all.
+ */
+export async function resetAllData(): Promise<void> {
+  await db.transaction('rw', db.trips, db.items, db.pendingReceipts, db.appState, async () => {
+    await db.trips.clear()
+    await db.items.clear()
+    await db.pendingReceipts.clear()
+    await db.appState.clear()
+    const newId = await db.trips.add(newTrip())
+    await db.appState.put({ key: ACTIVE_TRIP_KEY, value: newId })
+  })
+}
