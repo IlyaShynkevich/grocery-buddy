@@ -30,6 +30,16 @@ export class GroqHttpError extends Error {
 
 const CATEGORY_KEYS = CATEGORIES.map((category) => category.key)
 
+// TEMPORARY DEBUG LOGGING — see the matching DEBUG_TAG comment in
+// api/extract-receipt.ts for why this exists. `requestId` is optional so
+// this function stays usable on its own (e.g. from a standalone script or a
+// future test) without a caller having to invent one.
+const DEBUG_TAG = '[TEMP_DEBUG_EXTRACT]'
+
+function debugLog(requestId: string | undefined, step: string, details?: Record<string, unknown>) {
+  console.log(`${DEBUG_TAG} ${requestId ?? '(no id)'} ${step}`, details ?? {})
+}
+
 const SYSTEM_PROMPT = `You extract line items from a photo of a grocery store receipt.
 Respond with ONLY a JSON object of the shape {"items": [{"name": string, "price": number, "category": string, "isDiscount": boolean}]}.
 - "price" is the item's paid price in the receipt's currency, as a plain number (no currency symbol, no thousands separators).
@@ -50,12 +60,22 @@ export async function extractReceiptItems(
   imageDataUrl: string,
   apiKey: string,
   fetchImpl: typeof fetch = fetch,
+  requestId?: string,
 ): Promise<ExtractedItem[]> {
+  debugLog(requestId, 'preparing Groq request', {
+    endpoint: GROQ_ENDPOINT,
+    model: GROQ_MODEL,
+    imageDataUrlLength: imageDataUrl.length,
+    apiKeyPresent: !!apiKey,
+    apiKeyLength: apiKey.length,
+  })
+
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
   let response: Response
   try {
+    debugLog(requestId, 'sending fetch to Groq')
     response = await fetchImpl(GROQ_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -80,7 +100,12 @@ export async function extractReceiptItems(
       }),
       signal: controller.signal,
     })
+    debugLog(requestId, 'fetch to Groq returned a response', { status: response.status, ok: response.ok })
   } catch (err) {
+    debugLog(requestId, 'fetch to Groq threw (never got a response)', {
+      errorName: err instanceof Error ? err.name : typeof err,
+      message: err instanceof Error ? err.message : String(err),
+    })
     if (err instanceof Error && err.name === 'AbortError') {
       throw new Error('Groq request timed out')
     }
@@ -91,6 +116,7 @@ export async function extractReceiptItems(
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
+    debugLog(requestId, 'Groq responded with a non-2xx status', { status: response.status, bodyPreview: body.slice(0, 300) })
     throw new GroqHttpError(response.status, `Groq returned ${response.status}: ${body.slice(0, 300)}`)
   }
 
@@ -98,15 +124,18 @@ export async function extractReceiptItems(
   try {
     payload = await response.json()
   } catch {
+    debugLog(requestId, 'Groq response body was not valid JSON')
     throw new Error('Groq response was not valid JSON')
   }
 
   const content = (payload as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]
     ?.message?.content
   if (typeof content !== 'string') {
+    debugLog(requestId, 'Groq response had no message content', { payloadPreview: JSON.stringify(payload).slice(0, 300) })
     throw new Error('Groq response had no message content')
   }
 
+  debugLog(requestId, 'Groq response parsed successfully, extracting items from content')
   return parseExtractedItems(content)
 }
 
