@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
-import { ACTIVE_TRIP_KEY, db, newItem, newTrip, recomputeTripTotal, type Item, type Trip } from '../../db/db'
+import { ACTIVE_TRIP_KEY, db, newItem, newTrip, recomputeTripTotal, resetAllData, type Item, type Trip } from '../../db/db'
 import { CATEGORIES, resolveEssential } from '../../db/categories'
 import { formatPrice } from '../../lib/formatPrice'
 import { pageStyle } from '../../lib/ui'
@@ -36,10 +36,9 @@ export function DbDebugPanel() {
   // doesn't own (receipt extraction), so item mutations must refresh the
   // trip list even without any action taken here. Deliberately scoped to
   // items rather than a broad live query over trips too: this panel's own
-  // actions (create/reset trip) already call refresh() directly below, and
-  // watching trips as well would also re-surface, on every render, the
-  // still-open "reset auto-recreates an active trip in the background"
-  // behavior tracked as a separate known issue.
+  // actions (create/reset trip) already call refresh() directly below, so a
+  // trips-level query would just be redundant reactivity, not additional
+  // correctness.
   const itemsSignal = useLiveQuery(() => db.items.toArray(), [])
 
   useEffect(() => {
@@ -81,10 +80,12 @@ export function DbDebugPanel() {
   }
 
   const resetAll = async () => {
-    await db.trips.clear()
-    await db.items.clear()
-    await db.pendingReceipts.clear()
-    await db.appState.clear()
+    // See resetAllData's own doc comment (db.ts) for why this can't just be
+    // four separate .clear() calls — it needs to wipe and re-pin a fresh
+    // draft as one atomic transaction, or other mounted components racing
+    // to self-heal the missing active-trip pointer leave 1-2 unpredictable
+    // extra trips behind.
+    await resetAllData()
     setSelectedTripId(null)
     await refresh()
   }
