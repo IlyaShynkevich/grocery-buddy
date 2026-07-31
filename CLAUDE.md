@@ -577,8 +577,22 @@ commit message(s); the user creates the branch, commits, pushes, and merges
 themselves. This keeps GitHub history under the user's own authorship.
 
 Every commit message Claude gives — milestone or fix, no exceptions — must
-be a short title line plus a brief description (2-4 lines) explaining what
-changed and why. Never just a one-line title.
+follow this format: a short title line, a brief 1-2 sentence summary of
+what changed and why, then bullet points listing each specific change.
+Never just a one-line title, and never a dense prose paragraph in place of
+the bullets — the goal is something quickly skimmable when reviewing past
+work later. For example:
+
+```
+Fix stale trip date and one-way shopping list toggle
+
+The active draft's date wasn't refreshing on load, and the collapse
+toggle couldn't be tapped back closed once expanded.
+
+- Refresh a draft trip's date to today on load, not just at creation
+- Always render the shopping list toggle so it works both directions
+- Add e2e coverage for both fixes
+```
 
 Vercel auto-deploys: pushes to `main` trigger a Production deploy; pushes to
 any other branch (or open PR) get an automatic Preview deployment with its
