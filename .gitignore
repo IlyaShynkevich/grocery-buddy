@@ -22,6 +22,10 @@ playwright/.cache
 # Raw mascot source art (processed into public/mascot/*.png, not shipped as-is)
 /MASCOT
 
+# Reference icon art used as a basis for hand-adapted inline SVGs in
+# src/features/navigation/icons.tsx — not shipped as-is
+/ICONS
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

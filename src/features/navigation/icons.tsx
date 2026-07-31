@@ -78,16 +78,30 @@ export function BarChartIcon({ size = 20 }: IconProps) {
   )
 }
 
-const GEAR_TOOTH_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315]
+// Adapted from the reference gear/settings icon at ICONS/gear-icon.png (a
+// filled cog-with-hole glyph) into this set's stroke-only style: one
+// continuous outline path — 8 teeth joined directly to a circular root, via
+// arcs for the valleys between teeth — plus a plain stroked circle for the
+// center hole, instead of that reference's filled silhouette. Being a single
+// path (not separate overlapping shapes, which is what earlier hand-drawn
+// attempts used) is what makes strokeLinejoin: round (set globally in
+// svgProps) soften every tooth corner for free, matching the reference's
+// rounded-tooth look, and it's also what avoids any gap/seam between teeth
+// and body — the failure mode of those earlier attempts. Coordinates were
+// generated with a small script (8-fold symmetry: each tooth is a trapezoid
+// between the root radius and the tip radius, joined by a root-radius arc
+// through the valley) rather than hand-typed, so the teeth are exactly
+// evenly spaced. Sized so the tip radius (~8.3) roughly matches Info/Clock's
+// circle radius (8.5), and the center hole (r 3.4) is proportioned like the
+// reference's.
+const GEAR_PATH =
+  'M 10.55 6.59 L 10.56 3.83 L 13.44 3.83 L 13.45 6.59 A 5.6 5.6 0 0 1 14.8 7.15 L 16.76 5.2 L 18.8 7.24 L 16.85 9.2 A 5.6 5.6 0 0 1 17.41 10.55 L 20.17 10.56 L 20.17 13.44 L 17.41 13.45 A 5.6 5.6 0 0 1 16.85 14.8 L 18.8 16.76 L 16.76 18.8 L 14.8 16.85 A 5.6 5.6 0 0 1 13.45 17.41 L 13.44 20.17 L 10.56 20.17 L 10.55 17.41 A 5.6 5.6 0 0 1 9.2 16.85 L 7.24 18.8 L 5.2 16.76 L 7.15 14.8 A 5.6 5.6 0 0 1 6.59 13.45 L 3.83 13.44 L 3.83 10.56 L 6.59 10.55 A 5.6 5.6 0 0 1 7.15 9.2 L 5.2 7.24 L 7.24 5.2 L 9.2 7.15 A 5.6 5.6 0 0 1 10.55 6.59 Z'
 
 export function GearIcon({ size = 20 }: IconProps) {
   return (
     <svg {...svgProps(size)}>
-      <circle cx="12" cy="12" r="5.5" />
-      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
-      {GEAR_TOOTH_ANGLES.map((deg) => (
-        <rect key={deg} x="10.7" y="1.4" width="2.6" height="3" rx="0.9" transform={`rotate(${deg} 12 12)`} />
-      ))}
+      <path d={GEAR_PATH} />
+      <circle cx="12" cy="12" r="3.4" />
     </svg>
   )
 }
