@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useState } from 'react'
-import { ACTIVE_TRIP_KEY, db, getOrCreateActiveTrip } from '../../db/db'
+import { ACTIVE_TRIP_KEY, db, getOrCreateActiveTrip, refreshDraftDate } from '../../db/db'
 
 /**
  * Resolves the id of the trip currently being shopped, reactively.
@@ -25,7 +25,13 @@ export function useActiveTripId(): number | null {
       if (pointerTripId !== undefined) {
         const pinned = await db.trips.get(pointerTripId)
         if (pinned && pinned.status === 'draft') {
-          if (!cancelled) setTripId(pinned.id)
+          // Refreshes the trip's date to today if it's gone stale (e.g. the
+          // app was left open, or reopened, on a later day than the draft
+          // was created) — trip.date is read reactively elsewhere via
+          // Dexie live queries, so this DB write alone is enough for the
+          // displayed date to update without waiting for a new trip.
+          const refreshed = await refreshDraftDate(pinned)
+          if (!cancelled) setTripId(refreshed.id)
           return
         }
       }

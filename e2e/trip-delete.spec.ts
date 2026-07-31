@@ -87,6 +87,15 @@ test('deleting the trip currently pinned as active starts a fresh empty draft', 
   // pointer only ever legitimately targets a draft), but it's exactly the
   // edge case deleteTrip's pointer-reassignment guards against.
   await page.getByTestId('nav-history').click()
+  // TabTransition keeps the outgoing Shopping List tab mounted (and its
+  // useActiveTripId live query fully reactive) for its slide-out animation
+  // — if "Make active" points the pointer at trip1 (now complete) while
+  // that's still alive, its self-heal logic sees a non-draft pinned trip
+  // and immediately reassigns the pointer back to the existing draft,
+  // undoing the click. Waiting for the outgoing tab to actually finish
+  // unmounting avoids the race, same pattern as swipe-navigation.spec.ts's
+  // settle wait.
+  await expect(page.getByTestId('shopping-list')).toHaveCount(0)
   const trip1Row = page.locator(`[data-testid="debug-trip"][data-trip-id="${trip1Id}"]`)
   await trip1Row.getByTestId('debug-make-active').click()
   await expect(trip1Row).toHaveAttribute('data-active', 'true')
