@@ -40,14 +40,6 @@ function App() {
   // direction — updated by both the swipe handler and the tab-bar taps
   // below, so either input path gets the same directional animation.
   const [direction, setDirection] = useState<SlideDirection>('forward')
-  // Lags `activeTab` on purpose: only updates once a transition genuinely
-  // finishes (TabTransition's onSettle), not the instant one starts. Debug
-  // tools is gated on this, not `activeTab` directly — Stats is the only
-  // tab that hides it, and gating on `activeTab` made it pop in/out mid-
-  // transition (the moment a swipe/tap fires, before the slide has even
-  // started), adding an extra, slide-unrelated layout jump on top of the
-  // panels' own height animation.
-  const [settledTab, setSettledTab] = useState<TabName>(activeTab)
 
   // Swipe-to-switch-tabs: left advances (Shopping List -> History -> Stats),
   // right goes back, no wraparound past either end. Raw touch events only
@@ -220,31 +212,27 @@ function App() {
       {view.name === 'trip-detail' ? (
         <TripDetailPage tripId={view.tripId} onBack={() => setView({ name: 'history' })} />
       ) : (
-        <TabTransition
-          activeTab={activeTab}
-          direction={direction}
-          renderTab={renderTab}
-          onSettle={() => setSettledTab(activeTab)}
-        />
+        <TabTransition activeTab={activeTab} direction={direction} renderTab={renderTab} />
       )}
 
       {/*
-        Debug tools + footer are one bottom-anchored group, not two
-        independently-pinned pieces — marginTop: 'auto' on the group (not
-        on the footer alone) is what makes them sit flush together at the
-        true bottom of the viewport on short pages, with the actual page
-        content above filling the rest of the space.
+        Debug tools + footer are static, outside TabTransition entirely —
+        they never slide, jump, or animate due to a tab switch; they just
+        reflow like any other static content below it. marginTop: 'auto' on
+        the group (not on the footer alone) is what makes them sit flush
+        together at the true bottom of the viewport on short pages, with the
+        actual page content above filling the rest of the space.
       */}
       <div style={{ marginTop: 'auto' }}>
         {/*
           Stats is a pure read-only report — there's nothing there to debug,
           unlike Shopping List/History where trip and receipt data is
-          actively worked with. `settledTab` (not `activeTab`/view.name) so
-          trip detail, reached via History, still counts as "in History"
-          here too, and so this only flips once a transition actually
-          settles (see the `settledTab` comment above).
+          actively worked with. Gated directly on `activeTab` (trip-detail
+          counts as "in History" since it isn't a distinct tab — see
+          `activeTab`'s derivation above) — same plain, instant conditional
+          as the tab bar's own highlight, no settle-timing involved.
         */}
-        {settledTab !== 'stats' && <DbDebugPanel />}
+        {activeTab !== 'stats' && <DbDebugPanel />}
         <Footer />
       </div>
     </main>
