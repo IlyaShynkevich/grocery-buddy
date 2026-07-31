@@ -547,41 +547,78 @@ model.
     identically, which made the outgoing tab read as hesitating near the
     edge instead of speeding away.
   - Separately, swiping to change tabs from within History stopped
-    registering once there were enough trips to make the page scrollable
-    — the gesture got eaten as a vertical scroll instead. Diagnosis (not
-    yet independently confirmed, see verification note below): `<main>`
-    sets `touch-action: pan-y`, and the swipe handler (`App.tsx`) only
-    calls `preventDefault()` once a gesture has already locked to
-    `'horizontal'` (past `SWIPE_DIRECTION_LOCK`, 10px). On a page tall
-    enough to actually scroll, the browser can commit to a native
-    vertical-scroll gesture from an earlier touchmove than that, and once
-    committed, ignores `preventDefault()` on later touchmove events in the
-    same gesture — so by the time our JS decides "horizontal," it's too
-    late. Short (non-scrollable) pages never hit this because there's
-    nothing for the browser to commit to. Fixed by having `onTouchMove`
-    speculatively call `preventDefault()` while still in the `'pending'`
-    (undecided) phase, whenever the current move is at least as horizontal
-    as vertical — keeps the swipe option alive through the ambiguous
-    window instead of only defending it after the lock threshold. If the
-    gesture resolves to vertical, we simply stop calling it and the
-    browser's normal scroll takes over a few px behind, imperceptibly.
-  - **Verification gap, worth knowing if this is touched again**: this fix
-    was verified by code reasoning (matches documented browser
-    touch-action/gesture-commit semantics) and the full Playwright suite
-    (62/62, no regressions) — but the specific race it addresses could
-    not be reproduced in an automated test, even after real effort. Plain
-    `dispatchEvent(new TouchEvent(...))` (what the existing swipe specs
-    use) fires *untrusted* events, which never drive the browser's actual
-    native-scroll compositor path at all, so they can't exercise this race
-    regardless of whether the fix is applied — confirmed by reverting the
-    fix and seeing the existing-style test still pass. Escalating to
-    Chrome DevTools Protocol's `Input.dispatchTouchEvent` (trusted
-    synthetic input, which does drive real gesture recognition) still
-    didn't reproduce it, even with a deliberately added early vertical
-    wobble before straightening into a horizontal swipe, headed or
-    headless. So this one fix has no automated regression coverage — real
-    verification is manual, on an actual touch device (or Chrome's mobile
-    device toolbar), not something caught by `npm run test:e2e`.
+    registering once there were enough trips to make the page scrollable.
+    First attempt (this bullet, superseded below): theorized a native
+    `touch-action: pan-y` scroll-commit race in `onTouchMove` and added a
+    speculative `preventDefault()` during the ambiguous gesture phase. That
+    fix shipped with **no automated regression coverage** — real effort,
+    including Chrome DevTools Protocol trusted touch input (which does
+    drive real gesture recognition, unlike plain `dispatchEvent(new
+    TouchEvent(...))`), never reproduced the theorized race at all.
+  - **Second attempt found the real cause, and it was reachable by code
+    reading, not a timing race.** `onTouchStart`'s `isInteractive` check
+    (`App.tsx`) excluded any touch starting on a `button` or `a` from swipe
+    consideration entirely, before the gesture is ever evaluated. In
+    `HistoryPage.tsx`, each trip row is a `<button data-testid=
+    "history-trip">` with `width: 100%`, and the list only has an 8px gap
+    between rows — so once there's a real list of trips, a `<button>`
+    covers nearly the whole visible list, and `onTouchStart` sets `phase =
+    'ignored'` immediately for almost any touch starting "in the list."
+    Because of that, `onTouchMove`'s early `if (phase === 'ignored')
+    return` meant the *first* fix's speculative-`preventDefault()` code
+    never even ran for this scenario — it was unreachable, not ineffective.
+    Confirmed live (CDP trusted touch on a real `history-trip` button,
+    against a running `npm run preview` build) that the swipe genuinely did
+    nothing pre-fix, and did switch tabs post-fix. Fixed by narrowing
+    `isInteractive` to `input, textarea, select` only — the controls that
+    actually need full native touch ownership (text cursor placement, the
+    native `<select>` picker). Buttons/links no longer block swipe
+    detection: a real tap is unaffected (nothing here calls
+    `preventDefault()` on touchstart/touchend for a stationary touch), and
+    a genuine horizontal drag naturally won't also fire the underlying
+    element's click, per standard mobile "tap slop" behavior. Grepped `src/`
+    to confirm `App.tsx` is the only file with any touch/pointer/drag
+    handling, so nothing else depends on buttons being excluded. Kept the
+    first attempt's speculative-`preventDefault()` change in place too
+    (harmless, and now actually reachable for non-button swipe starts).
+    This time has real automated coverage: `e2e/swipe-navigation.spec.ts`'s
+    "swiping starting directly on a history-trip button still switches
+    tabs" test uses CDP trusted touch input (confirmed necessary — plain
+    `dispatchEvent` doesn't reliably exercise this), seeds 15 trips so the
+    list is button-dense, and swipes from a point directly on a trip
+    button.
+  - **A second, unrelated bug found during the same manual testing pass**:
+    the slide transition visibly showed the outgoing and incoming pages'
+    text overlapping/bleeding together mid-animation (e.g. "History" and
+    "Save trip" simultaneously visible in the same space) — a regression
+    from the animation-smoothing bullet above. Root cause, confirmed by a
+    frame-by-frame `getBoundingClientRect()` trace against a real
+    `npm run preview` build: the outgoing (`position: absolute`) and
+    incoming (`position: static`) panels only tile edge-to-edge with zero
+    overlap if they stay exactly one panel-width apart at every instant,
+    which requires both to progress the same fraction of their distance at
+    the same time — i.e. the *same* easing curve. The asymmetric
+    decelerate/accelerate curves introduced above broke that invariant:
+    measured up to ~194px of genuine geometric overlap mid-transition (out
+    of a 390px-wide viewport) in a real trace. Neither panel had its own
+    background (`pageStyle` in `src/lib/ui.ts` sets none; `--bg` is only
+    painted at the shared `body` level), so wherever they overlapped, both
+    panels' text rendered simultaneously. Fixed by giving both sliding
+    panels in `TabTransition.tsx` an opaque `background: 'var(--bg)'` —
+    verified live (before/after screenshots of the same worst-overlap
+    frame) that this alone fully resolves the visible bleed, since default
+    CSS stacking already paints the `position: absolute` outgoing panel
+    above the `position: static` incoming one, so once opaque it fully
+    occludes whatever's behind it and progressively reveals the incoming
+    page as it slides out of the way. No changes to the easing
+    curves/duration/z-index were needed — the geometric overlap is now
+    harmless rather than eliminated. Covered by
+    `e2e/swipe-navigation.spec.ts`'s "outgoing and incoming tab panels stay
+    fully opaque during a transition" test (asserts computed
+    `backgroundColor` alpha is always 1 for both panels throughout a
+    transition, sampled every animation frame) — deliberately checks
+    opacity rather than geometric non-overlap, since the fix doesn't (and
+    doesn't need to) make the overlap itself go away.
 
 ## Known limitations
 

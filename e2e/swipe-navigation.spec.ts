@@ -135,3 +135,100 @@ test('tapping the tab bar still works exactly as before, alongside swipe', async
   await page.getByTestId('nav-shopping').click()
   await expect(page.getByTestId('shopping-list')).toBeVisible()
 })
+
+/**
+ * Dispatches a *trusted* touch swipe via Chrome DevTools Protocol, unlike
+ * `touchSwipe` above (which fires untrusted `dispatchEvent`s — those never
+ * drive the browser's own default-action/gesture machinery, which is fine
+ * for testing this app's own JS logic in isolation, but doesn't reliably
+ * exercise real button/gesture interaction the way an actual finger would).
+ * Needed here because the bug this covers only reproduced with trusted
+ * input during investigation.
+ */
+async function cdpTouchSwipe(
+  page: Page,
+  { x1, y1, x2, y2, steps = 10 }: { x1: number; y1: number; x2: number; y2: number; steps?: number },
+) {
+  const client = await page.context().newCDPSession(page)
+  for (let i = 0; i <= steps; i++) {
+    await client.send('Input.dispatchTouchEvent', {
+      type: i === 0 ? 'touchStart' : 'touchMove',
+      touchPoints: [{ x: x1 + ((x2 - x1) * i) / steps, y: y1 + ((y2 - y1) * i) / steps, id: 1 }],
+    })
+    await page.waitForTimeout(16)
+  }
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+}
+
+test('swiping starting directly on a history-trip button still switches tabs', async ({ page }) => {
+  await page.goto('/')
+  // Enough trips that history-trip buttons (cardStyle, width: 100%, only an
+  // 8px gap between rows) cover essentially the whole visible list — a
+  // touch "in the middle of the scrollable list" is, in practice, a touch
+  // starting on one of these buttons.
+  for (let i = 0; i < 15; i++) {
+    await page.getByTestId('add-item-input').fill(`Item ${i}`)
+    await page.getByTestId('add-item-submit').click()
+    const tripId = await page.getByTestId('shopping-list').getAttribute('data-trip-id')
+    await page.getByTestId('save-trip-button').click()
+    await expect.poll(() => page.getByTestId('shopping-list').getAttribute('data-trip-id')).not.toBe(tripId)
+  }
+
+  await page.getByTestId('nav-history').click()
+  await expect(page.getByTestId('history-page')).toBeVisible()
+  await page.waitForTimeout(ANIMATION_SETTLE_MS)
+
+  const box = await page.getByTestId('history-trip').first().boundingBox()
+  if (!box) throw new Error('no bounding box for history-trip')
+  const x = box.x + box.width / 2
+  const y = box.y + box.height / 2
+
+  await cdpTouchSwipe(page, { x1: x + 100, y1: y, x2: x - 100, y2: y })
+  await expect(page.getByTestId('stats-page')).toBeVisible()
+})
+
+test('outgoing and incoming tab panels stay fully opaque during a transition', async ({ page }) => {
+  // The outgoing and incoming panels use different (asymmetric) easing
+  // curves, so they don't stay a constant panel-width apart mid-animation —
+  // they briefly overlap geometrically (this is expected, not a bug: see
+  // TabTransition.tsx). What must hold is that wherever they overlap, only
+  // one is visible — i.e. both panels paint as fully opaque sheets, so
+  // whichever one is on top (the outgoing one, by default stacking order)
+  // completely occludes the other rather than both pages' text showing
+  // through simultaneously.
+  await page.goto('/')
+  await expect(page.getByTestId('shopping-list')).toBeVisible()
+
+  // Start a rAF sampler before the switch so every frame of the ~300ms
+  // transition is captured with no round-trip latency between samples.
+  await page.evaluate(() => {
+    ;(window as unknown as { __alphas: number[] }).__alphas = []
+    const alphas = (window as unknown as { __alphas: number[] }).__alphas
+    const start = performance.now()
+    function alphaOf(color: string): number {
+      const match = color.match(/rgba?\(([^)]+)\)/)
+      if (!match) return color === 'transparent' ? 0 : 1
+      const parts = match[1].split(',').map((p) => Number.parseFloat(p))
+      return parts.length === 4 ? parts[3] : 1
+    }
+    function tick() {
+      const slides = Array.from(document.querySelectorAll('.gb-tab-slide'))
+      if (slides.length === 2) {
+        for (const el of slides) {
+          alphas.push(alphaOf(getComputedStyle(el).backgroundColor))
+        }
+      }
+      if (performance.now() - start < 400) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
+
+  await page.getByTestId('nav-history').click()
+  await page.waitForTimeout(450)
+
+  const alphas = await page.evaluate(() => (window as unknown as { __alphas: number[] }).__alphas)
+  expect(alphas.length).toBeGreaterThan(0)
+  for (const alpha of alphas) {
+    expect(alpha).toBe(1)
+  }
+})
