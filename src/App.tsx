@@ -79,7 +79,20 @@ function App() {
       const dy = e.touches[0].clientY - startY
 
       if (phase === 'pending') {
-        if (Math.abs(dx) < SWIPE_DIRECTION_LOCK && Math.abs(dy) < SWIPE_DIRECTION_LOCK) return
+        if (Math.abs(dx) < SWIPE_DIRECTION_LOCK && Math.abs(dy) < SWIPE_DIRECTION_LOCK) {
+          // Direction isn't decided yet, but on a page tall enough to
+          // actually scroll, touch-action: pan-y lets the browser commit to
+          // a native vertical scroll from an early touchmove — it doesn't
+          // wait for the lock threshold below, and once it commits,
+          // preventDefault() on later touchmove events in the same gesture
+          // is ignored. Speculatively preventing default here (whenever this
+          // move is at least as horizontal as vertical) keeps the swipe
+          // option alive through the ambiguous window; if it resolves to
+          // vertical below, we just stop calling it and the browser's normal
+          // scroll takes over a few px behind, which is imperceptible.
+          if (Math.abs(dx) >= Math.abs(dy)) e.preventDefault()
+          return
+        }
         phase = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'ignored'
       }
 

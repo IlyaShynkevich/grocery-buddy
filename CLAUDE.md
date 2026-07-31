@@ -536,6 +536,52 @@ model.
   before and after; full suite now 62/62, no known-flake carve-out needed.
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
+- **Swipe transition smoothing + swipe-from-scrollable-list fix**: fixed,
+  not yet merged. Two follow-ups on the swipe/slide-transition work above.
+  - The 220ms slide felt too fast/abrupt even after the earlier duration
+    fix. `TRANSITION_MS` (`TabTransition.tsx`) raised to 300ms, and the
+    single shared `ease-out` split into two curves: the incoming tab now
+    uses a decelerate curve (`cubic-bezier(0, 0, 0.2, 1)`), the outgoing
+    tab an accelerate curve (`cubic-bezier(0.4, 0, 1, 1)`) — Material's
+    standard enter/exit pairing. Previously both directions decelerated
+    identically, which made the outgoing tab read as hesitating near the
+    edge instead of speeding away.
+  - Separately, swiping to change tabs from within History stopped
+    registering once there were enough trips to make the page scrollable
+    — the gesture got eaten as a vertical scroll instead. Diagnosis (not
+    yet independently confirmed, see verification note below): `<main>`
+    sets `touch-action: pan-y`, and the swipe handler (`App.tsx`) only
+    calls `preventDefault()` once a gesture has already locked to
+    `'horizontal'` (past `SWIPE_DIRECTION_LOCK`, 10px). On a page tall
+    enough to actually scroll, the browser can commit to a native
+    vertical-scroll gesture from an earlier touchmove than that, and once
+    committed, ignores `preventDefault()` on later touchmove events in the
+    same gesture — so by the time our JS decides "horizontal," it's too
+    late. Short (non-scrollable) pages never hit this because there's
+    nothing for the browser to commit to. Fixed by having `onTouchMove`
+    speculatively call `preventDefault()` while still in the `'pending'`
+    (undecided) phase, whenever the current move is at least as horizontal
+    as vertical — keeps the swipe option alive through the ambiguous
+    window instead of only defending it after the lock threshold. If the
+    gesture resolves to vertical, we simply stop calling it and the
+    browser's normal scroll takes over a few px behind, imperceptibly.
+  - **Verification gap, worth knowing if this is touched again**: this fix
+    was verified by code reasoning (matches documented browser
+    touch-action/gesture-commit semantics) and the full Playwright suite
+    (62/62, no regressions) — but the specific race it addresses could
+    not be reproduced in an automated test, even after real effort. Plain
+    `dispatchEvent(new TouchEvent(...))` (what the existing swipe specs
+    use) fires *untrusted* events, which never drive the browser's actual
+    native-scroll compositor path at all, so they can't exercise this race
+    regardless of whether the fix is applied — confirmed by reverting the
+    fix and seeing the existing-style test still pass. Escalating to
+    Chrome DevTools Protocol's `Input.dispatchTouchEvent` (trusted
+    synthetic input, which does drive real gesture recognition) still
+    didn't reproduce it, even with a deliberately added early vertical
+    wobble before straightening into a horizontal swipe, headed or
+    headless. So this one fix has no automated regression coverage — real
+    verification is manual, on an actual touch device (or Chrome's mobile
+    device toolbar), not something caught by `npm run test:e2e`.
 
 ## Known limitations
 
