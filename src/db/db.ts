@@ -298,3 +298,49 @@ export async function resetAllData(): Promise<void> {
     await db.appState.put({ key: ACTIVE_TRIP_KEY, value: newId })
   })
 }
+
+/**
+ * Atomically "claims" a pending/failed receipt for processing, so that only
+ * one of the receipt system's three independent triggers — a manual Retry
+ * click, the per-row auto-retry timer (ReceiptRow's setTimeout in
+ * ReceiptCapture.tsx), and the online-reconnect sweep
+ * (useReceiptCapture's syncPendingReceipts) — can ever actually kick off a
+ * Groq extraction call for a given receipt at a time. Confirmed from real
+ * production data: Groq's own dashboard showed 6+ rapid-fire 429s within
+ * under 40s for one receipt during a session with flaky mobile
+ * connectivity — the per-row timer and a rapid string of 'online' events
+ * both landing right as a backoff's retryAt expired, each independently
+ * seeing the row as still eligible and each starting its own extraction.
+ *
+ * Every trigger already re-reads the receipt fresh right before deciding to
+ * process it, but a plain read-then-write is a classic TOCTOU race: two
+ * triggers can observe the same eligible row a moment apart, then both
+ * write 'processing' a moment apart too — neither one's read reflects the
+ * other's not-yet-committed write. IndexedDB serializes overlapping
+ * readwrite transactions scoped to the same object store (a platform
+ * guarantee, not a Dexie-specific trick — the same one deleteTrip/
+ * resetAllData above rely on), so wrapping the re-read and the conditional
+ * write in one transaction closes the gap: a second concurrent caller's
+ * transaction runs strictly after the first one's commits, and so reliably
+ * observes the first one's write instead of racing it.
+ *
+ * Returns the freshly-claimed receipt (now 'processing') on success, or
+ * `null` if the row was no longer pending/failed by the time this
+ * transaction actually ran — callers must treat `null` as "another trigger
+ * already has this receipt" and silently no-op, never retry or surface it
+ * as an error.
+ */
+export async function claimReceiptForProcessing(receiptId: number): Promise<PendingReceipt | null> {
+  return db.transaction('rw', db.pendingReceipts, async () => {
+    const fresh = await db.pendingReceipts.get(receiptId)
+    if (!fresh || (fresh.status !== 'pending' && fresh.status !== 'failed')) return null
+
+    const claimed: PendingReceipt = { ...fresh, status: 'processing', lastError: undefined, retryAt: undefined }
+    await db.pendingReceipts.update(receiptId, {
+      status: 'processing',
+      lastError: undefined,
+      retryAt: undefined,
+    })
+    return claimed
+  })
+}
