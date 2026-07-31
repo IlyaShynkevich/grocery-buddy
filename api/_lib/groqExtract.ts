@@ -110,20 +110,145 @@ export async function extractReceiptItems(
   return parseExtractedItems(content)
 }
 
+/**
+ * TEMPORARY DEBUG LOGGING — a receipt was failing extraction on every
+ * attempt with "Groq response was not parseable JSON", and we had no
+ * visibility into what Groq actually sent back, only that it didn't parse.
+ * Logs the full raw content on that specific failure (and, separately, how
+ * many objects the salvage pass below recovered vs. had to skip) so the
+ * actual malformed text is visible in Vercel's logs instead of just the
+ * fact of failure. Search for TEMP_DEBUG_PARSE_FAILURE to find/remove this
+ * once the root cause behind a *fully* unrecoverable response (if any still
+ * occur after the salvage pass below) is identified; it doesn't change what
+ * gets returned or thrown, only what gets logged.
+ */
+const DEBUG_TAG = '[TEMP_DEBUG_PARSE_FAILURE]'
+
 /** Exported separately so malformed/garbage-content handling can be tested directly. */
 export function parseExtractedItems(content: string): ExtractedItem[] {
+  const stripped = stripCodeFence(content)
+
+  const strictItems = tryStrictParse(stripped)
+  if (strictItems) return itemsFromRaw(strictItems)
+
+  // The response as a whole isn't valid JSON — a single bad escape, an
+  // unterminated string, truncation from hitting max_completion_tokens, ...
+  // That used to mean the entire extraction failed even when most of the
+  // response was fine (e.g. 12 good items and one malformed coupon line).
+  // Salvage whatever complete item objects are actually present instead of
+  // discarding all of them over one bad one.
+  console.log(DEBUG_TAG, 'strict JSON.parse failed on Groq content, attempting salvage', {
+    contentLength: content.length,
+    content,
+  })
+
+  const { objects: salvaged, skipped } = salvageItemObjects(stripped)
+  console.log(DEBUG_TAG, 'salvage pass complete', { recovered: salvaged.length, skipped })
+
+  if (salvaged.length === 0) {
+    throw new Error('Groq response was not parseable JSON and no items could be salvaged from it')
+  }
+  return itemsFromRaw(salvaged)
+}
+
+/**
+ * Strict, fast path: the response is exactly the well-formed JSON the
+ * prompt asked for. Returns null (never throws) so the caller can fall
+ * through to the salvage pass — this function's behavior for a
+ * well-formed response is unchanged from before.
+ */
+function tryStrictParse(stripped: string): unknown[] | null {
   let parsed: unknown
   try {
-    parsed = JSON.parse(stripCodeFence(content))
+    parsed = JSON.parse(stripped)
   } catch {
-    throw new Error('Groq response was not parseable JSON')
+    return null
   }
-
   const rawItems = Array.isArray(parsed) ? parsed : (parsed as { items?: unknown } | null)?.items
-  if (!Array.isArray(rawItems)) {
-    throw new Error('Groq response did not contain an items array')
-  }
+  return Array.isArray(rawItems) ? rawItems : null
+}
 
+/**
+ * Walks the raw text looking for the items array and pulls out every
+ * syntactically complete top-level `{...}` object inside it, JSON-parsing
+ * each independently. An object that's itself malformed — or a dangling one
+ * at the very end, never closed because the response got cut off — is just
+ * skipped, instead of one bad object taking down every other item that
+ * parsed fine.
+ *
+ * Known limitation, not silently glossed over: this tracks string vs.
+ * non-string state by counting unescaped `"` characters. If a malformed
+ * item's own break is an odd number of stray unescaped quotes (rather than,
+ * say, a bad number, a missing comma, or plain truncation — the far more
+ * likely causes here, per this file's own history of hitting
+ * max_completion_tokens on receipts with many line items), that desyncs
+ * string-tracking for the rest of the document and can cause later,
+ * otherwise-valid objects to be swept into the same broken span. This is
+ * still strictly no worse than before (which discarded 100% of items on
+ * any malformed byte anywhere in the response) — see the debug logging
+ * above for confirming which failure mode a given receipt actually hit.
+ */
+function salvageItemObjects(content: string): { objects: unknown[]; skipped: number } {
+  const arrayStart = findItemsArrayStart(content)
+  if (arrayStart === -1) return { objects: [], skipped: 0 }
+
+  const objects: unknown[] = []
+  let skipped = 0
+  let depth = 0
+  let objStart = -1
+  let inString = false
+  let escaped = false
+
+  for (let i = arrayStart; i < content.length; i++) {
+    const char = content[i]
+
+    if (inString) {
+      if (escaped) escaped = false
+      else if (char === '\\') escaped = true
+      else if (char === '"') inString = false
+      continue
+    }
+
+    if (char === '"') {
+      inString = true
+      continue
+    }
+
+    if (depth === 0 && char === ']') break // end of the items array
+
+    if (char === '{') {
+      if (depth === 0) objStart = i
+      depth++
+    } else if (char === '}') {
+      depth = Math.max(0, depth - 1)
+      if (depth === 0 && objStart !== -1) {
+        const candidate = content.slice(objStart, i + 1)
+        try {
+          objects.push(JSON.parse(candidate))
+        } catch {
+          // This one object is malformed (or its boundaries got thrown off
+          // by a quote-parity issue upstream) — skip just it and keep
+          // scanning for the next one.
+          skipped++
+        }
+        objStart = -1
+      }
+    }
+  }
+  // Anything left dangling in objStart (an opening `{` with no matching `}`
+  // before the array ended or the response was truncated) is simply never
+  // pushed — that's the desired behavior, not an oversight.
+
+  return { objects, skipped }
+}
+
+function findItemsArrayStart(content: string): number {
+  const keyed = /"items"\s*:\s*\[/.exec(content)
+  if (keyed) return keyed.index + keyed[0].length
+  return content.indexOf('[')
+}
+
+function itemsFromRaw(rawItems: unknown[]): ExtractedItem[] {
   const items: ExtractedItem[] = []
   for (const raw of rawItems) {
     if (!raw || typeof raw !== 'object') continue
