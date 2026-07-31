@@ -54,11 +54,10 @@ interface TabTransitionProps<T extends string> {
  * other's). The grid sizes to the max of both panels' heights while both are
  * mounted, settling to just the current panel's height once the outgoing one
  * unmounts — a deliberate simplification, not something this component tries
- * to smooth over. Anything below it (Debug tools, the footer) is a sibling
- * outside this component entirely, so it just reflows with the page like any
- * other static content; see CLAUDE.md ("Stats<->History height animation")
- * for why chasing a fully jump-free version of that reflow inside this
- * component was abandoned in favor of this simpler structure.
+ * to smooth over. The footer (the only thing below this component now — see
+ * CLAUDE.md, Debug tools was moved to only render on the Shopping List tab)
+ * is a sibling outside this component entirely, so it just reflows with the
+ * page like any other static content.
  *
  * Since neither panel is `position`-based, default paint order would
  * otherwise be DOM order (the later-rendered incoming panel on top); the
