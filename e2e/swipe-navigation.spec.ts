@@ -266,38 +266,37 @@ test('the outgoing page keeps its DOM node identity instead of remounting when a
   await expect(page.locator('[data-canary="no-remount"]')).toHaveCount(0)
 })
 
-test('Debug tools and the footer stay outside the sliding tab content and are unaffected by a transition', async ({
-  page,
-}) => {
-  // Debug tools + the footer are static siblings of TabTransition now, not
-  // wrapped by it — this asserts that structure directly (both are present
-  // and outside `.gb-tab-slide` throughout a transition), rather than
-  // measuring animation smoothness, which this area deliberately no longer
-  // tries to guarantee — see CLAUDE.md ("Stats<->History height animation").
+test('the footer stays outside the sliding tab content and is unaffected by a transition', async ({ page }) => {
+  // The footer is a static sibling of TabTransition, not wrapped by it — this
+  // asserts that structure directly (present and outside `.gb-tab-slide`
+  // throughout a transition), rather than measuring animation smoothness,
+  // which this area deliberately doesn't try to guarantee — see CLAUDE.md
+  // ("Stats<->History height animation").
   await page.goto('/')
-  await page.getByTestId('debug-panel-toggle').click()
 
   await page.getByTestId('nav-history').click()
   await expect(page.getByTestId('app-footer')).toBeVisible()
-  await expect(page.getByTestId('debug-panel-toggle')).toBeVisible()
   const slideCount = await page.locator('.gb-tab-slide').count()
   expect(slideCount).toBeGreaterThan(0)
   await expect(page.locator('.gb-tab-slide [data-testid="app-footer"]')).toHaveCount(0)
-  await expect(page.locator('.gb-tab-slide [data-testid="debug-panel-toggle"]')).toHaveCount(0)
 
   await page.waitForTimeout(ANIMATION_SETTLE_MS)
   await expect(page.getByTestId('app-footer')).toBeVisible()
 })
 
-test('Debug tools is hidden on Stats instantly, with no settle delay, same as the tab bar highlight', async ({
-  page,
-}) => {
+test('Debug tools only appears on Shopping List, instantly, with no settle delay', async ({ page }) => {
+  // Debug tools no longer appears on History or Stats at all (removing the
+  // root cause of the footer/Debug-tools jump between them, rather than
+  // continuing to animate around it) — gated directly on `activeTab`, same
+  // plain conditional as the tab bar's own highlight, no settle-timing
+  // involved.
   await page.goto('/')
   await expect(page.getByTestId('debug-panel-toggle')).toBeVisible()
 
+  await page.getByTestId('nav-history').click()
+  await expect(page.getByTestId('debug-panel-toggle')).toHaveCount(0)
+
   await page.getByTestId('nav-stats').click()
-  // No wait for the slide to settle — Debug tools is gated directly on the
-  // active tab, the same plain conditional as the tab bar's own highlight.
   await expect(page.getByTestId('debug-panel-toggle')).toHaveCount(0)
 
   await page.getByTestId('nav-shopping').click()

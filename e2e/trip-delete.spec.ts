@@ -20,11 +20,41 @@ async function saveAndGetCompletedTripId(page: Page): Promise<string> {
   return tripId ?? ''
 }
 
-// The debug panel is collapsed by default (native <details>) — its contents
-// stay in the DOM either way, but any button inside needs the panel opened
-// first or Playwright's actionability check on .click() fails as "hidden".
-async function openDebugPanel(page: Page) {
-  await page.getByTestId('debug-panel-toggle').click()
+/**
+ * Pins a trip as "active" directly in IndexedDB, bypassing Dexie entirely —
+ * same technique and reasoning as history-improvements.spec.ts's
+ * `setTripDate`: a raw IndexedDB write doesn't fire Dexie's own liveQuery
+ * reactivity, unlike writing through `db.appState.put`. That distinction
+ * matters here specifically: `useActiveTripId` self-heals (reassigns the
+ * pointer back to a real draft) the moment any component using it is
+ * mounted and sees the pointer resolve to a non-draft trip — which, now
+ * that Debug tools only renders on the Shopping List tab (the same tab
+ * that mounts that hook), is unavoidable to reach through the debug panel's
+ * own "Make active" button. Writing the pointer directly sidesteps that
+ * entirely, and works precisely because Dexie's read layer still sees a
+ * raw-written value correctly (it's the same underlying IndexedDB data) —
+ * only its *live* reactivity is bypassed.
+ */
+async function setActiveTripPointer(page: Page, tripId: string) {
+  await page.evaluate(
+    (tripIdNum) => {
+      return new Promise<void>((resolve, reject) => {
+        const req = indexedDB.open('grocery-buddy')
+        req.onerror = () => reject(req.error)
+        req.onsuccess = () => {
+          const idb = req.result
+          const tx = idb.transaction('appState', 'readwrite')
+          tx.objectStore('appState').put({ key: 'activeTripId', value: tripIdNum })
+          tx.oncomplete = () => {
+            idb.close()
+            resolve()
+          }
+          tx.onerror = () => reject(tx.error)
+        }
+      })
+    },
+    Number(tripId),
+  )
 }
 
 test('deleting a trip requires confirmation, and cancelling keeps the trip', async ({ page }) => {
@@ -77,29 +107,21 @@ test('confirming delete removes the trip and returns to history', async ({ page 
 
 test('deleting the trip currently pinned as active starts a fresh empty draft', async ({ page }) => {
   await page.goto('/')
-  await openDebugPanel(page)
 
   await addItem(page, 'Milk')
   const trip1Id = await saveAndGetCompletedTripId(page)
 
-  // Pin the now-completed trip1 as "active" via the debug panel — this is a
-  // debug-only affordance (real navigation never does this, since the active
-  // pointer only ever legitimately targets a draft), but it's exactly the
-  // edge case deleteTrip's pointer-reassignment guards against.
-  await page.getByTestId('nav-history').click()
-  // TabTransition keeps the outgoing Shopping List tab mounted (and its
-  // useActiveTripId live query fully reactive) for its slide-out animation
-  // — if "Make active" points the pointer at trip1 (now complete) while
-  // that's still alive, its self-heal logic sees a non-draft pinned trip
-  // and immediately reassigns the pointer back to the existing draft,
-  // undoing the click. Waiting for the outgoing tab to actually finish
-  // unmounting avoids the race, same pattern as swipe-navigation.spec.ts's
-  // settle wait.
-  await expect(page.getByTestId('shopping-list')).toHaveCount(0)
-  const trip1Row = page.locator(`[data-testid="debug-trip"][data-trip-id="${trip1Id}"]`)
-  await trip1Row.getByTestId('debug-make-active').click()
-  await expect(trip1Row).toHaveAttribute('data-active', 'true')
+  // Pin the now-completed trip1 as "active" — this is a debug-only edge
+  // case (real navigation never does this, since the active pointer only
+  // ever legitimately targets a draft), but it's exactly the case
+  // deleteTrip's pointer-reassignment guards against. Done via a raw
+  // IndexedDB write (see setActiveTripPointer) rather than the debug
+  // panel's own "Make active" button — Debug tools only renders on the
+  // Shopping List tab, the same tab whose mounted `useActiveTripId` would
+  // otherwise immediately self-heal (undo) this exact write.
+  await setActiveTripPointer(page, trip1Id)
 
+  await page.getByTestId('nav-history').click()
   await page.getByTestId('history-trip').click()
   await expect(page.getByTestId('trip-detail-page')).toBeVisible()
 

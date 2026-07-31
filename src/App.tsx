@@ -225,14 +225,14 @@ function App() {
       */}
       <div style={{ marginTop: 'auto' }}>
         {/*
-          Stats is a pure read-only report — there's nothing there to debug,
-          unlike Shopping List/History where trip and receipt data is
-          actively worked with. Gated directly on `activeTab` (trip-detail
-          counts as "in History" since it isn't a distinct tab — see
-          `activeTab`'s derivation above) — same plain, instant conditional
-          as the tab bar's own highlight, no settle-timing involved.
+          Debug tools only appears on Shopping List — the one tab where trip/
+          receipt data is actively worked with, and the only tab where the
+          resulting footer/Debug-tools content-height difference can never
+          show up as a jump (there's nothing else to jump against, since it
+          never appears on History or Stats to begin with). Plain, instant
+          conditional on `activeTab`, same as the tab bar's own highlight.
         */}
-        {activeTab !== 'stats' && <DbDebugPanel />}
+        {activeTab === 'shopping' && <DbDebugPanel />}
         <Footer />
       </div>
     </main>

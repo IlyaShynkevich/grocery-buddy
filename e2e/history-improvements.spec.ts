@@ -232,9 +232,9 @@ test('with more than 9 trips, the trip list scrolls internally instead of growin
   }))
   expect(scrollHeight).toBeGreaterThan(clientHeight)
 
-  // The page itself must not have grown to accommodate all 12 rows — Debug
-  // tools and the footer stay reachable without scrolling the whole page.
-  await expect(page.getByTestId('debug-panel-toggle')).toBeInViewport()
+  // The page itself must not have grown to accommodate all 12 rows — the
+  // footer stays reachable without scrolling the whole page. (Debug tools
+  // only renders on the Shopping List tab, not here.)
   await expect(page.getByTestId('app-footer')).toBeInViewport()
 })
 
