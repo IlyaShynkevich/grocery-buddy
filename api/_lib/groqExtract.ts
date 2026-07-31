@@ -3,6 +3,16 @@ import { CATEGORIES } from '../../src/db/categories.js'
 const GROQ_MODEL = 'qwen/qwen3.6-27b'
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions'
 const TIMEOUT_MS = 25_000
+// Groq's own dashboard confirmed every json_validate_failed 400 for a
+// complex receipt (many items, coupons, deposit/Pfand lines) showed
+// output_tokens: 4096 exactly, every single time — the model was being cut
+// off mid-response by the old limit, not intermittently rate-limited or
+// producing genuinely malformed JSON on its own. Raised with real headroom
+// for complex receipts; the salvage-based parsing below (parseExtractedItems)
+// is a second, independent safety net for whatever still gets truncated at
+// this limit (or fails for any other reason), not a substitute for giving
+// the model enough room to finish in the first place.
+const MAX_COMPLETION_TOKENS = 8000
 
 export interface ExtractedItem {
   name: string
@@ -75,7 +85,7 @@ export async function extractReceiptItems(
           },
         ],
         temperature: 0,
-        max_completion_tokens: 4096,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
         response_format: { type: 'json_object' },
       }),
       signal: controller.signal,

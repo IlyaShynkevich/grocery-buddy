@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef } from 'react'
 import {
+  claimReceiptForProcessing,
   db,
   getOrCreateActiveTrip,
   newItem,
@@ -45,11 +46,14 @@ export function useReceiptCapture() {
   }
 
   const processReceipt = async (receipt: PendingReceipt) => {
-    await db.pendingReceipts.update(receipt.id, {
-      status: 'processing',
-      lastError: undefined,
-      retryAt: undefined,
-    })
+    // Atomic claim — closes a real race between the three independent
+    // triggers that can all call this function for the same receipt at
+    // once (a manual Retry click, ReceiptRow's per-row auto-retry timer,
+    // and the online-reconnect sweep below). See claimReceiptForProcessing's
+    // doc comment in db.ts for the full race and why this has to be atomic.
+    const claimed = await claimReceiptForProcessing(receipt.id)
+    if (!claimed) return // lost the race — another trigger already has this receipt
+    receipt = claimed
 
     try {
       const extractedItems = await extractReceiptItems(receipt.imageBlob)
@@ -157,7 +161,12 @@ export function useReceiptCapture() {
           for (const candidate of candidates) {
             // Re-check right before processing: another in-flight process (a
             // scheduled rate-limit retry, a manual click) may have already
-            // picked this receipt up since the sweep started.
+            // picked this receipt up since the sweep started. This is just a
+            // cheap fast-path skip, not the thing that actually makes this
+            // safe against a same-instant race with the per-row auto-retry
+            // timer — processReceipt's own atomic claim (see its comment)
+            // is what guarantees only one trigger ever proceeds to call Groq
+            // even if both read the row as eligible here.
             const fresh = await db.pendingReceipts.get(candidate.id)
             if (!fresh || (fresh.status !== 'pending' && fresh.status !== 'failed')) continue
             // A failed receipt with a still-future retryAt already has its own
