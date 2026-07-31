@@ -266,125 +266,40 @@ test('the outgoing page keeps its DOM node identity instead of remounting when a
   await expect(page.locator('[data-canary="no-remount"]')).toHaveCount(0)
 })
 
-// Generous, but data-driven, not arbitrary: measured live (see CLAUDE.md,
-// "Stats<->History height animation") max single-frame jumps of ~18px for
-// Shopping List<->History and ~44px for History<->Stats (which also toggles
-// Debug tools' visibility, a separate, accepted, un-animated ~70px show/hide
-// — see the same entry) under a single serial run. Both pages' natural
-// heights come from Dexie's useLiveQuery, which can resolve mid-transition
-// and re-target the still-in-flight height animation (see the doc comment
-// in TabTransition.tsx) — under a full parallel test run's CPU contention,
-// that re-target landing late enough to be caught in one sampled frame was
-// observed up to ~140px. Still far below the original bug's ~285px single-
-// frame snap, so this stays a meaningful regression check without being
-// flaky under parallel load.
-const MAX_ACCEPTABLE_FRAME_JUMP_PX = 180
-
-/**
- * Samples `app-footer`'s position every animation frame through a tab
- * switch and returns the largest single-frame jump while both panels are
- * mounted (`.gb-tab-slide` count === 2) — i.e. while the transition is
- * actually in flight, not before it starts or after it's fully settled.
- */
-async function maxFooterJumpDuringTransition(page: Page, toTab: string): Promise<number> {
-  await page.evaluate(() => {
-    ;(window as unknown as { __tops: Array<{ footer: number; slides: number }> }).__tops = []
-    const tops = (window as unknown as { __tops: Array<{ footer: number; slides: number }> }).__tops
-    const start = performance.now()
-    function tick() {
-      const footer = document.querySelector('[data-testid="app-footer"]')
-      if (footer) {
-        tops.push({ footer: footer.getBoundingClientRect().top, slides: document.querySelectorAll('.gb-tab-slide').length })
-      }
-      if (performance.now() - start < 450) requestAnimationFrame(tick)
-    }
-    requestAnimationFrame(tick)
-  })
-
-  await page.getByTestId('nav-' + toTab).click()
-  await page.waitForTimeout(500)
-
-  const tops = await page.evaluate(() => (window as unknown as { __tops: Array<{ footer: number; slides: number }> }).__tops)
-  const duringTransition = tops.filter((t) => t.slides === 2)
-  expect(duringTransition.length).toBeGreaterThan(0)
-
-  let maxJump = 0
-  let prev: number | null = null
-  for (const t of duringTransition) {
-    if (prev !== null) maxJump = Math.max(maxJump, Math.abs(t.footer - prev))
-    prev = t.footer
-  }
-  return maxJump
-}
-
-test('content below the transitioning tabs animates smoothly, no single-frame jump, when the two pages differ in height', async ({
+test('Debug tools and the footer stay outside the sliding tab content and are unaffected by a transition', async ({
   page,
 }) => {
-  // Regression test for two flicks fixed in the same area: the outgoing
-  // panel used to be `position: absolute` (contributing zero height to its
-  // container), so the wrapper's height snapped *instantly* to the incoming
-  // page's height the moment a transition started. A later fix (CSS Grid,
-  // sizing to the max of both panels while mounted) only deferred that snap
-  // to the moment the outgoing panel unmounted, which was still clearly
-  // visible for page pairs with a large height difference (Stats, by far
-  // the tallest page, <-> History) — see CLAUDE.md. The wrapper's height is
-  // now explicitly animated alongside the slide instead, so there's no
-  // single large jump at either end, just smooth interpolation throughout.
-  // Seed enough items that Shopping List is visibly taller than an empty
-  // History so the height mismatch this depends on is real.
+  // Debug tools + the footer are static siblings of TabTransition now, not
+  // wrapped by it — this asserts that structure directly (both are present
+  // and outside `.gb-tab-slide` throughout a transition), rather than
+  // measuring animation smoothness, which this area deliberately no longer
+  // tries to guarantee — see CLAUDE.md ("Stats<->History height animation").
   await page.goto('/')
-  for (let i = 0; i < 10; i++) {
-    await page.getByTestId('add-item-input').fill(`Item ${i}`)
-    await page.getByTestId('add-item-submit').click()
-  }
-
-  const maxJump = await maxFooterJumpDuringTransition(page, 'history')
-  expect(maxJump).toBeLessThan(MAX_ACCEPTABLE_FRAME_JUMP_PX)
-})
-
-test('Stats <-> History transitions animate smoothly in both directions, despite Stats being much taller', async ({
-  page,
-}) => {
-  // Stats is by far the app's tallest page (multiple bar-chart cards) —
-  // build it up with items across several categories via the receipt mock
-  // (same fixture the other receipt specs use) so the height mismatch this
-  // depends on is real, not just an empty page.
-  await page.route('**/api/extract-receipt', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        items: [
-          { name: 'Milk', price: 3.49, category: 'dairy', isDiscount: false },
-          { name: 'Bread', price: 2.29, category: 'bakery', isDiscount: false },
-          { name: 'Apples', price: 4.99, category: 'produce', isDiscount: false },
-          { name: 'Chicken', price: 8.49, category: 'meat', isDiscount: false },
-          { name: 'Chips', price: 3.29, category: 'snacks', isDiscount: false },
-          { name: 'Soap', price: 2.49, category: 'household', isDiscount: false },
-        ],
-      }),
-    }),
-  )
-  await page.goto('/')
-  await page.getByTestId('receipt-capture-input').setInputFiles({
-    name: 'receipt.png',
-    mimeType: 'image/png',
-    buffer: Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-      'base64',
-    ),
-  })
-  await page.getByTestId('receipt-process-button').click()
-  await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed')
-  await page.getByTestId('receipt-review-confirm').click()
-  await page.getByTestId('save-trip-button').click()
+  await page.getByTestId('debug-panel-toggle').click()
 
   await page.getByTestId('nav-history').click()
-  await page.waitForTimeout(ANIMATION_SETTLE_MS)
-  const historyToStatsJump = await maxFooterJumpDuringTransition(page, 'stats')
-  expect(historyToStatsJump).toBeLessThan(MAX_ACCEPTABLE_FRAME_JUMP_PX)
+  await expect(page.getByTestId('app-footer')).toBeVisible()
+  await expect(page.getByTestId('debug-panel-toggle')).toBeVisible()
+  const slideCount = await page.locator('.gb-tab-slide').count()
+  expect(slideCount).toBeGreaterThan(0)
+  await expect(page.locator('.gb-tab-slide [data-testid="app-footer"]')).toHaveCount(0)
+  await expect(page.locator('.gb-tab-slide [data-testid="debug-panel-toggle"]')).toHaveCount(0)
 
   await page.waitForTimeout(ANIMATION_SETTLE_MS)
-  const statsToHistoryJump = await maxFooterJumpDuringTransition(page, 'history')
-  expect(statsToHistoryJump).toBeLessThan(MAX_ACCEPTABLE_FRAME_JUMP_PX)
+  await expect(page.getByTestId('app-footer')).toBeVisible()
+})
+
+test('Debug tools is hidden on Stats instantly, with no settle delay, same as the tab bar highlight', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await expect(page.getByTestId('debug-panel-toggle')).toBeVisible()
+
+  await page.getByTestId('nav-stats').click()
+  // No wait for the slide to settle — Debug tools is gated directly on the
+  // active tab, the same plain conditional as the tab bar's own highlight.
+  await expect(page.getByTestId('debug-panel-toggle')).toHaveCount(0)
+
+  await page.getByTestId('nav-shopping').click()
+  await expect(page.getByTestId('debug-panel-toggle')).toBeVisible()
 })

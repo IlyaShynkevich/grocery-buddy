@@ -787,6 +787,45 @@ model.
     List<->History case, whose old "zero movement while mounted" assertion
     no longer holds now that height is deliberately animated throughout
     rather than held flat).
+- **Stats<->History height animation replaced with a structural fix
+  (Debug tools/footer moved outside TabTransition)**: done and verified.
+  The previous entry's approach — chasing a smoothly *animated* wrapper
+  height inside `TabTransition` (explicit height interpolation,
+  `ResizeObserver` re-targeting, `settledTab` gating for Debug tools) — kept
+  growing in complexity across several follow-up sessions and still left an
+  accepted residual jump. Replaced with a structural fix instead of another
+  animation tweak:
+  - `TabTransition` now wraps *only* the active page's own content (the
+    Shopping List/History/Stats components) — nothing else. All of the
+    height-animation machinery (`wrapperRef`/`currentPanelRef` height
+    measurement, the `useLayoutEffect` driving the wrapper's `height`
+    transition, the `ResizeObserver` re-targeting it) is gone; the
+    horizontal slide (CSS Grid overlap, asymmetric enter/exit easing,
+    opaque panel backgrounds, stable keys to avoid remounts) is unchanged.
+  - `DbDebugPanel` and `Footer` moved out of the transitioning region
+    entirely — they're plain siblings in `App.tsx`, below `TabTransition`/
+    `TripDetailPage`, same as before this fix (they were already DOM
+    siblings; what changed is that `TabTransition` no longer has any
+    logic that reaches past its own two panels to affect their layout).
+    They still reflow instantly when the active page's height differs
+    between tabs (that's an unavoidable consequence of a column-flex
+    layout, not something being smoothed over) — no longer animated,
+    deliberately: the user asked to stop chasing further animation
+    smoothing here and accept a plain, instant reflow instead.
+  - Debug tools' Stats-hiding gate moved from `settledTab` (a state that
+    lagged `activeTab` until a transition settled, added specifically to
+    avoid an extra jump mid-transition) to `activeTab` directly — the same
+    plain, instant conditional the tab bar's own highlight already uses.
+    `settledTab` and its `onSettle` callback are gone from both
+    `TabTransition` and `App.tsx`.
+  - `e2e/swipe-navigation.spec.ts`'s two footer-jump-threshold tests
+    ("content below the transitioning tabs animates smoothly..." and
+    "Stats <-> History transitions animate smoothly...") were removed —
+    they encoded the old animated-height contract, which no longer holds
+    by design. Replaced with two tests matching the new contract: Debug
+    tools/the footer are structurally outside `.gb-tab-slide` throughout a
+    transition, and Debug tools hides/shows on Stats with no settle delay.
+    Full suite: 69/69 passing.
 
 ## Known limitations
 
