@@ -27,7 +27,7 @@ test('auto-retries after the parsed rate-limit wait, with no manual interaction'
   await page.route('**/api/extract-receipt', (route) => {
     callCount += 1
     if (callCount === 1) {
-      return route.fulfill({ status: 502, contentType: 'application/json', body: rateLimitError(1) })
+      return route.fulfill({ status: 429, contentType: 'application/json', body: rateLimitError(1) })
     }
     return route.fulfill({
       status: 200,
@@ -54,7 +54,7 @@ test('repeats the parse-and-wait loop if the auto-retry itself hits another 429'
   await page.route('**/api/extract-receipt', (route) => {
     callCount += 1
     if (callCount <= 2) {
-      return route.fulfill({ status: 502, contentType: 'application/json', body: rateLimitError(1) })
+      return route.fulfill({ status: 429, contentType: 'application/json', body: rateLimitError(1) })
     }
     return route.fulfill({
       status: 200,
@@ -80,7 +80,7 @@ test('manual Retry works immediately and bypasses the countdown', async ({ page 
   await page.route('**/api/extract-receipt', (route) => {
     callCount += 1
     if (callCount === 1) {
-      return route.fulfill({ status: 502, contentType: 'application/json', body: rateLimitError(30) })
+      return route.fulfill({ status: 429, contentType: 'application/json', body: rateLimitError(30) })
     }
     return route.fulfill({
       status: 200,
@@ -105,7 +105,7 @@ test('manual Retry works immediately and bypasses the countdown', async ({ page 
 test('an unrecognized 429 message falls back to manual-retry-only, no countdown', async ({ page }) => {
   await page.route('**/api/extract-receipt', (route) =>
     route.fulfill({
-      status: 502,
+      status: 429,
       contentType: 'application/json',
       body: JSON.stringify({ error: 'Groq returned 429: rate limited, please slow down' }),
     }),

@@ -122,3 +122,49 @@ test('a failed receipt (no rate-limit wait parsed) is retried automatically on r
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed', { timeout: 5000 })
   expect(callCount).toBe(2)
 })
+
+test('a rate-limited receipt with a pending auto-retry is not retried early by a reconnect sweep', async ({
+  page,
+}) => {
+  let callCount = 0
+  await page.route('**/api/extract-receipt', (route) => {
+    callCount += 1
+    if (callCount === 1) {
+      return route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: 'Groq returned 429: {"error":{"message":"Rate limit reached. Please try again in 2s."}}',
+        }),
+      })
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ items: [{ name: 'Eggs', price: 4.2, category: 'dairy' }] }),
+    })
+  })
+
+  await page.goto('/')
+  await captureReceipt(page, 'receipt.png')
+  await page.getByTestId('receipt-process-button').click()
+
+  await expect(page.getByTestId('receipt-status').first()).toHaveText(/Retrying in \d+s/)
+  expect(callCount).toBe(1)
+
+  // Flaky connectivity firing 'online' repeatedly (the same event the
+  // auto-sync sweep listens for) must not re-trigger the request before the
+  // parsed rate-limit wait has actually elapsed — that would just hit the
+  // same rate limit again instead of letting it clear.
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await page.waitForTimeout(300)
+  expect(callCount).toBe(1)
+  await page.evaluate(() => window.dispatchEvent(new Event('online')))
+  await page.waitForTimeout(300)
+  expect(callCount).toBe(1)
+
+  // Once the wait genuinely elapses, the (unbypassed) row-level auto-retry
+  // still fires on its own.
+  await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed', { timeout: 5000 })
+  expect(callCount).toBe(2)
+})

@@ -12,6 +12,22 @@ export interface ExtractedItem {
   isDiscount?: boolean
 }
 
+/**
+ * Thrown when Groq itself responded with a non-2xx status. Carries that
+ * status so the route handler can forward it instead of flattening every
+ * extraction failure to a generic 502 (which made real Groq 429s
+ * indistinguishable from an actual server crash in Vercel's own logs).
+ */
+export class GroqHttpError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'GroqHttpError'
+    this.status = status
+  }
+}
+
 const CATEGORY_KEYS = CATEGORIES.map((category) => category.key)
 
 const SYSTEM_PROMPT = `You extract line items from a photo of a grocery store receipt.
@@ -75,7 +91,7 @@ export async function extractReceiptItems(
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    throw new Error(`Groq returned ${response.status}: ${body.slice(0, 300)}`)
+    throw new GroqHttpError(response.status, `Groq returned ${response.status}: ${body.slice(0, 300)}`)
   }
 
   let payload: unknown
