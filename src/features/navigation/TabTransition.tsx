@@ -83,6 +83,15 @@ export function TabTransition<T extends string>({ activeTab, direction, renderTa
             top: 0,
             left: 0,
             width: '100%',
+            // Opaque, not transparent: the incoming/outgoing panels use
+            // different (asymmetric) easing curves, so they don't stay a
+            // constant panel-width apart mid-animation — they briefly
+            // overlap geometrically. An opaque background here (this panel
+            // paints above the static-positioned current one by default
+            // stacking order) keeps that overlap from showing as both
+            // pages' text bleeding together; it just fully covers whatever
+            // is behind it until it slides out of the way.
+            background: 'var(--bg)',
             pointerEvents: 'none',
             animation: `${outgoingAnimation} ${TRANSITION_MS}ms ${EASE_OUTGOING} both`,
           }}
@@ -93,8 +102,15 @@ export function TabTransition<T extends string>({ activeTab, direction, renderTa
       <div
         key={`current-${activeTab}`}
         className={incomingAnimation ? 'gb-tab-slide' : undefined}
+        // Opaque for the same reason as the outgoing panel above — this one
+        // isn't the layer doing the occluding (outgoing paints on top by
+        // default stacking), but giving it its own matching background too
+        // means that doesn't depend on which panel happens to stack above
+        // the other.
         style={
-          incomingAnimation ? { animation: `${incomingAnimation} ${TRANSITION_MS}ms ${EASE_INCOMING} both` } : undefined
+          incomingAnimation
+            ? { background: 'var(--bg)', animation: `${incomingAnimation} ${TRANSITION_MS}ms ${EASE_INCOMING} both` }
+            : undefined
         }
       >
         {renderTab(activeTab)}

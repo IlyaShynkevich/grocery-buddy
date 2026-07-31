@@ -48,10 +48,19 @@ function App() {
   // "commits" to being a horizontal swipe once it has moved past
   // SWIPE_DIRECTION_LOCK px more horizontally than vertically; until then
   // (or if it turns out to be more vertical) it's left completely alone, so
-  // normal vertical scrolling is never hijacked. Touches starting on an
-  // interactive element (buttons, inputs, the tab bar itself, the receipt
-  // source-picker menu) are ignored from the start, so tapping/typing keeps
-  // working exactly as before — this is purely an additional input path.
+  // normal vertical scrolling is never hijacked. Touches starting on a
+  // native form control (input, textarea, select) are ignored from the
+  // start, since those need full native touch ownership (text cursor
+  // placement, the native select picker). Buttons/links are deliberately
+  // NOT excluded — a content-dense list (e.g. History with many trips) is
+  // mostly covered edge-to-edge by row buttons, so excluding them meant a
+  // swipe starting "on the list" almost never registered. This is safe: a
+  // real tap (no meaningful movement) still reaches the element's own click
+  // handler untouched, since nothing here calls preventDefault() on
+  // touchstart/touchend for a non-swipe touch; a genuine horizontal drag
+  // naturally won't also fire that element's click, per standard mobile
+  // "tap slop" behavior (movement past a small threshold before release
+  // suppresses the synthesized click) — independent of anything here.
   useEffect(() => {
     const el = mainRef.current
     if (!el) return
@@ -61,7 +70,7 @@ function App() {
     let phase: 'idle' | 'pending' | 'horizontal' | 'ignored' = 'idle'
 
     const isInteractive = (target: EventTarget | null) =>
-      target instanceof Element && !!target.closest('button, a, input, textarea, select')
+      target instanceof Element && !!target.closest('input, textarea, select')
 
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1 || isInteractive(e.target)) {
