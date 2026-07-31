@@ -1,5 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { extractReceiptItems } from './_lib/groqExtract.js'
+import { extractReceiptItems, GroqHttpError } from './_lib/groqExtract.js'
+
+// groqExtract.ts aborts its own Groq call at 25s; without this, Vercel's
+// platform default (10s Hobby / 15s Pro) would kill the function first on a
+// genuinely slow (not rate-limited) Groq response, before that abort ever
+// fires.
+export const config = {
+  maxDuration: 30,
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -25,7 +33,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(200).json({ items })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown extraction error'
-      res.status(502).json({ error: message })
+      // Forward Groq's own 4xx as-is (429, 400, 413, ...) — those describe
+      // something about our request and are genuinely useful in Vercel's
+      // logs instead of reading as a crash. A Groq 5xx (or a transport/
+      // timeout/parse failure with no real response at all) stays a 502:
+      // "this server, acting as a gateway, got an invalid response from the
+      // upstream" is the accurate description either way.
+      const status = err instanceof GroqHttpError && err.status >= 400 && err.status < 500 ? err.status : 502
+      res.status(status).json({ error: message })
     }
   } catch (error) {
     // Top-level safety net: Vercel returns a bare 502 with no diagnostics if

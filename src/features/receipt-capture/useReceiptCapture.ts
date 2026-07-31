@@ -9,7 +9,7 @@ import {
   type SuggestedItemMatch,
 } from '../../db/db'
 import { isLikelyMatch } from '../../lib/itemMatch'
-import { extractReceiptItems } from './extractReceipt'
+import { ExtractionRequestError, extractReceiptItems } from './extractReceipt'
 import { parseRetryAfterSeconds } from './retryAfter'
 import { useActiveTripId } from '../trip/useActiveTripId'
 
@@ -111,6 +111,7 @@ export function useReceiptCapture() {
       await db.pendingReceipts.update(receipt.id, {
         status: 'failed',
         lastError: message,
+        lastErrorStatus: err instanceof ExtractionRequestError ? err.status : undefined,
         retryAt: retryAfterSeconds !== null ? Date.now() + retryAfterSeconds * 1000 : undefined,
       })
     }
@@ -159,6 +160,12 @@ export function useReceiptCapture() {
             // picked this receipt up since the sweep started.
             const fresh = await db.pendingReceipts.get(candidate.id)
             if (!fresh || (fresh.status !== 'pending' && fresh.status !== 'failed')) continue
+            // A failed receipt with a still-future retryAt already has its own
+            // scheduled retry (see ReceiptRow) honoring Groq's requested
+            // backoff — repeated 'online' events (flaky connectivity) must not
+            // bypass that by retrying it again early, which would just
+            // re-trigger the same rate limit before it had a chance to clear.
+            if (fresh.status === 'failed' && fresh.retryAt !== undefined && fresh.retryAt > Date.now()) continue
             await processReceipt(fresh)
           }
         } while (needsAnotherPassRef.current)

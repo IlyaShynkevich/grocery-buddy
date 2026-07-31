@@ -93,7 +93,7 @@ test('a server error marks the receipt failed, shows the message, and allows ret
     callCount += 1
     if (callCount === 1) {
       return route.fulfill({
-        status: 502,
+        status: 429,
         contentType: 'application/json',
         body: JSON.stringify({ error: 'Groq returned 429: rate limited, try again later' }),
       })

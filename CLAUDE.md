@@ -465,6 +465,55 @@ model.
     placeholder had an easier time here precisely because it was simpler,
     not because detailed icons are expected to stay crisp at 16px).
 
+- **Receipt extraction 502s masking real Groq 429s, and a retry-backoff
+  bypass**: fixed, not yet merged. Investigated after 8+ consecutive 502s
+  showed in Vercel logs over ~20 minutes (each 198-850ms, "too fast to be
+  Groq") while the UI showed "Too many requests." Traced the full path
+  rather than guessing:
+  - `api/extract-receipt.ts` was unconditionally converting *any*
+    extraction failure to HTTP 502, including a real Groq 429 — the "429"
+    only ever reached the browser as text inside the error message
+    (`groqExtract.ts`'s `` `Groq returned ${response.status}: ...` ``),
+    and the frontend classified purely by regexing that text
+    (`errorMessage.ts`'s `` /\b429\b/ ``), never the actual status code.
+    So the UI message was correct — it really was Groq 429s — but Vercel's
+    own dashboard read as a server crash instead of a rate limit, which is
+    what made this look alarming enough to investigate. Fast durations
+    aren't suspicious either: a 429 rejection happens before Groq runs any
+    inference.
+  - Fixed by having `groqExtract.ts` throw a `GroqHttpError` carrying
+    Groq's real status, and `extract-receipt.ts` forwarding it as-is for
+    4xx (429, 400, 413, ...) while still collapsing 5xx/transport/timeout
+    failures to 502 (accurate "bad gateway" semantics for an upstream
+    failure, vs. 4xx describing something about our own request). The
+    frontend (`extractReceipt.ts`'s new `ExtractionRequestError`,
+    `PendingReceipt.lastErrorStatus` in `db.ts`, `errorMessage.ts`) now
+    checks `status === 429` as the primary signal, keeping the text regex
+    only as a fallback.
+  - Separately, found a real bug while reading the retry path: the
+    online-reconnect sweep (`useReceiptCapture.ts`'s `syncPendingReceipts`)
+    retried every `pending`/`failed` receipt on any `online` event with no
+    check of `retryAt` at all — unlike the per-row auto-retry timer, which
+    does respect it. Repeated `online` events (flaky mobile connectivity
+    reconnecting/dropping, which the app already listens for) could retry
+    a just-429'd receipt before Groq's own requested backoff window
+    elapsed, re-triggering the same rate limit — a more likely explanation
+    for a sustained 20-minute burst than quota alone. Fixed by having the
+    sweep skip `failed` receipts whose `retryAt` is still in the future.
+  - Also added `maxDuration: 30` to `extract-receipt.ts`'s function config
+    — `groqExtract.ts`'s in-code `TIMEOUT_MS` (25s) exceeded Vercel's
+    platform default (10s Hobby / 15s Pro) with no override anywhere in
+    the repo, so a genuinely slow (not rate-limited) Groq call would have
+    been killed by the platform first. Not the cause of this incident
+    (durations were sub-second) but a real latent gap in the same code.
+  - `e2e/receipt-retry.spec.ts` and `e2e/receipt-extraction.spec.ts`'s
+    rate-limit mocks now return real HTTP 429 (previously 502-with-429-text,
+    modeling the old flattened behavior); added
+    `e2e/receipt-auto-sync.spec.ts`: "a rate-limited receipt with a
+    pending auto-retry is not retried early by a reconnect sweep" for the
+    backoff-bypass fix. Full suite: 60/61 passing — the one failure is the
+    pre-existing, already-documented "Make active" bug below, confirmed
+    unrelated (reproduces identically without any of this change applied).
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
 - **DB Debug Panel "Make active" doesn't reliably reflect as active.**

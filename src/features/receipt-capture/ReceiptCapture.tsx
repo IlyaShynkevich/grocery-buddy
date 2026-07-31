@@ -207,7 +207,7 @@ function ReceiptRow({
         <div style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>{new Date(receipt.capturedAt).toLocaleString()}</div>
         {receipt.status === 'failed' && receipt.lastError && (
           <div data-testid="receipt-error" style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>
-            {getUserFacingErrorMessage(receipt.lastError)}
+            {getUserFacingErrorMessage(receipt.lastError, receipt.lastErrorStatus)}
           </div>
         )}
       </div>

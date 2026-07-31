@@ -50,6 +50,8 @@ export interface PendingReceipt {
   status: ReceiptStatus
   /** message from the most recent failed extraction attempt, if any */
   lastError?: string
+  /** HTTP status of the most recent failed attempt, when it came from our API (not a network/timeout failure) */
+  lastErrorStatus?: number
   /** timestamp to auto-retry at, when lastError parsed a rate-limit wait time */
   retryAt?: number
   /**

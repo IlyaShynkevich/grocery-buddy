@@ -6,6 +6,17 @@ export interface ExtractedItem {
   isDiscount?: boolean
 }
 
+/** Thrown for a non-2xx /api/extract-receipt response; carries the real HTTP status. */
+export class ExtractionRequestError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'ExtractionRequestError'
+    this.status = status
+  }
+}
+
 const MAX_DIMENSION = 1600
 const JPEG_QUALITY = 0.8
 
@@ -28,7 +39,10 @@ export async function extractReceiptItems(imageBlob: Blob): Promise<ExtractedIte
 
   if (!response.ok) {
     const message = (body as { error?: unknown } | null)?.error
-    throw new Error(typeof message === 'string' ? message : `Extraction failed (${response.status})`)
+    throw new ExtractionRequestError(
+      response.status,
+      typeof message === 'string' ? message : `Extraction failed (${response.status})`,
+    )
   }
 
   const items = (body as { items?: unknown } | null)?.items
