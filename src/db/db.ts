@@ -89,9 +89,13 @@ db.version(2).stores({
   appState: '&key',
 })
 
+function todayDateString(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export function newTrip(overrides: Partial<Omit<Trip, 'id'>> = {}): Omit<Trip, 'id'> {
   return {
-    date: new Date().toISOString().slice(0, 10),
+    date: todayDateString(),
     store: undefined,
     total: 0,
     status: 'draft',
@@ -159,11 +163,27 @@ async function createTrip(): Promise<Trip> {
 // promise) or the in-flight promise from the first caller — never a gap.
 let pendingActiveTripCreation: Promise<Trip> | null = null
 
+/**
+ * A draft trip's `date` is only ever set once, at creation. If it's still
+ * the active draft when the calendar day rolls over, its date would
+ * otherwise stay stale until the next trip is created (e.g. via Save
+ * trip) — so every read of the active draft refreshes it to today first.
+ * A no-op (no DB write) once it's already current. Completed trips are
+ * left alone — their date is a historical record, not "today".
+ */
+export async function refreshDraftDate(trip: Trip): Promise<Trip> {
+  if (trip.status !== 'draft') return trip
+  const today = todayDateString()
+  if (trip.date === today) return trip
+  await db.trips.update(trip.id, { date: today })
+  return { ...trip, date: today }
+}
+
 export async function getOrCreateActiveTrip(): Promise<Trip> {
   const pointer = await db.appState.get(ACTIVE_TRIP_KEY)
   if (typeof pointer?.value === 'number') {
     const pinned = await db.trips.get(pointer.value)
-    if (pinned && pinned.status === 'draft') return pinned
+    if (pinned && pinned.status === 'draft') return refreshDraftDate(pinned)
   }
 
   if (pendingActiveTripCreation) return pendingActiveTripCreation
@@ -171,7 +191,7 @@ export async function getOrCreateActiveTrip(): Promise<Trip> {
   pendingActiveTripCreation = (async () => {
     try {
       const drafts = await db.trips.where('status').equals('draft').toArray()
-      const trip = drafts.length === 1 ? drafts[0] : await createTrip()
+      const trip = drafts.length === 1 ? await refreshDraftDate(drafts[0]) : await createTrip()
       await db.appState.put({ key: ACTIVE_TRIP_KEY, value: trip.id })
       return trip
     } finally {

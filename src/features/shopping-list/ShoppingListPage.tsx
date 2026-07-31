@@ -8,16 +8,17 @@ export function ShoppingListPage() {
   const { trip, items, addItem, renameItem, removeItem, saveTrip } = useShoppingList()
   const [draftName, setDraftName] = useState('')
 
-  // While a receipt review is pending, the review panel and Save trip
-  // button need to both be visible without scrolling past the full item
-  // list — so the list (not the header/date/Save trip button, which stay
-  // put) collapses by default, same idea as the DB Debug Panel's
-  // <details>. Once the review resolves (confirmed or dismissed), the
-  // collapsed/open state is left exactly as it was — it does not force
+  // The list is always collapsible via the toggle, in either direction, at
+  // any time — tapping it expands when collapsed and collapses when
+  // expanded, regardless of whether a review is pending. While a receipt
+  // review is pending, the review panel and Save trip button need to both
+  // be visible without scrolling past the full item list, so the list
+  // additionally collapses by default the moment a *new* pending review
+  // appears (the false -> true rising edge), same idea as the DB Debug
+  // Panel's <details>. Once the review resolves (confirmed or dismissed),
+  // the collapsed/open state is left exactly as it was — it does not force
   // back open — so a still-collapsed list stays collapsed until the user
-  // expands it themselves via the toggle. Only a *new* pending review
-  // (the false -> true rising edge) forces a fresh collapse, deliberately
-  // discarding whatever was left over from the previous one.
+  // expands it themselves via the toggle.
   const pendingReceipt = usePendingReceipt()
   const hasPendingReview = !!pendingReceipt
   const [isOpen, setIsOpen] = useState(true)
@@ -36,10 +37,6 @@ export function ShoppingListPage() {
     lastTripId.current = tripId
     setIsOpen(true)
   }, [tripId])
-  // The collapse affordance itself only needs to exist while there's an
-  // active review, or while a past one left the list collapsed — a fresh
-  // trip that's never had a review shows the plain, always-visible list.
-  const showCollapsible = hasPendingReview || !isOpen
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -116,21 +113,17 @@ export function ShoppingListPage() {
         {trip ? formatDate(trip.date) : 'Loading trip…'}
       </p>
 
-      {showCollapsible ? (
-        <details
-          data-testid="shopping-list-collapsible"
-          open={isOpen}
-          onToggle={(e) => setIsOpen(e.currentTarget.open)}
-          style={{ marginTop: '0.5rem' }}
-        >
-          <summary data-testid="shopping-list-toggle" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
-            {isOpen ? 'Hide shopping list' : 'Show shopping list'}
-          </summary>
-          {listContent}
-        </details>
-      ) : (
-        listContent
-      )}
+      <details
+        data-testid="shopping-list-collapsible"
+        open={isOpen}
+        onToggle={(e) => setIsOpen(e.currentTarget.open)}
+        style={{ marginTop: '0.5rem' }}
+      >
+        <summary data-testid="shopping-list-toggle" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
+          {isOpen ? 'Hide shopping list' : 'Show shopping list'}
+        </summary>
+        {listContent}
+      </details>
     </section>
   )
 }

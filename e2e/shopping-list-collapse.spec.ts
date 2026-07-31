@@ -24,12 +24,24 @@ async function captureAndProcess(page: Page) {
   await expect(page.getByTestId('receipt-review-panel')).toBeVisible()
 }
 
-test('the shopping list is visible by default with no toggle when no review is pending', async ({ page }) => {
+test('the shopping list is open by default, and the toggle collapses/expands it either way, any time', async ({
+  page,
+}) => {
   await page.goto('/')
 
   await expect(page.getByTestId('add-item-input')).toBeVisible()
   await expect(page.getByText("No items yet — add what you're picking up.")).toBeVisible()
-  await expect(page.getByTestId('shopping-list-toggle')).toHaveCount(0)
+  await expect(page.getByTestId('shopping-list-toggle')).toBeVisible()
+  await expect(page.getByTestId('shopping-list-toggle')).toHaveText('Hide shopping list')
+
+  // No pending review at all here — the toggle still works both ways.
+  await page.getByTestId('shopping-list-toggle').click()
+  await expect(page.getByTestId('shopping-list-toggle')).toHaveText('Show shopping list')
+  await expect(page.getByTestId('add-item-input')).toBeHidden()
+
+  await page.getByTestId('shopping-list-toggle').click()
+  await expect(page.getByTestId('shopping-list-toggle')).toHaveText('Hide shopping list')
+  await expect(page.getByTestId('add-item-input')).toBeVisible()
 })
 
 test('the shopping list auto-collapses once a receipt review becomes pending', async ({ page }) => {
@@ -144,6 +156,6 @@ test('saving the trip starts the fresh draft uncollapsed, not inheriting the fin
   await expect(page.getByTestId('shopping-list-toggle')).toHaveText('Show shopping list')
 
   await page.getByTestId('save-trip-button').click()
-  await expect(page.getByTestId('shopping-list-toggle')).toHaveCount(0)
+  await expect(page.getByTestId('shopping-list-toggle')).toHaveText('Hide shopping list')
   await expect(page.getByTestId('add-item-input')).toBeVisible()
 })

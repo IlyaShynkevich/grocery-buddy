@@ -514,15 +514,28 @@ model.
     backoff-bypass fix. Full suite: 60/61 passing — the one failure is the
     pre-existing, already-documented "Make active" bug below, confirmed
     unrelated (reproduces identically without any of this change applied).
+- **`trip-delete.spec.ts` "Make active" test fix**: investigated and
+  fixed, not yet merged. Root cause traced (not guessed): `TabTransition`
+  keeps the outgoing tab mounted for its `TRANSITION_MS` (220ms) slide-out
+  animation, so `ShoppingListPage`'s `useActiveTripId` instance stays
+  fully reactive for that long after switching to the History tab. The
+  failing test clicked "Make active" (pointing the pointer at a completed
+  trip) fast enough to reliably land inside that window every run — and
+  `useActiveTripId`'s self-heal logic (`getOrCreateActiveTrip` in
+  `db.ts`), seeing a pointer aimed at a non-draft trip, immediately
+  reassigned it back to the existing draft, undoing the click before the
+  assertion could observe it. Deterministic (not flaky) because a
+  synthetic Playwright click on an already-visible button consistently
+  resolves faster than the 220ms window. Not a production bug: "Make
+  active" is a dev-only debug affordance and the only way the pointer ever
+  targets a non-draft trip at all — no shipped user path can reach this
+  sequence. Fixed the test, not the app: added a wait for `shopping-list`
+  to fully unmount (proving the outgoing tab's live query is gone) before
+  clicking "Make active", same pattern as the existing
+  `swipe-navigation.spec.ts` settle-wait. Confirmed with `--repeat-each=3`
+  before and after; full suite now 62/62, no known-flake carve-out needed.
 - **DB Debug Panel "Reset all data"** leaves 1-2 phantom trips behind after
   reload instead of zero. Not yet fixed.
-- **DB Debug Panel "Make active" doesn't reliably reflect as active.**
-  `e2e/trip-delete.spec.ts`'s "deleting the trip currently pinned as
-  active..." test fails deterministically: after clicking a trip row's
-  "Make active", `data-active` on that row stays `"false"` instead of
-  flipping to `"true"`. Reproduces on a clean checkout with no unrelated
-  changes applied, so this isn't test flakiness. Not yet investigated or
-  fixed.
 
 ## Known limitations
 
