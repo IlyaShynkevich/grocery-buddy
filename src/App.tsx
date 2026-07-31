@@ -1,8 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
+import { AboutPage } from './features/about/AboutPage'
+import { CustomizePage } from './features/customize/CustomizePage'
 import { DbDebugPanel } from './features/debug/DbDebugPanel'
 import { Footer } from './features/footer/Footer'
 import { HistoryPage } from './features/history/HistoryPage'
 import { TripDetailPage } from './features/history/TripDetailPage'
+import { HomePage } from './features/home/HomePage'
+import { BarChartIcon, ClockIcon, GearIcon, HomeIcon, InfoIcon, ShoppingBagIcon, type IconProps } from './features/navigation/icons'
 import { TabTransition, type SlideDirection } from './features/navigation/TabTransition'
 import { ReceiptCapture } from './features/receipt-capture/ReceiptCapture'
 import { ReceiptReviewPanel } from './features/receipt-review/ReceiptReviewPanel'
@@ -10,13 +14,22 @@ import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
 import { StatsPage } from './features/stats/StatsPage'
 import { PAGE_MAX_WIDTH } from './lib/ui'
 
-type View = { name: 'shopping' } | { name: 'history' } | { name: 'trip-detail'; tripId: number } | { name: 'stats' }
-type TabName = Exclude<View['name'], 'trip-detail'>
+// The 4 icon-only tabs in the middle of the nav bar — these are the ones
+// swipe gesture navigation moves between. Home and About (the corner icons)
+// are deliberately not part of this set: they're reached only by tapping,
+// same as trip-detail reached via History.
+type TabName = 'shopping' | 'history' | 'stats' | 'customize'
+type View =
+  | { name: TabName }
+  | { name: 'trip-detail'; tripId: number }
+  | { name: 'home' }
+  | { name: 'about' }
 
-const TABS: Array<{ name: TabName; label: string; testId: string }> = [
-  { name: 'shopping', label: 'Shopping List', testId: 'nav-shopping' },
-  { name: 'history', label: 'History', testId: 'nav-history' },
-  { name: 'stats', label: 'Stats', testId: 'nav-stats' },
+const TABS: Array<{ name: TabName; label: string; testId: string; Icon: ComponentType<IconProps> }> = [
+  { name: 'shopping', label: 'Shopping List', testId: 'nav-shopping', Icon: ShoppingBagIcon },
+  { name: 'history', label: 'History', testId: 'nav-history', Icon: ClockIcon },
+  { name: 'stats', label: 'Stats', testId: 'nav-stats', Icon: BarChartIcon },
+  { name: 'customize', label: 'Customize', testId: 'nav-customize', Icon: GearIcon },
 ]
 
 // Single source of truth for swipe/tab order, shared with the tab bar above.
@@ -30,11 +43,33 @@ const SWIPE_MIN_DISTANCE = 50
 // below this, direction is still ambiguous and the gesture is left alone.
 const SWIPE_DIRECTION_LOCK = 10
 
+// Icon-only buttons, square-ish touch targets — shared by the 4 middle tabs
+// and the 2 corner icons (Home/About), same active/inactive color language
+// the old text-label tab bar used (solid accent fill vs. plain/transparent).
+function tabButtonStyle(active: boolean): CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0.5rem',
+    background: active ? 'var(--accent)' : 'transparent',
+    color: active ? 'var(--accent-contrast)' : 'inherit',
+    borderColor: active ? 'var(--accent)' : 'transparent',
+  }
+}
+
+function cornerButtonStyle(active: boolean): CSSProperties {
+  return { ...tabButtonStyle(active), padding: '0.4rem' }
+}
+
 function App() {
   const [view, setView] = useState<View>({ name: 'shopping' })
   // trip-detail isn't its own tab — it's reached via History, so it keeps
   // the History tab highlighted rather than showing no active tab at all.
-  const activeTab = view.name === 'trip-detail' ? 'history' : view.name
+  // Home/About aren't part of the swipeable tab set at all, so neither the
+  // middle tab bar nor swipe has an active tab while on either of them.
+  const activeTab: TabName | null =
+    view.name === 'trip-detail' ? 'history' : view.name === 'home' || view.name === 'about' ? null : view.name
   const mainRef = useRef<HTMLElement>(null)
   // Which way the last tab switch happened, for TabTransition's slide
   // direction — updated by both the swipe handler and the tab-bar taps
@@ -118,8 +153,8 @@ function App() {
       const dx = e.changedTouches[0].clientX - startX
       if (Math.abs(dx) < SWIPE_MIN_DISTANCE) return
 
-      const currentIndex = TAB_ORDER.indexOf(activeTab)
-      if (currentIndex === -1) return // e.g. trip detail — not one of the 3 swipeable tabs
+      const currentIndex = activeTab === null ? -1 : TAB_ORDER.indexOf(activeTab)
+      if (currentIndex === -1) return // e.g. trip detail, Home, About — not one of the swipeable tabs
       const swipeDirection: SlideDirection = dx < 0 ? 'forward' : 'backward'
       const nextIndex = currentIndex + (swipeDirection === 'forward' ? 1 : -1)
       if (nextIndex < 0 || nextIndex >= TAB_ORDER.length) return // no wraparound at the edges
@@ -151,6 +186,8 @@ function App() {
         return <HistoryPage onSelectTrip={(tripId) => setView({ name: 'trip-detail', tripId })} />
       case 'stats':
         return <StatsPage />
+      case 'customize':
+        return <CustomizePage />
     }
   }
 
@@ -174,6 +211,7 @@ function App() {
         data-testid="app-nav"
         style={{
           display: 'flex',
+          alignItems: 'center',
           gap: '0.25rem',
           maxWidth: PAGE_MAX_WIDTH,
           margin: '0.75rem auto 0',
@@ -181,38 +219,67 @@ function App() {
           borderBottom: '1px solid var(--border)',
         }}
       >
-        {TABS.map((tab) => {
-          const active = tab.name === activeTab
-          return (
-            <button
-              key={tab.name}
-              type="button"
-              data-testid={tab.testId}
-              onClick={() => {
-                const fromIndex = TAB_ORDER.indexOf(activeTab)
-                const toIndex = TAB_ORDER.indexOf(tab.name)
-                if (fromIndex !== -1 && toIndex !== -1 && toIndex !== fromIndex) {
-                  setDirection(toIndex > fromIndex ? 'forward' : 'backward')
-                }
-                setView({ name: tab.name } as View)
-              }}
-              style={{
-                background: active ? 'var(--accent)' : 'transparent',
-                color: active ? 'var(--accent-contrast)' : 'inherit',
-                borderColor: active ? 'var(--accent)' : 'transparent',
-                fontWeight: active ? 600 : 400,
-              }}
-            >
-              {tab.label}
-            </button>
-          )
-        })}
+        {/* Home (top-left) and About (top-right) are plain tap-only corner
+            icons — deliberately outside TAB_ORDER/TABS, so they never
+            participate in swipe navigation, only in the onClick below. */}
+        <button
+          type="button"
+          data-testid="nav-home"
+          aria-label="Home"
+          title="Home"
+          onClick={() => setView({ name: 'home' })}
+          style={cornerButtonStyle(view.name === 'home')}
+        >
+          <HomeIcon />
+        </button>
+
+        <div style={{ display: 'flex', flex: 1, justifyContent: 'center', gap: '0.25rem' }}>
+          {TABS.map((tab) => {
+            const active = tab.name === activeTab
+            const Icon = tab.Icon
+            return (
+              <button
+                key={tab.name}
+                type="button"
+                data-testid={tab.testId}
+                aria-label={tab.label}
+                title={tab.label}
+                onClick={() => {
+                  const fromIndex = activeTab === null ? -1 : TAB_ORDER.indexOf(activeTab)
+                  const toIndex = TAB_ORDER.indexOf(tab.name)
+                  if (fromIndex !== -1 && toIndex !== -1 && toIndex !== fromIndex) {
+                    setDirection(toIndex > fromIndex ? 'forward' : 'backward')
+                  }
+                  setView({ name: tab.name })
+                }}
+                style={tabButtonStyle(active)}
+              >
+                <Icon />
+              </button>
+            )
+          })}
+        </div>
+
+        <button
+          type="button"
+          data-testid="nav-about"
+          aria-label="About"
+          title="About"
+          onClick={() => setView({ name: 'about' })}
+          style={cornerButtonStyle(view.name === 'about')}
+        >
+          <InfoIcon />
+        </button>
       </nav>
 
       {view.name === 'trip-detail' ? (
         <TripDetailPage tripId={view.tripId} onBack={() => setView({ name: 'history' })} />
+      ) : view.name === 'home' ? (
+        <HomePage />
+      ) : view.name === 'about' ? (
+        <AboutPage />
       ) : (
-        <TabTransition activeTab={activeTab} direction={direction} renderTab={renderTab} />
+        <TabTransition activeTab={view.name} direction={direction} renderTab={renderTab} />
       )}
 
       {/*

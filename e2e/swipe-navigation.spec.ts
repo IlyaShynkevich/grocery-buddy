@@ -76,15 +76,25 @@ test('swipe left moves forward through the tabs in order', async ({ page }) => {
   point = await contentPoint(page, 'history-page')
   await touchSwipe(page, { x1: point.x + 150, y1: point.y, x2: point.x - 150, y2: point.y })
   await expect(page.getByTestId('stats-page')).toBeVisible()
+  await page.waitForTimeout(ANIMATION_SETTLE_MS)
+
+  point = await contentPoint(page, 'stats-page')
+  await touchSwipe(page, { x1: point.x + 150, y1: point.y, x2: point.x - 150, y2: point.y })
+  await expect(page.getByTestId('customize-page')).toBeVisible()
 })
 
 test('swipe right moves backward through the tabs in order', async ({ page }) => {
   await page.goto('/')
-  await page.getByTestId('nav-stats').click()
+  await page.getByTestId('nav-customize').click()
+  await expect(page.getByTestId('customize-page')).toBeVisible()
+  await page.waitForTimeout(ANIMATION_SETTLE_MS)
+
+  let point = await contentPoint(page, 'customize-page')
+  await touchSwipe(page, { x1: point.x - 150, y1: point.y, x2: point.x + 150, y2: point.y })
   await expect(page.getByTestId('stats-page')).toBeVisible()
   await page.waitForTimeout(ANIMATION_SETTLE_MS)
 
-  let point = await contentPoint(page, 'stats-page')
+  point = await contentPoint(page, 'stats-page')
   await touchSwipe(page, { x1: point.x - 150, y1: point.y, x2: point.x + 150, y2: point.y })
   await expect(page.getByTestId('history-page')).toBeVisible()
   await page.waitForTimeout(ANIMATION_SETTLE_MS)
@@ -103,13 +113,14 @@ test('swiping past either edge does not wrap around', async ({ page }) => {
   await touchSwipe(page, { x1: point.x - 150, y1: point.y, x2: point.x + 150, y2: point.y })
   await expect(page.getByTestId('shopping-list')).toBeVisible()
 
-  // Move to the last tab, then swiping left (forward) must do nothing.
-  await page.getByTestId('nav-stats').click()
-  await expect(page.getByTestId('stats-page')).toBeVisible()
+  // Move to the last tab (now Customize, the 4th middle tab), then swiping
+  // left (forward) must do nothing.
+  await page.getByTestId('nav-customize').click()
+  await expect(page.getByTestId('customize-page')).toBeVisible()
   await page.waitForTimeout(ANIMATION_SETTLE_MS)
-  point = await contentPoint(page, 'stats-page')
+  point = await contentPoint(page, 'customize-page')
   await touchSwipe(page, { x1: point.x + 150, y1: point.y, x2: point.x - 150, y2: point.y })
-  await expect(page.getByTestId('stats-page')).toBeVisible()
+  await expect(page.getByTestId('customize-page')).toBeVisible()
 })
 
 test('a vertical scroll gesture does not trigger a tab change', async ({ page }) => {
@@ -299,6 +310,34 @@ test('Debug tools only appears on Shopping List, instantly, with no settle delay
   await page.getByTestId('nav-stats').click()
   await expect(page.getByTestId('debug-panel-toggle')).toHaveCount(0)
 
+  await page.getByTestId('nav-customize').click()
+  await expect(page.getByTestId('debug-panel-toggle')).toHaveCount(0)
+
   await page.getByTestId('nav-shopping').click()
   await expect(page.getByTestId('debug-panel-toggle')).toBeVisible()
+})
+
+test('Home and About are reached only by tapping, never by swipe', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByTestId('nav-home').click()
+  await expect(page.getByTestId('home-page')).toBeVisible()
+
+  // Home isn't part of the swipeable tab set at all — a swipe here must do
+  // nothing (no crash, no navigation), unlike a swipe on any of the 4 middle
+  // tabs which always moves to a neighbor.
+  let point = await contentPoint(page, 'home-page')
+  await touchSwipe(page, { x1: point.x + 150, y1: point.y, x2: point.x - 150, y2: point.y })
+  await expect(page.getByTestId('home-page')).toBeVisible()
+
+  await page.getByTestId('nav-about').click()
+  await expect(page.getByTestId('about-page')).toBeVisible()
+
+  point = await contentPoint(page, 'about-page')
+  await touchSwipe(page, { x1: point.x - 150, y1: point.y, x2: point.x + 150, y2: point.y })
+  await expect(page.getByTestId('about-page')).toBeVisible()
+
+  // Tapping back into the middle tab set still works normally afterwards.
+  await page.getByTestId('nav-shopping').click()
+  await expect(page.getByTestId('shopping-list')).toBeVisible()
 })
