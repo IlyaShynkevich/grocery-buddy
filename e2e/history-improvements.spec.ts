@@ -203,3 +203,45 @@ test('discount entries no longer show category/essential controls anywhere', asy
   await expect(detailDiscountRow).toContainText('Coupon Herzstuecke')
   await expect(detailDiscountRow.getByTestId('trip-detail-item-essential')).toHaveCount(0)
 })
+
+async function seedTrips(page: Page, count: number) {
+  for (let i = 0; i < count; i++) {
+    await addItem(page, `Item ${i}`)
+    await saveAndGetCompletedTripId(page)
+  }
+}
+
+test('with more than 9 trips, the trip list scrolls internally instead of growing the page', async ({ page }) => {
+  await page.goto('/')
+  await seedTrips(page, 12)
+
+  await page.getByTestId('nav-history').click()
+  await expect(page.getByTestId('history-page')).toBeVisible()
+
+  const scrollBox = page.getByTestId('history-list-scroll')
+  const { scrollHeight, clientHeight } = await scrollBox.evaluate((el) => ({
+    scrollHeight: el.scrollHeight,
+    clientHeight: el.clientHeight,
+  }))
+  expect(scrollHeight).toBeGreaterThan(clientHeight)
+
+  // The page itself must not have grown to accommodate all 12 rows — Debug
+  // tools and the footer stay reachable without scrolling the whole page.
+  await expect(page.getByTestId('debug-panel-toggle')).toBeInViewport()
+  await expect(page.getByTestId('app-footer')).toBeInViewport()
+})
+
+test('with 9 or fewer trips, the trip list has no internal scrollbar', async ({ page }) => {
+  await page.goto('/')
+  await seedTrips(page, 3)
+
+  await page.getByTestId('nav-history').click()
+  await expect(page.getByTestId('history-page')).toBeVisible()
+
+  const scrollBox = page.getByTestId('history-list-scroll')
+  const { scrollHeight, clientHeight } = await scrollBox.evaluate((el) => ({
+    scrollHeight: el.scrollHeight,
+    clientHeight: el.clientHeight,
+  }))
+  expect(scrollHeight).toBeLessThanOrEqual(clientHeight)
+})

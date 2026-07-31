@@ -28,16 +28,27 @@ interface TabTransitionProps<T extends string> {
  * outgoing one unmounts as soon as its animation ends so it doesn't linger
  * around holding onto live-query subscriptions or being (invisibly) tappable.
  *
- * The current tab's wrapper `<div>` (key `current-${activeTab}`) is rendered
- * in the exact same position/shape whether or not a transition is in
- * flight — only the outgoing sibling is conditionally added/removed, and the
- * current div's own animation is just a style tweak. This matters: an
- * earlier version swapped between "no wrapper" and "wrapper + sibling"
- * shapes depending on transition state, which made React tear down and
- * remount the *current* tab's whole subtree the instant an animation
- * finished — losing DOM node identity mid-interaction (e.g. a click landing
- * right as the transition ended would hit an element that had just been
- * detached).
+ * The current tab's wrapper `<div>` (key `activeTab`) is rendered in the
+ * exact same position/shape whether or not a transition is in flight — only
+ * the outgoing sibling is conditionally added/removed, and the current
+ * div's own animation is just a style tweak. This matters: an earlier
+ * version swapped between "no wrapper" and "wrapper + sibling" shapes
+ * depending on transition state, which made React tear down and remount the
+ * *current* tab's whole subtree the instant an animation finished — losing
+ * DOM node identity mid-interaction (e.g. a click landing right as the
+ * transition ended would hit an element that had just been detached).
+ *
+ * Both wrapper divs are keyed by the bare tab name (`outgoing.tab` /
+ * `activeTab`), not a role-prefixed string like `outgoing-${tab}` — a tab's
+ * wrapper must keep the *same* key across the render where it switches from
+ * playing the "current" role to playing the "outgoing" role, or React reads
+ * the key change as "different element" and remounts that tab's whole
+ * subtree (losing its live-query data, resetting local state) right as the
+ * transition starts, before the slide animation's first paint — a visible
+ * flick/snap of already-loaded content briefly reverting to a loading
+ * state. `outgoing.tab` and `activeTab` are always different tabs while a
+ * transition is in flight (see the synchronous state update above), so
+ * these two keys never collide.
  */
 export function TabTransition<T extends string>({ activeTab, direction, renderTab }: TabTransitionProps<T>) {
   const [outgoing, setOutgoing] = useState<{ tab: T; direction: SlideDirection } | null>(null)
@@ -74,7 +85,7 @@ export function TabTransition<T extends string>({ activeTab, direction, renderTa
     <div style={{ position: 'relative', overflow: outgoing ? 'hidden' : 'visible' }}>
       {outgoing && (
         <div
-          key={`outgoing-${outgoing.tab}`}
+          key={outgoing.tab}
           className="gb-tab-slide"
           // pointer-events: none — this copy is on its way out, it shouldn't
           // still be tappable during the brief window it's animating away.
@@ -100,7 +111,7 @@ export function TabTransition<T extends string>({ activeTab, direction, renderTa
         </div>
       )}
       <div
-        key={`current-${activeTab}`}
+        key={activeTab}
         className={incomingAnimation ? 'gb-tab-slide' : undefined}
         // Opaque for the same reason as the outgoing panel above — this one
         // isn't the layer doing the occluding (outgoing paints on top by

@@ -619,6 +619,50 @@ model.
     transition, sampled every animation frame) — deliberately checks
     opacity rather than geometric non-overlap, since the fix doesn't (and
     doesn't need to) make the overlap itself go away.
+- **Pre-slide flick fix + History's trip list made internally scrollable**:
+  done and verified in production. Two more follow-ups on the tab-
+  transition/History work above.
+  - A flick/snap was visible right before every slide animation started
+    (swipe or tab-bar tap). Root cause, confirmed live (marked the real
+    `shopping-list` DOM node with a unique attribute, triggered a switch,
+    checked immediately after — the node was already gone): the outgoing
+    panel's wrapper `<div>` in `TabTransition.tsx` was keyed
+    `` `outgoing-${tab}` ``, different from the `` `current-${tab}` `` key
+    that same tab's wrapper had one render earlier while it was still
+    active. A key change reads to React as "different element," so it
+    unmounted that tab's entire subtree and mounted a fresh one — losing
+    already-resolved `useLiveQuery` data (most hooks, e.g.
+    `useShoppingList`'s `items`, default to an empty/`undefined` value on a
+    component's first render) and repainting a "loading" flash before the
+    CSS animation's first frame. Fixed by keying both wrapper divs by the
+    bare tab name (`outgoing.tab` / `activeTab`, never colliding since
+    `outgoing` is always the *other* tab while a transition is in flight) —
+    React now recognizes the wrapper as the same element across the
+    current-to-outgoing role change and only updates its style in place, no
+    remount. This is the same class of bug as the earlier "keep the current
+    wrapper's shape stable" fix, just the symmetrical case at the *start* of
+    a transition instead of the end, missed the first time. Confirmed live
+    the same way (canary attribute now survives immediately after the
+    switch, and is only actually removed once the transition genuinely
+    settles); covered by `e2e/swipe-navigation.spec.ts`'s "the outgoing page
+    keeps its DOM node identity instead of remounting when a transition
+    starts."
+  - History's trip list (`HistoryPage.tsx`) now sits in a `maxHeight: 29rem`
+    (measured live: 9 rows at `cardStyle`'s actual rendered row height,
+    ~44.375px, plus 8px gaps between them ≈ 463px — what fits on one screen
+    without scrolling), `overflowY: auto` container
+    (`data-testid="history-list-scroll"`) wrapping all month groups
+    together, instead of an unbounded page that pushed Debug tools/the
+    footer down and off-screen once there were enough trips. `max-height`
+    (not a fixed `height`) so fewer trips (or a month-filtered view) still
+    render at their natural height, no forced scrollbar/dead space — only
+    content taller than ~9 rows clips and scrolls internally. The `<h1>`,
+    "No saved trips yet" message, and the month-filter `<select>` stay
+    outside/above the scroll container so they're always visible. Covered
+    by two new tests in `e2e/history-improvements.spec.ts`: 12 trips
+    produces an internally-scrollable list with Debug tools/the footer
+    still in viewport without scrolling the page, and 3 trips produces no
+    internal scrollbar.
 
 ## Known limitations
 

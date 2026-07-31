@@ -232,3 +232,36 @@ test('outgoing and incoming tab panels stay fully opaque during a transition', a
     expect(alpha).toBe(1)
   }
 })
+
+test('the outgoing page keeps its DOM node identity instead of remounting when a transition starts', async ({
+  page,
+}) => {
+  // Regression test for a "flick" right before the slide animation: the
+  // outgoing panel's wrapper used to be keyed differently (`outgoing-${tab}`)
+  // than the same tab's wrapper had been keyed while it was still current
+  // (`current-${tab}`), so React saw a key change and remounted that tab's
+  // whole subtree — losing already-loaded live-query data and any local
+  // state — right as the transition started, before the CSS animation ever
+  // painted a frame. Marking the live DOM node and checking it survives the
+  // switch (not just that the page eventually looks right) is what actually
+  // encodes "no remount happened."
+  await page.goto('/')
+  await expect(page.getByTestId('shopping-list')).toBeVisible()
+
+  await page.evaluate(() => {
+    document.querySelector('[data-testid="shopping-list"]')!.setAttribute('data-canary', 'no-remount')
+  })
+
+  await page.getByTestId('nav-history').click()
+
+  // Checked immediately, deliberately not waiting for the transition to
+  // settle — a remount happens synchronously in the same commit that starts
+  // the transition, so if the canary is gone here, it was never about the
+  // animation timing.
+  await expect(page.locator('[data-canary="no-remount"]')).toHaveCount(1)
+
+  // Once the transition genuinely finishes, the outgoing panel is removed
+  // for real — the canary should be gone by then.
+  await page.waitForTimeout(ANIMATION_SETTLE_MS)
+  await expect(page.locator('[data-canary="no-remount"]')).toHaveCount(0)
+})
