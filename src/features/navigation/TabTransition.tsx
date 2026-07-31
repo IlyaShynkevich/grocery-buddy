@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-// Kept snappy on purpose — long enough to read as a slide, short enough to
-// not feel laggy when swiping quickly between tabs.
-const TRANSITION_MS = 220
+// Long enough to read as a smooth slide rather than a flash-cut, short
+// enough to not feel laggy when swiping quickly between tabs.
+const TRANSITION_MS = 300
+
+// Asymmetric easing, not the same curve both ways: a decelerate curve for
+// the incoming tab (settles into place) and an accelerate curve for the
+// outgoing one (speeds away rather than lingering/decelerating on its way
+// off-screen, which read as hesitation). Standard Material Design motion
+// curves.
+const EASE_INCOMING = 'cubic-bezier(0, 0, 0.2, 1)'
+const EASE_OUTGOING = 'cubic-bezier(0.4, 0, 1, 1)'
 
 export type SlideDirection = 'forward' | 'backward'
 
@@ -76,7 +84,7 @@ export function TabTransition<T extends string>({ activeTab, direction, renderTa
             left: 0,
             width: '100%',
             pointerEvents: 'none',
-            animation: `${outgoingAnimation} ${TRANSITION_MS}ms ease-out both`,
+            animation: `${outgoingAnimation} ${TRANSITION_MS}ms ${EASE_OUTGOING} both`,
           }}
         >
           {renderTab(outgoing.tab)}
@@ -85,7 +93,9 @@ export function TabTransition<T extends string>({ activeTab, direction, renderTa
       <div
         key={`current-${activeTab}`}
         className={incomingAnimation ? 'gb-tab-slide' : undefined}
-        style={incomingAnimation ? { animation: `${incomingAnimation} ${TRANSITION_MS}ms ease-out both` } : undefined}
+        style={
+          incomingAnimation ? { animation: `${incomingAnimation} ${TRANSITION_MS}ms ${EASE_INCOMING} both` } : undefined
+        }
       >
         {renderTab(activeTab)}
       </div>
