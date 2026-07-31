@@ -872,6 +872,61 @@ model.
     and the flex-column layout in `App.tsx` are untouched by this entry;
     only the Debug tools visibility condition and its affected tests
     changed. Full suite: 69/69 passing.
+- **History: sticky swapping month header + trip list sized for exactly 9
+  rows**: done and verified, two follow-ups on the History trip list
+  (`HistoryPage.tsx`).
+  - The month header (`<h2 data-testid="history-month-header">`) is now
+    `position: sticky; top: 0` instead of scrolling away as ordinary list
+    content — the standard CSS-only "swapping section header" pattern
+    (contact lists, calendars): every month group already renders its own
+    header stacked in normal document order, so giving each one `position:
+    sticky` is enough on its own for the pinned label to swap to the next
+    month automatically as its group scrolls to the top — no JS scroll
+    tracking needed. `background: var(--bg)` (the page background, not
+    `--surface`, which is the row cards' color) keeps scrolled-past rows
+    from showing through underneath the pinned label, and `zIndex: 1` keeps
+    it painting above them (sticky alone doesn't imply paint order).
+  - The scroll container's `maxHeight` was wrong: `29rem` (464px) was
+    sized assuming *only* 9 rows + 8 gaps, entirely omitting the month
+    header's own height, its margin-bottom, and the group wrapper's
+    top-margin — that omitted overhead (~49.5px) was silently eating into
+    the row budget, so only 8 rows actually fit, leaving a visible gap
+    below the 8th row before the footer. Fixed by measuring live (real
+    `npm run preview` build, via a temporary Playwright script, not
+    guessed): row height 44.375px, row gap 8px, header height 25.5px +
+    8px margin-bottom + 16px group top-margin = 49.5px of fixed overhead.
+    `maxHeight` is now `32.25rem` (516px) = overhead + 9 rows + 8 gaps
+    (512.875px) plus a few px of slack, the same margin style the original
+    (wrong) value used.
+  - `e2e/history-improvements.spec.ts`'s two boundary tests were
+    tightened to actually exercise the boundary — "with 9 or fewer trips,
+    no internal scrollbar" seeded only 3 trips before (nowhere near 9,
+    so it could never have caught this bug), now seeds exactly 9; "with
+    more than 9 trips, scrolls internally" seeded 12 (also fine, but not
+    the tight boundary), now seeds 10. Also removed that test's
+    now-obsolete `debug-panel-toggle` in-viewport assertion (Debug tools
+    doesn't render on History at all anymore — see the entry above).
+  - New test: "the pinned month header updates as trips from an earlier
+    month scroll into view" — seeds two month groups and scrolls the
+    container, checking which header's own rect currently satisfies
+    `bottom > containerTop` (i.e., hasn't fully scrolled past yet) rather
+    than asserting exact pixel equality against the container's top edge.
+    Getting this test right took two live-measured iterations, worth
+    remembering if this is touched again: scrolling to the container's
+    absolute max (`scrollTop = scrollHeight`) is *not* guaranteed to evict
+    the first month's header — if the second month's own group is shorter
+    than the container, the total scrollable distance never exceeds the
+    first group's height, so there's no scroll position from which it
+    could ever be evicted (confirmed live: with only 5 second-month trips,
+    this genuinely cannot pass at any scroll position, not a CSS bug).
+    Fixed by giving the earlier month enough trips (12) that its own group
+    exceeds the container's height. Separately, scrolling to *precisely*
+    the first group's measured height lands inside a real, live-measured
+    multi-pixel handoff window where the outgoing header is already
+    clipped-but-not-fully-gone and the incoming one hasn't reached the top
+    yet — neither reads as "current" for a few pixels of scroll. Scrolling
+    well past that boundary (+40px margin, not +5px) clears it reliably.
+    Full suite: 70/70 passing.
 
 ## Known limitations
 

@@ -213,7 +213,10 @@ async function seedTrips(page: Page, count: number) {
 
 test('with more than 9 trips, the trip list scrolls internally instead of growing the page', async ({ page }) => {
   await page.goto('/')
-  await seedTrips(page, 12)
+  // 10, not some larger round number — the point of this test is the exact
+  // boundary (9 fits, 10 doesn't), not "many trips scroll," so it should
+  // fail if the scroll container's height is ever off by one row again.
+  await seedTrips(page, 10)
 
   await page.getByTestId('nav-history').click()
   await expect(page.getByTestId('history-page')).toBeVisible()
@@ -223,7 +226,7 @@ test('with more than 9 trips, the trip list scrolls internally instead of growin
   // Wait for the actual rows before measuring scroll dimensions, or a slow
   // enough query (e.g. under parallel-test load) reads scrollHeight/
   // clientHeight as 0/0 on an as-yet-childless container.
-  await expect(page.getByTestId('history-trip')).toHaveCount(12)
+  await expect(page.getByTestId('history-trip')).toHaveCount(10)
 
   const scrollBox = page.getByTestId('history-list-scroll')
   const { scrollHeight, clientHeight } = await scrollBox.evaluate((el) => ({
@@ -240,14 +243,18 @@ test('with more than 9 trips, the trip list scrolls internally instead of growin
 
 test('with 9 or fewer trips, the trip list has no internal scrollbar', async ({ page }) => {
   await page.goto('/')
-  await seedTrips(page, 3)
+  // Exactly 9, the true boundary — the scroll container's height is sized
+  // for precisely 9 rows plus one month header; this is the case that was
+  // actually broken before (only 8 rows fit, with dead space below), which
+  // a smaller trip count like 3 would never have caught.
+  await seedTrips(page, 9)
 
   await page.getByTestId('nav-history').click()
   await expect(page.getByTestId('history-page')).toBeVisible()
   // See the comment in the test above — wait for the live-query-backed rows
   // to actually render before measuring, not just the (always-present)
   // page shell.
-  await expect(page.getByTestId('history-trip')).toHaveCount(3)
+  await expect(page.getByTestId('history-trip')).toHaveCount(9)
 
   const scrollBox = page.getByTestId('history-list-scroll')
   const { scrollHeight, clientHeight } = await scrollBox.evaluate((el) => ({
@@ -255,4 +262,61 @@ test('with 9 or fewer trips, the trip list has no internal scrollbar', async ({ 
     clientHeight: el.clientHeight,
   }))
   expect(scrollHeight).toBeLessThanOrEqual(clientHeight)
+})
+
+test('the pinned month header updates as trips from an earlier month scroll into view', async ({ page }) => {
+  await page.goto('/')
+  // June needs enough of its own trips that its group alone is taller than
+  // the scroll container — otherwise the total scrollable distance never
+  // exceeds July's group height, and there's no scroll position from which
+  // July's header (still correctly sticky-pinned until its whole group has
+  // scrolled past) could ever be evicted, regardless of how the test
+  // scrolls. Confirmed live: with only 5 June trips this test cannot pass
+  // no matter how far it scrolls, because the container simply can't
+  // scroll far enough — not a bug in the sticky behavior itself.
+  for (let i = 0; i < 6; i++) {
+    await addItem(page, `July item ${i}`)
+    await saveAndGetCompletedTripId(page)
+  }
+  for (let i = 0; i < 12; i++) {
+    await addItem(page, `June item ${i}`)
+    const tripId = await saveAndGetCompletedTripId(page)
+    await setTripDate(page, tripId, '2026-06-15')
+  }
+
+  await page.reload()
+  await page.getByTestId('nav-history').click()
+  await expect(page.getByTestId('history-month-header')).toHaveText(['Juli 2026', 'Juni 2026'])
+
+  // The "current" header is the topmost one whose group hasn't fully
+  // scrolled past yet (bottom still below the container's top edge) — at
+  // rest that's just whichever header is first in the list; once its whole
+  // group scrolls past, position: sticky keeps the *next* header pinned at
+  // the container's top edge instead, so it becomes the one satisfying this.
+  const stuckHeaderText = () =>
+    page.evaluate(() => {
+      const containerTop = document.querySelector('[data-testid="history-list-scroll"]')!.getBoundingClientRect().top
+      const headers = Array.from(document.querySelectorAll('[data-testid="history-month-header"]'))
+      const current = headers.find((h) => h.getBoundingClientRect().bottom > containerTop)
+      return current?.textContent
+    })
+
+  // At rest, July (the first, most-recent group) is pinned.
+  await expect.poll(stuckHeaderText).toBe('Juli 2026')
+
+  // Scroll well past the measured height of July's whole group (header +
+  // all its rows), not just barely past it: right at that exact boundary,
+  // July's header is still mid-handoff — clipped above the container's top
+  // edge but with a couple of its own pixels still poking below it, while
+  // June's header hasn't reached the top edge yet either (confirmed live by
+  // sampling rects frame-by-frame at the boundary) — so neither header
+  // reads as "current" for a few pixels of scroll. A comfortable margin
+  // (well past one header's own height) clears that handoff zone entirely.
+  const julyGroupHeight = await page
+    .locator('[data-testid="history-month-group"][data-month-key="2026-07"]')
+    .evaluate((el) => el.getBoundingClientRect().height)
+  await page.getByTestId('history-list-scroll').evaluate((el, distance) => {
+    el.scrollTop = distance
+  }, julyGroupHeight + 40)
+  await expect.poll(stuckHeaderText).toBe('Juni 2026')
 })

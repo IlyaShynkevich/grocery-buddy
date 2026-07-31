@@ -34,21 +34,45 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
       {/*
         Fixed max-height, not an unbounded page: without this, a long
         history pushes Debug tools/the footer down and off-screen, requiring
-        the whole page to scroll. 29rem (464px at the default root font
-        size) is sized to fit ~9 trip rows — measured live from cardStyle's
-        actual rendered row height (~44.375px) plus the list's 8px row gap
-        (9 rows + 8 gaps = ~463px) — matching what fits on screen without
-        scrolling. max-height (not height) so fewer trips, or a
-        month-filtered view with few trips, still render at their natural
-        height with no forced scrollbar/dead space; only content taller than
-        that clips and scrolls internally. The heading, "No saved trips
-        yet" message, and month filter above stay outside this container so
-        they're always visible without scrolling.
+        the whole page to scroll. 32.25rem (516px at the default root font
+        size) is sized to fit exactly 9 trip rows plus one month header —
+        measured live (not guessed) against a real npm run preview build:
+        cardStyle's actual rendered row height is 44.375px, the list's row
+        gap is 8px, and a month header (with its own 8px margin-bottom) plus
+        the group wrapper's 1rem top margin adds 49.5px of fixed overhead
+        above the rows (sticky, see below, doesn't change how much space it
+        occupies — only whether it's pinned). 49.5 + 9*44.375 + 8*8 =
+        512.875px; 516px leaves a few px of slack, same margin the previous
+        (wrong) 464px value left for what turned out to be only 8 rows — that
+        value never accounted for the header/margin overhead at all, which
+        is what shorted it by a full row. max-height (not height) so fewer
+        trips, or a month-filtered view with few trips, still render at
+        their natural height with no forced scrollbar/dead space; only
+        content taller than that clips and scrolls internally. The heading,
+        "No saved trips yet" message, and month filter above stay outside
+        this container so they're always visible without scrolling.
       */}
-      <div data-testid="history-list-scroll" style={{ maxHeight: '29rem', overflowY: 'auto' }}>
+      <div data-testid="history-list-scroll" style={{ maxHeight: '32.25rem', overflowY: 'auto' }}>
         {visibleGroups.map((group) => (
           <div key={group.key} data-testid="history-month-group" data-month-key={group.key} style={{ marginTop: '1rem' }}>
-            <h2 data-testid="history-month-header" style={{ fontSize: '1.1rem', margin: '0 0 0.5rem' }}>
+            {/*
+              position: sticky (not static) — the standard "swapping section
+              header" pattern (contact lists, calendars): each month's header
+              sticks to the top of the scrollable container for as long as
+              any of that month's rows are in view, then is pushed off by
+              the next month's header once its own group has fully scrolled
+              past, which is what makes the pinned label "swap" to the new
+              month automatically. No JS scroll tracking needed — this falls
+              out of every group having its own sticky header stacked in
+              normal document order. background matches the page (not
+              --surface, which is the row cards' color) so scrolled-past rows
+              don't show through underneath the pinned label; zIndex keeps it
+              above those rows too, since sticky doesn't imply a paint order.
+            */}
+            <h2
+              data-testid="history-month-header"
+              style={{ fontSize: '1.1rem', margin: '0 0 0.5rem', position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}
+            >
               {group.label}
             </h2>
             <ul
