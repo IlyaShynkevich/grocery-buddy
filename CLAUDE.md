@@ -663,6 +663,49 @@ model.
     produces an internally-scrollable list with Debug tools/the footer
     still in viewport without scrolling the page, and 3 trips produces no
     internal scrollbar.
+- **Residual pre-slide blip fixed (instant vertical layout snap)**: done
+  and verified in production. A second, separate follow-up to the flick
+  work above — after the remount fix, a much smaller but still-perceptible
+  blip remained right as a transition started.
+  - Root cause, confirmed via a frame-by-frame `getBoundingClientRect()`
+    trace against a real `npm run preview` build: `TabTransition.tsx`'s
+    outgoing panel was `position: absolute` (contributes zero height to its
+    container), so the wrapper's height was always driven solely by the
+    *incoming* panel — and that's true from the very first render of a
+    transition, not just at the end. If the outgoing/incoming pages have
+    different natural heights (e.g. a populated Shopping List vs. an empty
+    History), the wrapper's height — and therefore Debug tools/the footer's
+    position below it — snapped instantly to the incoming page's height in
+    the same commit that starts the transition, independent of and well
+    before the horizontal slide had progressed at all. Measured directly: a
+    ~159px jump in footer/Debug-toggle position between two consecutive
+    animation frames (16ms apart), at the very start of a Shopping List
+    (10 items) -> History (empty) transition.
+  - Fixed by replacing the `position: relative` (wrapper) / `position:
+    absolute` (outgoing panel) overlay with a CSS Grid single-cell overlap:
+    wrapper `display: grid`, both panels given `gridArea: '1 / 1'` (no
+    `position`/`top`/`left` needed — grid's default stretch handles
+    sizing). Standard CSS Grid behavior: when multiple items share a track,
+    the auto-sized track's height is the *max* of everything placed in it —
+    so the wrapper now reflects the taller of the two pages for as long as
+    both are present, only settling to the incoming page's height once the
+    outgoing panel actually unmounts at the end of the transition (after
+    the slide has already visually finished — a far less jarring moment for
+    a layout shift). Verified live with the same frame-trace methodology:
+    footer/debug-toggle position now stays completely still for the entire
+    ~300ms both panels are present, only moving once at the very end when
+    the outgoing panel is removed.
+  - Since neither panel is `position`-based anymore, default paint order
+    would otherwise flip to DOM order (the later-rendered incoming panel on
+    top) — added an explicit `zIndex: 1` on the outgoing panel to
+    deliberately preserve the stacking order the opaque-panels fix (above)
+    relies on (outgoing paints above incoming, revealing it as it slides
+    away).
+  - Covered by a new test in `e2e/swipe-navigation.spec.ts`: seeds a
+    height-mismatched Shopping List -> History transition, samples
+    footer/debug-toggle position every animation frame, and asserts zero
+    movement for as long as both panels are present (any movement in that
+    window would be a snap, since the slide itself is purely horizontal).
 
 ## Known limitations
 

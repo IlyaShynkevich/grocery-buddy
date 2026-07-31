@@ -217,6 +217,13 @@ test('with more than 9 trips, the trip list scrolls internally instead of growin
 
   await page.getByTestId('nav-history').click()
   await expect(page.getByTestId('history-page')).toBeVisible()
+  // useHistory() is Dexie's useLiveQuery, which returns [] synchronously
+  // before its async IndexedDB read resolves — history-page itself renders
+  // regardless, so it can become visible while the list is still empty.
+  // Wait for the actual rows before measuring scroll dimensions, or a slow
+  // enough query (e.g. under parallel-test load) reads scrollHeight/
+  // clientHeight as 0/0 on an as-yet-childless container.
+  await expect(page.getByTestId('history-trip')).toHaveCount(12)
 
   const scrollBox = page.getByTestId('history-list-scroll')
   const { scrollHeight, clientHeight } = await scrollBox.evaluate((el) => ({
@@ -237,6 +244,10 @@ test('with 9 or fewer trips, the trip list has no internal scrollbar', async ({ 
 
   await page.getByTestId('nav-history').click()
   await expect(page.getByTestId('history-page')).toBeVisible()
+  // See the comment in the test above — wait for the live-query-backed rows
+  // to actually render before measuring, not just the (always-present)
+  // page shell.
+  await expect(page.getByTestId('history-trip')).toHaveCount(3)
 
   const scrollBox = page.getByTestId('history-list-scroll')
   const { scrollHeight, clientHeight } = await scrollBox.evaluate((el) => ({
