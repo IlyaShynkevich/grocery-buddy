@@ -826,6 +826,52 @@ model.
     tools/the footer are structurally outside `.gb-tab-slide` throughout a
     transition, and Debug tools hides/shows on Stats with no settle delay.
     Full suite: 69/69 passing.
+- **Debug tools removed from History and Stats entirely (root-cause fix,
+  superseding the entry above)**: done and verified. The previous entry
+  still left a real gap: Debug tools was visible on History (a tab whose
+  content height can differ hugely from Stats'), so the footer/Debug-tools
+  group still visibly jumped between those two tabs — the entry above only
+  eliminated the *animation-smoothing* complexity, not the jump itself.
+  Root cause removed instead of continuing to chase layout/positioning
+  fixes: Debug tools now only ever renders on the Shopping List tab
+  (`activeTab === 'shopping'` in `App.tsx`, replacing `activeTab !==
+  'stats'`) — the one tab where trip/receipt data is actively worked with.
+  Since it never coexists with History or Stats, there is nothing left for
+  it to jump against on those tabs. The footer is unchanged: still visible,
+  unconditionally, on all three tabs.
+  - Real, non-obvious side effect discovered while updating
+    `trip-delete.spec.ts`'s "deleting the trip currently pinned as active
+    starts a fresh empty draft" test: that test used the debug panel's
+    "Make active" button, from the History tab, to pin a completed trip as
+    the active pointer — reachable specifically because `useActiveTripId`
+    (which self-heals a pointer aimed at a non-draft trip back to a real
+    draft) is only mounted while on the Shopping List tab, so pinning it
+    from History let the write "stick". Now that Debug tools only renders
+    on Shopping List — the same tab that mounts that hook — clicking "Make
+    active" on a non-draft trip there self-heals it right back,
+    essentially instantly; there is no longer any tab from which this can
+    be done through the UI at all. Fixed the test, not the app (this was
+    always a debug-only affordance modeling an edge case unreachable
+    through real navigation to begin with — see `deleteTrip`'s doc comment
+    in `db.ts`): added a `setActiveTripPointer` helper that pins the
+    pointer via a raw IndexedDB write (same technique as this file's
+    existing `setTripDate` in `history-improvements.spec.ts` — bypasses
+    Dexie's own reactivity, so no live-mounted hook ever observes and
+    self-heals the write), then proceeds straight to History/trip-detail
+    without ever touching the debug panel for this part of the test.
+  - `e2e/history-improvements.spec.ts`'s "with more than 9 trips..." test
+    had a `debug-panel-toggle` visibility assertion while on the History
+    tab — removed (no longer meaningful), keeping the footer-in-viewport
+    assertion.
+  - `e2e/swipe-navigation.spec.ts`'s two Debug-tools/footer tests updated:
+    the footer-outside-`.gb-tab-slide` test no longer opens/checks the
+    debug panel (History has none to check); the settle-timing test now
+    covers Debug tools disappearing on *both* History and Stats, not just
+    Stats.
+  - No layout/positioning code needed changing at all — `TabTransition.tsx`
+    and the flex-column layout in `App.tsx` are untouched by this entry;
+    only the Debug tools visibility condition and its affected tests
+    changed. Full suite: 69/69 passing.
 
 ## Known limitations
 
