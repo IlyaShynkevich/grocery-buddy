@@ -7,12 +7,17 @@ const TIMEOUT_MS = 25_000
 // complex receipt (many items, coupons, deposit/Pfand lines) showed
 // output_tokens: 4096 exactly, every single time — the model was being cut
 // off mid-response by the old limit, not intermittently rate-limited or
-// producing genuinely malformed JSON on its own. Raised with real headroom
-// for complex receipts; the salvage-based parsing below (parseExtractedItems)
-// is a second, independent safety net for whatever still gets truncated at
-// this limit (or fails for any other reason), not a substitute for giving
-// the model enough room to finish in the first place.
-const MAX_COMPLETION_TOKENS = 8000
+// producing genuinely malformed JSON on its own. Raising this to 8000 gave
+// complex receipts headroom, but pushed request+completion size over Groq's
+// tokens-per-minute limit on some receipts, tripping a "type": "tokens"
+// rate_limit_exceeded — a failure that can't succeed on retry, since the
+// same oversized request just gets rejected again (see GroqHttpError /
+// getUserFacingErrorMessage's token-limit handling below and in
+// errorMessage.ts). Lowered to 2500 to stay clear of that limit; the
+// salvage-based parsing below (parseExtractedItems) is still a second,
+// independent safety net for whatever gets truncated at this limit (or
+// fails for any other reason).
+const MAX_COMPLETION_TOKENS = 2500
 
 export interface ExtractedItem {
   name: string
@@ -35,6 +40,16 @@ export class GroqHttpError extends Error {
     super(message)
     this.name = 'GroqHttpError'
     this.status = status
+  }
+}
+
+/** True for Groq's `"type": "tokens"`, `"code": "rate_limit_exceeded"` error body shape. */
+function isTokenLimitBody(body: string): boolean {
+  try {
+    const parsed = JSON.parse(body) as { error?: { type?: unknown; code?: unknown } }
+    return parsed?.error?.type === 'tokens' && parsed?.error?.code === 'rate_limit_exceeded'
+  } catch {
+    return false
   }
 }
 
@@ -101,7 +116,16 @@ export async function extractReceiptItems(
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    throw new GroqHttpError(response.status, `Groq returned ${response.status}: ${body.slice(0, 300)}`)
+    // Groq's "type": "tokens" / "code": "rate_limit_exceeded" variant means
+    // the request itself (image + prompt) is too large for the account's
+    // tokens-per-minute limit — unlike an ordinary 429, waiting and retrying
+    // the same request will just trip the same limit again. Tagged with a
+    // stable "(token limit)" marker (independent of the truncated body text
+    // below, which may cut off before the "type" field) so the frontend
+    // (errorMessage.ts's isGroqTokenLimitError) can tell the two apart and
+    // skip the countdown-retry UI for this one.
+    const label = response.status === 429 && isTokenLimitBody(body) ? ' (token limit)' : ''
+    throw new GroqHttpError(response.status, `Groq returned ${response.status}${label}: ${body.slice(0, 300)}`)
   }
 
   let payload: unknown

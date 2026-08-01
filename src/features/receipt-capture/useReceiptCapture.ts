@@ -11,6 +11,7 @@ import {
 } from '../../db/db'
 import { isLikelyMatch } from '../../lib/itemMatch'
 import { ExtractionRequestError, extractReceiptItems } from './extractReceipt'
+import { isGroqTokenLimitError } from './errorMessage'
 import { parseRetryAfterSeconds } from './retryAfter'
 import { useActiveTripId } from '../trip/useActiveTripId'
 
@@ -108,14 +109,19 @@ export function useReceiptCapture() {
       console.error('RECEIPT_EXTRACTION_ERROR:', err)
 
       const message = err instanceof Error ? err.message : 'Unknown error'
+      const status = err instanceof ExtractionRequestError ? err.status : undefined
       // If Groq gave us a rate-limit wait time (e.g. "...try again in 16.6s"),
       // schedule an automatic retry for then; otherwise leave retryAt unset
       // and fall back to manual-retry-only, same as before this existed.
-      const retryAfterSeconds = parseRetryAfterSeconds(message)
+      // A token-limit 429 (the request itself is too large) never gets a
+      // scheduled retry even if Groq's message happens to include a wait
+      // time — waiting doesn't shrink the request, so it would just trip the
+      // same limit again.
+      const retryAfterSeconds = isGroqTokenLimitError(message, status) ? null : parseRetryAfterSeconds(message)
       await db.pendingReceipts.update(receipt.id, {
         status: 'failed',
         lastError: message,
-        lastErrorStatus: err instanceof ExtractionRequestError ? err.status : undefined,
+        lastErrorStatus: status,
         retryAt: retryAfterSeconds !== null ? Date.now() + retryAfterSeconds * 1000 : undefined,
       })
     }

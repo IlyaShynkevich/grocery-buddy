@@ -10,7 +10,23 @@
  * regex is kept only as a fallback for older stored receipts or a status
  * that didn't make it through for some other reason.
  */
+/**
+ * True for Groq's `"type": "tokens"` / `"code": "rate_limit_exceeded"`
+ * variant (tagged server-side in groqExtract.ts with a stable "(token
+ * limit)" marker) — the request itself was too large for the account's
+ * tokens-per-minute limit, not an ordinary "too many requests" rate limit.
+ * Retrying the same image won't succeed, so callers should treat this as
+ * non-retryable rather than scheduling/showing the countdown-retry UI.
+ */
+export function isGroqTokenLimitError(rawMessage: string, status?: number): boolean {
+  return status === 429 && /\(token limit\)/.test(rawMessage)
+}
+
 export function getUserFacingErrorMessage(rawMessage: string, status?: number): string {
+  if (isGroqTokenLimitError(rawMessage, status)) {
+    return 'Receipt image too large for current plan — try a clearer/smaller photo'
+  }
+
   if (status === 429 || /\b429\b/.test(rawMessage)) {
     return 'Too many requests — retrying automatically'
   }
