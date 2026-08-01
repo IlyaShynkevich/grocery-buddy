@@ -35,13 +35,13 @@ I don't have visibility into *what* I'm actually spending my grocery money on, c
 ## Suggested tech shape (for Claude Code to refine)
 - **Platform**: PWA (installable web app) rather than native iOS/Android — much lighter to build/iterate solo, still gives home-screen install + camera access + offline capability. Add to home screen via browser once; no app store.
 - **Frontend**: React.
-- **AI provider**: Groq API — free tier, no credit card required, and has vision-capable models (e.g. Qwen 3.6 27B) that can do OCR-style extraction from a receipt photo. Note: Groq's model lineup changes fairly often (frequent deprecations), so double-check the chosen model is current when implementation starts.
+- **AI provider**: OpenAI API — `gpt-4.1-mini`, a vision-capable model that can do OCR-style extraction from a receipt photo at low per-request cost. Note: double-check the chosen model is still current/available when revisiting this.
 - **Storage**: local-first (e.g. local DB / simple file storage) is enough for a single-user personal tool; no auth needed unless it's later shared/deployed.
 
 ## Offline behavior (important — design in from the start, not bolted on later)
 - Typing the shopping list and taking the receipt photo must both work with no connection — save locally via the service worker / local storage.
 - A receipt photo taken offline goes into a **pending queue** (visibly marked "waiting to process") rather than failing or blocking the user.
-- Once connectivity returns, queued receipt photos are automatically sent to Groq for extraction (items, prices, categories).
+- Once connectivity returns, queued receipt photos are automatically sent to OpenAI for extraction (items, prices, categories).
 - The typed shopping list is optional, not required: if the user skips typing items in-store, the receipt scan alone is sufficient to populate a full session — the AI fills in whatever wasn't manually entered, and the user just reviews/corrects afterward rather than starting from scratch.
 
 ## Data model sketch

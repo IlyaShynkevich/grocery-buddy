@@ -9,11 +9,11 @@ const SAMPLE_IMAGE = Buffer.from(
 // The preview build (npm run preview) serves static files only — there's no
 // live serverless function to hit. These tests mock /api/extract-receipt at
 // the network layer so the *client* wiring (status transitions, item
-// creation, error display, retry) is exercised end-to-end. Groq call
+// creation, error display, retry) is exercised end-to-end. OpenAI call
 // quality and the server-side error/timeout handling are covered
 // separately: real extraction was verified manually against a synthetic
 // receipt photo, and error paths (429, 400, timeout, garbage JSON) are
-// covered by a standalone script against api/_lib/groqExtract.ts.
+// covered by a standalone script against api/_lib/openaiExtract.ts.
 
 async function captureReceipt(page: Page) {
   await page.getByTestId('receipt-capture-input').setInputFiles({
@@ -95,7 +95,7 @@ test('a server error marks the receipt failed, shows the message, and allows ret
       return route.fulfill({
         status: 429,
         contentType: 'application/json',
-        body: JSON.stringify({ error: 'Groq returned 429: rate limited, try again later' }),
+        body: JSON.stringify({ error: 'OpenAI returned 429: rate limited, try again later' }),
       })
     }
     return route.fulfill({

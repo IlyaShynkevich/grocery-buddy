@@ -1,30 +1,13 @@
 import { CATEGORIES } from '../../src/db/categories.js'
 
-const GROQ_MODEL = 'qwen/qwen3.6-27b'
-const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions'
+const OPENAI_MODEL = 'gpt-4.1-mini'
+const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions'
 const TIMEOUT_MS = 25_000
-// Groq's own dashboard confirmed every json_validate_failed 400 for a
-// complex receipt (many items, coupons, deposit/Pfand lines) showed
-// output_tokens: 4096 exactly, every single time — the model was being cut
-// off mid-response by the old limit, not intermittently rate-limited or
-// producing genuinely malformed JSON on its own. Raising this to 8000 gave
-// complex receipts headroom, but pushed request+completion size over Groq's
-// tokens-per-minute limit on some receipts, tripping a "type": "tokens"
-// rate_limit_exceeded — a failure that can't succeed on retry, since the
-// same oversized request just gets rejected again (see GroqHttpError /
-// getUserFacingErrorMessage's token-limit handling below and in
-// errorMessage.ts). Lowered to 2500 to stay clear of that limit — but that
-// undershot: a real receipt (2080 input tokens, well under the 8000 TPM
-// limit) hit the 2500 completion cap and failed with json_validate_failed,
-// the JSON cut off mid-generation before it could complete. Raised to 4500
-// — still comfortable headroom under 8000 TPM for a typical receipt-image
-// input token count, but far more room for long item lists than 2500 gave.
-// The salvage-based parsing below (parseExtractedItems) and the
-// finish_reason: "length" / json_validate_failed truncation detection
-// (isTruncationBody, getUserFacingErrorMessage's truncation handling in
-// errorMessage.ts) are still independent safety nets for whatever still
-// gets cut off at this limit, not a substitute for enough headroom in the
-// first place.
+// Starting value carried over from the prior provider's tuning (receipts
+// with many line items need real headroom to avoid getting cut off
+// mid-generation) — revisit if OpenAI truncation (finish_reason: "length")
+// actually occurs in practice, same as the salvage/truncation handling
+// below already anticipates.
 const MAX_COMPLETION_TOKENS = 4500
 
 export interface ExtractedItem {
@@ -36,43 +19,31 @@ export interface ExtractedItem {
 }
 
 /**
- * Thrown when Groq itself responded with a non-2xx status. Carries that
+ * Thrown when OpenAI itself responded with a non-2xx status. Carries that
  * status so the route handler can forward it instead of flattening every
- * extraction failure to a generic 502 (which made real Groq 429s
+ * extraction failure to a generic 502 (which would make a real OpenAI 429
  * indistinguishable from an actual server crash in Vercel's own logs).
  */
-export class GroqHttpError extends Error {
+export class OpenAiHttpError extends Error {
   readonly status: number
 
   constructor(status: number, message: string) {
     super(message)
-    this.name = 'GroqHttpError'
+    this.name = 'OpenAiHttpError'
     this.status = status
   }
 }
 
-/** True for Groq's `"type": "tokens"`, `"code": "rate_limit_exceeded"` error body shape. */
+/**
+ * True for OpenAI's `"type": "tokens"`, `"code": "rate_limit_exceeded"`
+ * error body shape — the request itself (image + prompt) is too large for
+ * the account's tokens-per-minute limit, unlike an ordinary 429 where
+ * waiting and retrying the same request will eventually succeed.
+ */
 function isTokenLimitBody(body: string): boolean {
   try {
     const parsed = JSON.parse(body) as { error?: { type?: unknown; code?: unknown } }
     return parsed?.error?.type === 'tokens' && parsed?.error?.code === 'rate_limit_exceeded'
-  } catch {
-    return false
-  }
-}
-
-/**
- * True for Groq's `"code": "json_validate_failed"` error body shape — the
- * 400 Groq itself returns (rather than a 200 with truncated content) when
- * `response_format: json_object` can't validate the model's output as JSON.
- * Per this file's own history (see MAX_COMPLETION_TOKENS above), every
- * occurrence observed so far was the output getting cut off by hitting the
- * completion-token cap mid-generation, never a genuinely malformed response.
- */
-function isTruncationBody(body: string): boolean {
-  try {
-    const parsed = JSON.parse(body) as { error?: { code?: unknown } }
-    return parsed?.error?.code === 'json_validate_failed'
   } catch {
     return false
   }
@@ -91,7 +62,7 @@ Respond with ONLY a JSON object of the shape {"items": [{"name": string, "price"
 Output raw JSON only. No markdown code fences, no commentary before or after.`
 
 /**
- * Calls Groq's vision model to extract line items from a receipt photo.
+ * Calls OpenAI's vision model to extract line items from a receipt photo.
  * `fetchImpl` is injectable so error-handling paths (timeouts, bad
  * responses, garbage content) can be exercised with a fake fetch in tests
  * without hitting the real API.
@@ -106,21 +77,21 @@ export async function extractReceiptItems(
 
   let response: Response
   try {
-    response = await fetchImpl(GROQ_ENDPOINT, {
+    response = await fetchImpl(OPENAI_ENDPOINT, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: GROQ_MODEL,
+        model: OPENAI_MODEL,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
             role: 'user',
             content: [
               { type: 'text', text: 'Extract the items from this receipt.' },
-              { type: 'image_url', image_url: { url: imageDataUrl } },
+              { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
             ],
           },
         ],
@@ -132,40 +103,32 @@ export async function extractReceiptItems(
     })
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('Groq request timed out')
+      throw new Error('OpenAI request timed out')
     }
-    throw new Error(`Groq request failed: ${err instanceof Error ? err.message : String(err)}`)
+    throw new Error(`OpenAI request failed: ${err instanceof Error ? err.message : String(err)}`)
   } finally {
     clearTimeout(timeout)
   }
 
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    // Groq's "type": "tokens" / "code": "rate_limit_exceeded" variant means
+    // OpenAI's "type": "tokens" / "code": "rate_limit_exceeded" variant means
     // the request itself (image + prompt) is too large for the account's
     // tokens-per-minute limit — unlike an ordinary 429, waiting and retrying
     // the same request will just trip the same limit again. Tagged with a
-    // stable "(token limit)" marker (independent of the truncated body text
-    // below, which may cut off before the "type" field) so the frontend
-    // (errorMessage.ts's isGroqTokenLimitError) can tell the two apart and
-    // skip the countdown-retry UI for this one.
+    // stable "(token limit)" marker so the frontend (errorMessage.ts's
+    // isOpenAiTokenLimitError) can tell the two apart and skip the
+    // countdown-retry UI for this one.
     const isTokenLimit = response.status === 429 && isTokenLimitBody(body)
-    // Groq's "code": "json_validate_failed" 400 means the model's own output
-    // got cut off by max_completion_tokens before it could finish (see
-    // isTruncationBody's doc comment) — retrying the same receipt image will
-    // hit the same cap again. Tagged with a stable "(truncated)" marker so
-    // the frontend (errorMessage.ts's isGroqTruncationError) can surface a
-    // distinct "too many items" message instead of the generic failure one.
-    const isTruncation = response.status === 400 && isTruncationBody(body)
-    const label = isTokenLimit ? ' (token limit)' : isTruncation ? ' (truncated)' : ''
-    throw new GroqHttpError(response.status, `Groq returned ${response.status}${label}: ${body.slice(0, 300)}`)
+    const label = isTokenLimit ? ' (token limit)' : ''
+    throw new OpenAiHttpError(response.status, `OpenAI returned ${response.status}${label}: ${body.slice(0, 300)}`)
   }
 
   let payload: unknown
   try {
     payload = await response.json()
   } catch {
-    throw new Error('Groq response was not valid JSON')
+    throw new Error('OpenAI response was not valid JSON')
   }
 
   const choice = (
@@ -173,23 +136,23 @@ export async function extractReceiptItems(
   )?.choices?.[0]
   const content = choice?.message?.content
   if (typeof content !== 'string') {
-    throw new Error('Groq response had no message content')
+    throw new Error('OpenAI response had no message content')
   }
 
   try {
     return parseExtractedItems(content)
   } catch (err) {
-    // A 200 response can still be truncated: Groq sets finish_reason:
+    // A 200 response can still be truncated: OpenAI sets finish_reason:
     // "length" when it stopped generating because max_completion_tokens was
-    // hit, same underlying cause as the json_validate_failed 400 case above,
-    // just surfaced as a "successful" response with incomplete content
+    // hit, surfaced as a "successful" response with incomplete content
     // instead of an error. Only relevant once parseExtractedItems has
     // already failed to salvage anything usable — a finish_reason: "length"
     // response that still yielded complete items via salvage isn't an error
-    // at all. Tagged with the same "(truncated)" marker as the 400 case so
-    // the frontend treats both identically.
+    // at all. Tagged with a "(truncated)" marker so the frontend
+    // (errorMessage.ts's isOpenAiTruncationError) can surface a distinct
+    // "too many items" message instead of the generic failure one.
     if (choice?.finish_reason === 'length') {
-      throw new Error(`Groq response was truncated (truncated) by max_completion_tokens: ${content.slice(0, 300)}`)
+      throw new Error(`OpenAI response was truncated (truncated) by max_completion_tokens: ${content.slice(0, 300)}`)
     }
     throw err
   }
@@ -197,15 +160,15 @@ export async function extractReceiptItems(
 
 /**
  * TEMPORARY DEBUG LOGGING — a receipt was failing extraction on every
- * attempt with "Groq response was not parseable JSON", and we had no
- * visibility into what Groq actually sent back, only that it didn't parse.
- * Logs the full raw content on that specific failure (and, separately, how
- * many objects the salvage pass below recovered vs. had to skip) so the
- * actual malformed text is visible in Vercel's logs instead of just the
- * fact of failure. Search for TEMP_DEBUG_PARSE_FAILURE to find/remove this
- * once the root cause behind a *fully* unrecoverable response (if any still
- * occur after the salvage pass below) is identified; it doesn't change what
- * gets returned or thrown, only what gets logged.
+ * attempt with "response was not parseable JSON", and we had no visibility
+ * into what the model actually sent back, only that it didn't parse. Logs
+ * the full raw content on that specific failure (and, separately, how many
+ * objects the salvage pass below recovered vs. had to skip) so the actual
+ * malformed text is visible in Vercel's logs instead of just the fact of
+ * failure. Search for TEMP_DEBUG_PARSE_FAILURE to find/remove this once the
+ * root cause behind a *fully* unrecoverable response (if any still occur
+ * after the salvage pass below) is identified; it doesn't change what gets
+ * returned or thrown, only what gets logged.
  */
 const DEBUG_TAG = '[TEMP_DEBUG_PARSE_FAILURE]'
 
@@ -222,7 +185,7 @@ export function parseExtractedItems(content: string): ExtractedItem[] {
   // response was fine (e.g. 12 good items and one malformed coupon line).
   // Salvage whatever complete item objects are actually present instead of
   // discarding all of them over one bad one.
-  console.log(DEBUG_TAG, 'strict JSON.parse failed on Groq content, attempting salvage', {
+  console.log(DEBUG_TAG, 'strict JSON.parse failed on model content, attempting salvage', {
     contentLength: content.length,
     content,
   })
@@ -231,7 +194,7 @@ export function parseExtractedItems(content: string): ExtractedItem[] {
   console.log(DEBUG_TAG, 'salvage pass complete', { recovered: salvaged.length, skipped })
 
   if (salvaged.length === 0) {
-    throw new Error('Groq response was not parseable JSON and no items could be salvaged from it')
+    throw new Error('OpenAI response was not parseable JSON and no items could be salvaged from it')
   }
   return itemsFromRaw(salvaged)
 }
@@ -265,13 +228,13 @@ function tryStrictParse(stripped: string): unknown[] | null {
  * non-string state by counting unescaped `"` characters. If a malformed
  * item's own break is an odd number of stray unescaped quotes (rather than,
  * say, a bad number, a missing comma, or plain truncation — the far more
- * likely causes here, per this file's own history of hitting
- * max_completion_tokens on receipts with many line items), that desyncs
- * string-tracking for the rest of the document and can cause later,
- * otherwise-valid objects to be swept into the same broken span. This is
- * still strictly no worse than before (which discarded 100% of items on
- * any malformed byte anywhere in the response) — see the debug logging
- * above for confirming which failure mode a given receipt actually hit.
+ * likely causes, per max_completion_tokens cutoffs on receipts with many
+ * line items), that desyncs string-tracking for the rest of the document
+ * and can cause later, otherwise-valid objects to be swept into the same
+ * broken span. This is still strictly no worse than before (which discarded
+ * 100% of items on any malformed byte anywhere in the response) — see the
+ * debug logging above for confirming which failure mode a given receipt
+ * actually hit.
  */
 function salvageItemObjects(content: string): { objects: unknown[]; skipped: number } {
   const arrayStart = findItemsArrayStart(content)
