@@ -13,11 +13,19 @@ const TIMEOUT_MS = 25_000
 // rate_limit_exceeded — a failure that can't succeed on retry, since the
 // same oversized request just gets rejected again (see GroqHttpError /
 // getUserFacingErrorMessage's token-limit handling below and in
-// errorMessage.ts). Lowered to 2500 to stay clear of that limit; the
-// salvage-based parsing below (parseExtractedItems) is still a second,
-// independent safety net for whatever gets truncated at this limit (or
-// fails for any other reason).
-const MAX_COMPLETION_TOKENS = 2500
+// errorMessage.ts). Lowered to 2500 to stay clear of that limit — but that
+// undershot: a real receipt (2080 input tokens, well under the 8000 TPM
+// limit) hit the 2500 completion cap and failed with json_validate_failed,
+// the JSON cut off mid-generation before it could complete. Raised to 4500
+// — still comfortable headroom under 8000 TPM for a typical receipt-image
+// input token count, but far more room for long item lists than 2500 gave.
+// The salvage-based parsing below (parseExtractedItems) and the
+// finish_reason: "length" / json_validate_failed truncation detection
+// (isTruncationBody, getUserFacingErrorMessage's truncation handling in
+// errorMessage.ts) are still independent safety nets for whatever still
+// gets cut off at this limit, not a substitute for enough headroom in the
+// first place.
+const MAX_COMPLETION_TOKENS = 4500
 
 export interface ExtractedItem {
   name: string
@@ -48,6 +56,23 @@ function isTokenLimitBody(body: string): boolean {
   try {
     const parsed = JSON.parse(body) as { error?: { type?: unknown; code?: unknown } }
     return parsed?.error?.type === 'tokens' && parsed?.error?.code === 'rate_limit_exceeded'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * True for Groq's `"code": "json_validate_failed"` error body shape — the
+ * 400 Groq itself returns (rather than a 200 with truncated content) when
+ * `response_format: json_object` can't validate the model's output as JSON.
+ * Per this file's own history (see MAX_COMPLETION_TOKENS above), every
+ * occurrence observed so far was the output getting cut off by hitting the
+ * completion-token cap mid-generation, never a genuinely malformed response.
+ */
+function isTruncationBody(body: string): boolean {
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: unknown } }
+    return parsed?.error?.code === 'json_validate_failed'
   } catch {
     return false
   }
@@ -124,7 +149,15 @@ export async function extractReceiptItems(
     // below, which may cut off before the "type" field) so the frontend
     // (errorMessage.ts's isGroqTokenLimitError) can tell the two apart and
     // skip the countdown-retry UI for this one.
-    const label = response.status === 429 && isTokenLimitBody(body) ? ' (token limit)' : ''
+    const isTokenLimit = response.status === 429 && isTokenLimitBody(body)
+    // Groq's "code": "json_validate_failed" 400 means the model's own output
+    // got cut off by max_completion_tokens before it could finish (see
+    // isTruncationBody's doc comment) — retrying the same receipt image will
+    // hit the same cap again. Tagged with a stable "(truncated)" marker so
+    // the frontend (errorMessage.ts's isGroqTruncationError) can surface a
+    // distinct "too many items" message instead of the generic failure one.
+    const isTruncation = response.status === 400 && isTruncationBody(body)
+    const label = isTokenLimit ? ' (token limit)' : isTruncation ? ' (truncated)' : ''
     throw new GroqHttpError(response.status, `Groq returned ${response.status}${label}: ${body.slice(0, 300)}`)
   }
 
@@ -135,13 +168,31 @@ export async function extractReceiptItems(
     throw new Error('Groq response was not valid JSON')
   }
 
-  const content = (payload as { choices?: { message?: { content?: unknown } }[] })?.choices?.[0]
-    ?.message?.content
+  const choice = (
+    payload as { choices?: { message?: { content?: unknown }; finish_reason?: unknown }[] }
+  )?.choices?.[0]
+  const content = choice?.message?.content
   if (typeof content !== 'string') {
     throw new Error('Groq response had no message content')
   }
 
-  return parseExtractedItems(content)
+  try {
+    return parseExtractedItems(content)
+  } catch (err) {
+    // A 200 response can still be truncated: Groq sets finish_reason:
+    // "length" when it stopped generating because max_completion_tokens was
+    // hit, same underlying cause as the json_validate_failed 400 case above,
+    // just surfaced as a "successful" response with incomplete content
+    // instead of an error. Only relevant once parseExtractedItems has
+    // already failed to salvage anything usable — a finish_reason: "length"
+    // response that still yielded complete items via salvage isn't an error
+    // at all. Tagged with the same "(truncated)" marker as the 400 case so
+    // the frontend treats both identically.
+    if (choice?.finish_reason === 'length') {
+      throw new Error(`Groq response was truncated (truncated) by max_completion_tokens: ${content.slice(0, 300)}`)
+    }
+    throw err
+  }
 }
 
 /**
