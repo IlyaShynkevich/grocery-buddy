@@ -22,6 +22,25 @@ function rateLimitError(seconds: number) {
   })
 }
 
+/**
+ * Mimics the real Groq token-per-minute rate-limit body
+ * (`"type": "tokens"`, `"code": "rate_limit_exceeded"`) and the message our
+ * server forwards for it: groqExtract.ts detects this exact body shape and
+ * tags the forwarded `error` string with a "(token limit)" marker, which is
+ * what errorMessage.ts's isGroqTokenLimitError keys off of.
+ */
+function tokenLimitError() {
+  const groqBody = JSON.stringify({
+    error: {
+      message:
+        'Request too large for model `qwen/qwen3.6-27b` in organization on tokens per minute (TPM): Limit 6000, Requested 7482. Please reduce your message size and try again.',
+      type: 'tokens',
+      code: 'rate_limit_exceeded',
+    },
+  })
+  return JSON.stringify({ error: `Groq returned 429 (token limit): ${groqBody.slice(0, 300)}` })
+}
+
 test('auto-retries after the parsed rate-limit wait, with no manual interaction', async ({ page }) => {
   let callCount = 0
   await page.route('**/api/extract-receipt', (route) => {
@@ -121,4 +140,31 @@ test('an unrecognized 429 message falls back to manual-retry-only, no countdown'
   await page.waitForTimeout(1500)
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Failed — will retry')
   await expect(page.getByTestId('receipt-process-button')).toHaveText('Retry')
+})
+
+test('a Groq token-limit 429 (request too large) shows a distinct message with no retry countdown', async ({
+  page,
+}) => {
+  let callCount = 0
+  await page.route('**/api/extract-receipt', (route) => {
+    callCount += 1
+    return route.fulfill({ status: 429, contentType: 'application/json', body: tokenLimitError() })
+  })
+
+  await page.goto('/')
+  await captureReceipt(page)
+  await page.getByTestId('receipt-process-button').click()
+
+  // distinct, non-retryable message — not the generic "too many requests" one
+  await expect(page.getByTestId('receipt-error')).toHaveText(
+    'Receipt image too large for current plan — try a clearer/smaller photo',
+  )
+  await expect(page.getByTestId('receipt-status').first()).toHaveText('Failed — will retry')
+  await expect(page.getByTestId('receipt-status').first()).not.toHaveText(/Retrying in \d+s/)
+  await expect(page.getByTestId('receipt-process-button')).toHaveText('Retry')
+
+  // no scheduled retry ever fires, unlike an ordinary parsed-wait 429 above
+  await page.waitForTimeout(1500)
+  await expect(page.getByTestId('receipt-status').first()).toHaveText('Failed — will retry')
+  expect(callCount).toBe(1)
 })
