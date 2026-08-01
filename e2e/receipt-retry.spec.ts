@@ -41,6 +41,22 @@ function tokenLimitError() {
   return JSON.stringify({ error: `Groq returned 429 (token limit): ${groqBody.slice(0, 300)}` })
 }
 
+/**
+ * Mimics the message our server forwards when Groq's response itself was
+ * truncated — `finish_reason: "length"`, not a non-2xx status — and salvage
+ * still couldn't recover any complete items. groqExtract.ts tags this with
+ * the same stable "(truncated)" marker as the json_validate_failed 400
+ * variant and forwards it as a 502 (a plain Error, not a GroqHttpError
+ * carrying a real Groq status), since the response Groq sent back was
+ * itself a 200.
+ */
+function truncatedResponseError() {
+  return JSON.stringify({
+    error:
+      'Groq response was truncated (truncated) by max_completion_tokens: {"items":[{"name":"Milk","price":3.49,"category":"dairy","isDiscount":false},{"name":"Eggs","price":4.2,"category"',
+  })
+}
+
 test('auto-retries after the parsed rate-limit wait, with no manual interaction', async ({ page }) => {
   let callCount = 0
   await page.route('**/api/extract-receipt', (route) => {
@@ -164,6 +180,34 @@ test('a Groq token-limit 429 (request too large) shows a distinct message with n
   await expect(page.getByTestId('receipt-process-button')).toHaveText('Retry')
 
   // no scheduled retry ever fires, unlike an ordinary parsed-wait 429 above
+  await page.waitForTimeout(1500)
+  await expect(page.getByTestId('receipt-status').first()).toHaveText('Failed — will retry')
+  expect(callCount).toBe(1)
+})
+
+test('a truncated Groq response (finish_reason: "length") shows a distinct "too many items" message', async ({
+  page,
+}) => {
+  let callCount = 0
+  await page.route('**/api/extract-receipt', (route) => {
+    callCount += 1
+    return route.fulfill({ status: 502, contentType: 'application/json', body: truncatedResponseError() })
+  })
+
+  await page.goto('/')
+  await captureReceipt(page)
+  await page.getByTestId('receipt-process-button').click()
+
+  // distinct "too many items" message — not the generic parse-failure one,
+  // even though the raw message also contains "JSON"-shaped text
+  await expect(page.getByTestId('receipt-error')).toHaveText(
+    'Receipt has too many items to process at once — try splitting it into two photos',
+  )
+  await expect(page.getByTestId('receipt-status').first()).toHaveText('Failed — will retry')
+  await expect(page.getByTestId('receipt-status').first()).not.toHaveText(/Retrying in \d+s/)
+  await expect(page.getByTestId('receipt-process-button')).toHaveText('Retry')
+
+  // no scheduled retry ever fires — same image would just get truncated again
   await page.waitForTimeout(1500)
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Failed — will retry')
   expect(callCount).toBe(1)

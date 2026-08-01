@@ -1,16 +1,4 @@
 /**
- * Maps a raw extraction error (Groq's own error text, a parse failure, a
- * network error, etc.) to a short, human-readable message for display.
- * The raw error is still logged via console.error wherever it's caught —
- * this only changes what the user sees, never what gets logged.
- *
- * `status` is the real HTTP status our API responded with, when we have
- * one (a network/timeout failure never reaches that point, so it stays
- * undefined) — it's the primary signal for a rate limit; the message-text
- * regex is kept only as a fallback for older stored receipts or a status
- * that didn't make it through for some other reason.
- */
-/**
  * True for Groq's `"type": "tokens"` / `"code": "rate_limit_exceeded"`
  * variant (tagged server-side in groqExtract.ts with a stable "(token
  * limit)" marker) — the request itself was too large for the account's
@@ -22,7 +10,40 @@ export function isGroqTokenLimitError(rawMessage: string, status?: number): bool
   return status === 429 && /\(token limit\)/.test(rawMessage)
 }
 
+/**
+ * True for a response Groq cut off by hitting max_completion_tokens before
+ * it finished generating — either a `"code": "json_validate_failed"` 400, or
+ * a 200 whose `finish_reason` was `"length"` and salvage still couldn't
+ * recover any complete items (both tagged server-side in groqExtract.ts with
+ * a stable "(truncated)" marker). Unlike the generic "couldn't read this
+ * receipt" parse failure, this specific cause means the receipt has more
+ * items than fit in one response — retrying the same image won't help, but
+ * splitting the receipt across two photos would.
+ */
+export function isGroqTruncationError(rawMessage: string): boolean {
+  return /\(truncated\)/.test(rawMessage)
+}
+
+/**
+ * Maps a raw extraction error (Groq's own error text, a parse failure, a
+ * network error, etc.) to a short, human-readable message for display.
+ * The raw error is still logged via console.error wherever it's caught —
+ * this only changes what the user sees, never what gets logged.
+ *
+ * `status` is the real HTTP status our API responded with, when we have
+ * one (a network/timeout failure never reaches that point, so it stays
+ * undefined) — it's the primary signal for a rate limit; the message-text
+ * regex is kept only as a fallback for older stored receipts or a status
+ * that didn't make it through for some other reason.
+ */
 export function getUserFacingErrorMessage(rawMessage: string, status?: number): string {
+  // Checked before the generic JSON-parse-failure regex below, since a
+  // truncation message legitimately contains "JSON"/"message content" text
+  // too and would otherwise be swallowed by that broader, less specific match.
+  if (isGroqTruncationError(rawMessage)) {
+    return 'Receipt has too many items to process at once — try splitting it into two photos'
+  }
+
   if (isGroqTokenLimitError(rawMessage, status)) {
     return 'Receipt image too large for current plan — try a clearer/smaller photo'
   }
