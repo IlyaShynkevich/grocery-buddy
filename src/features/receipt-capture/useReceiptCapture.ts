@@ -11,7 +11,7 @@ import {
 } from '../../db/db'
 import { isLikelyMatch } from '../../lib/itemMatch'
 import { ExtractionRequestError, extractReceiptItems } from './extractReceipt'
-import { isGroqTokenLimitError } from './errorMessage'
+import { isOpenAiTokenLimitError } from './errorMessage'
 import { parseRetryAfterSeconds } from './retryAfter'
 import { useActiveTripId } from '../trip/useActiveTripId'
 
@@ -110,14 +110,14 @@ export function useReceiptCapture() {
 
       const message = err instanceof Error ? err.message : 'Unknown error'
       const status = err instanceof ExtractionRequestError ? err.status : undefined
-      // If Groq gave us a rate-limit wait time (e.g. "...try again in 16.6s"),
-      // schedule an automatic retry for then; otherwise leave retryAt unset
-      // and fall back to manual-retry-only, same as before this existed.
-      // A token-limit 429 (the request itself is too large) never gets a
-      // scheduled retry even if Groq's message happens to include a wait
-      // time — waiting doesn't shrink the request, so it would just trip the
-      // same limit again.
-      const retryAfterSeconds = isGroqTokenLimitError(message, status) ? null : parseRetryAfterSeconds(message)
+      // If OpenAI gave us a rate-limit wait time (e.g. "...try again in
+      // 16.6s"), schedule an automatic retry for then; otherwise leave
+      // retryAt unset and fall back to manual-retry-only, same as before
+      // this existed. A token-limit 429 (the request itself is too large)
+      // never gets a scheduled retry even if the message happens to include
+      // a wait time — waiting doesn't shrink the request, so it would just
+      // trip the same limit again.
+      const retryAfterSeconds = isOpenAiTokenLimitError(message, status) ? null : parseRetryAfterSeconds(message)
       await db.pendingReceipts.update(receipt.id, {
         status: 'failed',
         lastError: message,
@@ -171,13 +171,13 @@ export function useReceiptCapture() {
             // cheap fast-path skip, not the thing that actually makes this
             // safe against a same-instant race with the per-row auto-retry
             // timer — processReceipt's own atomic claim (see its comment)
-            // is what guarantees only one trigger ever proceeds to call Groq
-            // even if both read the row as eligible here.
+            // is what guarantees only one trigger ever proceeds to call the
+            // extraction API even if both read the row as eligible here.
             const fresh = await db.pendingReceipts.get(candidate.id)
             if (!fresh || (fresh.status !== 'pending' && fresh.status !== 'failed')) continue
             // A failed receipt with a still-future retryAt already has its own
-            // scheduled retry (see ReceiptRow) honoring Groq's requested
-            // backoff — repeated 'online' events (flaky connectivity) must not
+            // scheduled retry (see ReceiptRow) honoring the provider's
+            // requested backoff — repeated 'online' events (flaky connectivity) must not
             // bypass that by retrying it again early, which would just
             // re-trigger the same rate limit before it had a chance to clear.
             if (fresh.status === 'failed' && fresh.retryAt !== undefined && fresh.retryAt > Date.now()) continue

@@ -75,8 +75,8 @@ function CategoryNotes({ category }: { category: Category }) {
 /**
  * Personal free-text notes per category, describing what the user
  * personally considers essential/non-essential within it (e.g. under
- * "Frozen": "nuggets, frozen pizza"). Feeding these into the Groq
- * extraction prompt so the AI can use them when judging essential/
+ * "Frozen": "nuggets, frozen pizza"). Feeding these into the extraction
+ * prompt so the AI can use them when judging essential/
  * non-essential for scanned items is a separate follow-up — this page is
  * just where the user creates/views/edits/deletes them.
  *

@@ -98,7 +98,7 @@ test('a failed receipt (no rate-limit wait parsed) is retried automatically on r
       return route.fulfill({
         status: 502,
         contentType: 'application/json',
-        body: JSON.stringify({ error: 'Groq returned 500: server exploded' }),
+        body: JSON.stringify({ error: 'OpenAI returned 500: server exploded' }),
       })
     }
     return route.fulfill({
@@ -134,7 +134,7 @@ test('a rate-limited receipt with a pending auto-retry is not retried early by a
         status: 429,
         contentType: 'application/json',
         body: JSON.stringify({
-          error: 'Groq returned 429: {"error":{"message":"Rate limit reached. Please try again in 2s."}}',
+          error: 'OpenAI returned 429: {"error":{"message":"Rate limit reached. Please try again in 2s."}}',
         }),
       })
     }

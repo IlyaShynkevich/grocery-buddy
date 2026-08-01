@@ -43,7 +43,7 @@ export function useStatsMonths(): MonthGroup[] {
  *
  * A discount/coupon line has no reliable link back to which purchased item
  * it discounted — the receipt extraction prompt just tags every discount
- * with category "other" (see api/_lib/groqExtract.ts) rather than the
+ * with category "other" (see api/_lib/openaiExtract.ts) rather than the
  * category of whatever it discounted. Rather than guess a distribution
  * across categories, each discount's (negative) amount is folded into its
  * own recorded category and resolved essential status, exactly like any

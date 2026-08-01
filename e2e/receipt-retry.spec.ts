@@ -15,45 +15,44 @@ async function captureReceipt(page: Page) {
   await expect(page.getByTestId('receipt-item')).toHaveCount(1)
 }
 
-/** Mimics the shape of the real Groq 429 message our server forwards as `error`. */
+/** Mimics the shape of the real OpenAI 429 message our server forwards as `error`. */
 function rateLimitError(seconds: number) {
   return JSON.stringify({
-    error: `Groq returned 429: {"error":{"message":"Rate limit reached for model \`qwen/qwen3.6-27b\`. Please try again in ${seconds}s. Need more tokens?"}}`,
+    error: `OpenAI returned 429: {"error":{"message":"Rate limit reached for gpt-4.1-mini in organization org-abc123 on requests per min (RPM): Limit 3, Used 3, Requested 1. Please try again in ${seconds}s.","type":"requests","param":null,"code":"rate_limit_exceeded"}}`,
   })
 }
 
 /**
- * Mimics the real Groq token-per-minute rate-limit body
+ * Mimics the real OpenAI token-per-minute rate-limit body
  * (`"type": "tokens"`, `"code": "rate_limit_exceeded"`) and the message our
- * server forwards for it: groqExtract.ts detects this exact body shape and
+ * server forwards for it: openaiExtract.ts detects this exact body shape and
  * tags the forwarded `error` string with a "(token limit)" marker, which is
- * what errorMessage.ts's isGroqTokenLimitError keys off of.
+ * what errorMessage.ts's isOpenAiTokenLimitError keys off of.
  */
 function tokenLimitError() {
-  const groqBody = JSON.stringify({
+  const openAiBody = JSON.stringify({
     error: {
       message:
-        'Request too large for model `qwen/qwen3.6-27b` in organization on tokens per minute (TPM): Limit 6000, Requested 7482. Please reduce your message size and try again.',
+        'Request too large for gpt-4.1-mini in organization org-abc123 on tokens per min (TPM): Limit 200000, Requested 205482. Please reduce your message size and try again.',
       type: 'tokens',
       code: 'rate_limit_exceeded',
     },
   })
-  return JSON.stringify({ error: `Groq returned 429 (token limit): ${groqBody.slice(0, 300)}` })
+  return JSON.stringify({ error: `OpenAI returned 429 (token limit): ${openAiBody.slice(0, 300)}` })
 }
 
 /**
- * Mimics the message our server forwards when Groq's response itself was
+ * Mimics the message our server forwards when OpenAI's response itself was
  * truncated — `finish_reason: "length"`, not a non-2xx status — and salvage
- * still couldn't recover any complete items. groqExtract.ts tags this with
- * the same stable "(truncated)" marker as the json_validate_failed 400
- * variant and forwards it as a 502 (a plain Error, not a GroqHttpError
- * carrying a real Groq status), since the response Groq sent back was
- * itself a 200.
+ * still couldn't recover any complete items. openaiExtract.ts tags this
+ * with a stable "(truncated)" marker and forwards it as a 502 (a plain
+ * Error, not an OpenAiHttpError carrying a real OpenAI status), since the
+ * response OpenAI sent back was itself a 200.
  */
 function truncatedResponseError() {
   return JSON.stringify({
     error:
-      'Groq response was truncated (truncated) by max_completion_tokens: {"items":[{"name":"Milk","price":3.49,"category":"dairy","isDiscount":false},{"name":"Eggs","price":4.2,"category"',
+      'OpenAI response was truncated (truncated) by max_completion_tokens: {"items":[{"name":"Milk","price":3.49,"category":"dairy","isDiscount":false},{"name":"Eggs","price":4.2,"category"',
   })
 }
 
@@ -142,7 +141,7 @@ test('an unrecognized 429 message falls back to manual-retry-only, no countdown'
     route.fulfill({
       status: 429,
       contentType: 'application/json',
-      body: JSON.stringify({ error: 'Groq returned 429: rate limited, please slow down' }),
+      body: JSON.stringify({ error: 'OpenAI returned 429: rate limited, please slow down' }),
     }),
   )
 
@@ -158,7 +157,7 @@ test('an unrecognized 429 message falls back to manual-retry-only, no countdown'
   await expect(page.getByTestId('receipt-process-button')).toHaveText('Retry')
 })
 
-test('a Groq token-limit 429 (request too large) shows a distinct message with no retry countdown', async ({
+test('an OpenAI token-limit 429 (request too large) shows a distinct message with no retry countdown', async ({
   page,
 }) => {
   let callCount = 0
@@ -185,7 +184,7 @@ test('a Groq token-limit 429 (request too large) shows a distinct message with n
   expect(callCount).toBe(1)
 })
 
-test('a truncated Groq response (finish_reason: "length") shows a distinct "too many items" message', async ({
+test('a truncated OpenAI response (finish_reason: "length") shows a distinct "too many items" message', async ({
   page,
 }) => {
   let callCount = 0

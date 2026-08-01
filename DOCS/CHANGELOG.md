@@ -980,3 +980,39 @@ summary of each milestone below and points back here for details.
     now-resolved "still-open... known issue" comment in
     `DbDebugPanel.tsx` that this fix made stale. Full suite: 70/70
     passing.
+- **Migrated receipt extraction from Groq to OpenAI**: done. Groq's
+  vision model (`qwen/qwen3.6-27b`) is replaced with OpenAI's
+  `gpt-4.1-mini`, keeping the same overall flow and JSON contract
+  (`{"items": [{"name","price","category","isDiscount"}]}`) the rest of
+  the app already relies on.
+  - `api/_lib/groqExtract.ts` renamed to `api/_lib/openaiExtract.ts`;
+    `GroqHttpError` renamed to `OpenAiHttpError`. Endpoint switched to
+    `https://api.openai.com/v1/chat/completions`; `GROQ_API_KEY` renamed
+    to `OPENAI_API_KEY` everywhere (`.env.example`, README, Vercel env
+    vars).
+  - Image is still sent the same way (a `data:image/...;base64,...` data
+    URL inside an `image_url` content block) — now with `detail: "high"`
+    set explicitly, since receipt line items are small text and the
+    default `"auto"` detail level wasn't guaranteed to pick the
+    high-resolution path.
+  - Error handling was ported, not assumed: OpenAI's real 429 body shape
+    (`type: "tokens"`, `code: "rate_limit_exceeded"`, "...Please try again
+    in Ns" phrasing) turned out to match what Groq's OpenAI-compatible API
+    was already mirroring, so the existing token-limit detection and
+    `retryAfter.ts`'s wait-time regex both carried over unchanged. One
+    real difference: Groq returned a distinct 400 (`code:
+    "json_validate_failed"`) when its own output failed JSON validation
+    mid-generation; OpenAI has no such upfront validation — a
+    token-limit cutoff only ever shows up as a normal 200 with
+    `finish_reason: "length"` and truncated content (a case already
+    handled). The 400-truncation branch was removed as dead code for this
+    provider rather than left in unreachable.
+  - `isGroqTokenLimitError`/`isGroqTruncationError` in `errorMessage.ts`
+    renamed to `isOpenAiTokenLimitError`/`isOpenAiTruncationError`; same
+    marker-text detection, no behavior change.
+  - Updated e2e mocks (`receipt-retry.spec.ts`,
+    `receipt-extraction.spec.ts`, `receipt-auto-sync.spec.ts`) to mock
+    OpenAI's response/error shapes instead of Groq's — the network
+    contract with `/api/extract-receipt` itself (`{ items: [...] }` /
+    `{ error: string }` + real HTTP status) didn't change, so only the
+    mocked error-body text needed reshaping.

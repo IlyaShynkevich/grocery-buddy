@@ -76,9 +76,9 @@ export interface AppStateEntry {
  * A free-text personal note under one category (see src/db/categories.ts),
  * describing what the user personally considers essential/non-essential
  * within it (e.g. under "Frozen": "nuggets, frozen pizza"). Written and
- * managed on the Customize page; feeding these into the Groq extraction
- * prompt so the AI can use them is a separate follow-up, not implemented
- * here — this table is just the storage + CRUD surface for them.
+ * managed on the Customize page; feeding these into the extraction prompt
+ * so the AI can use them is a separate follow-up, not implemented here —
+ * this table is just the storage + CRUD surface for them.
  */
 export interface CategoryNote {
   id: number
@@ -304,9 +304,10 @@ export async function resetAllData(): Promise<void> {
  * one of the receipt system's three independent triggers — a manual Retry
  * click, the per-row auto-retry timer (ReceiptRow's setTimeout in
  * ReceiptCapture.tsx), and the online-reconnect sweep
- * (useReceiptCapture's syncPendingReceipts) — can ever actually kick off a
- * Groq extraction call for a given receipt at a time. Confirmed from real
- * production data: Groq's own dashboard showed 6+ rapid-fire 429s within
+ * (useReceiptCapture's syncPendingReceipts) — can ever actually kick off an
+ * extraction call for a given receipt at a time. Confirmed from real
+ * production data: Groq's own dashboard (the provider in use at the time)
+ * showed 6+ rapid-fire 429s within
  * under 40s for one receipt during a session with flaky mobile
  * connectivity — the per-row timer and a rapid string of 'online' events
  * both landing right as a backoff's retryAt expired, each independently
