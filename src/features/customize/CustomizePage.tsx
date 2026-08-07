@@ -93,9 +93,14 @@ export function CustomizePage() {
         Add personal notes on what's essential per category.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.6rem' }}>
         {CATEGORIES.map((category) => (
-          <details key={category.key} data-testid="category-accordion" data-category-key={category.key} style={cardStyle}>
+          <details
+            key={category.key}
+            data-testid="category-accordion"
+            data-category-key={category.key}
+            style={{ ...cardStyle, padding: '0.55rem 0.75rem' }}
+          >
             <summary data-testid="category-accordion-toggle" style={{ fontWeight: 600, cursor: 'pointer' }}>
               {category.label}
             </summary>
