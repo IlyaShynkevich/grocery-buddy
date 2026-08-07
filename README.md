@@ -5,6 +5,18 @@ Single-user, no auth. See
 [`DOCS/grocery-buddy-spec.md`](DOCS/grocery-buddy-spec.md) for the original
 concept spec and data model.
 
+## Live Demo
+
+[grocery-buddy-demo.vercel.app](https://grocery-buddy-demo.vercel.app/)
+
+Receipt scanning is disabled in this public demo (no `OPENAI_API_KEY`
+configured there) — it shows a friendly "demo mode" message instead of
+running the AI extraction. Everything else (shopping list, trip history,
+monthly stats, Customize) works completely normally. Run it yourself with
+your own `OPENAI_API_KEY` (see [Environment
+variables](#environment-variables)) to get full functionality, including
+receipt scanning.
+
 ## What it does
 
 - **Shopping list** — build a running list as you shop, item by item.
@@ -15,6 +27,11 @@ concept spec and data model.
   a misread line, and auto-suggests merges between typed items and their
   scanned counterpart (e.g. a typed "Milk" matched against a scanned "Milch
   1L") so you don't end up with duplicates.
+- **Personalized category notes** — on the Customize page, jot down specific
+  items you personally treat as an exception within a category (e.g. under
+  Frozen: "nuggets, frozen pizza"). These feed into the receipt-scanning
+  prompt, so a matching item on a future scan gets flagged non-essential
+  automatically instead of just inheriting its category's usual default.
 - **Offline-first** — the shopping list and receipt capture both work with
   no connection. A receipt taken offline goes into a visible pending queue
   and is automatically sent for extraction once you're back online, with no
@@ -27,12 +44,19 @@ concept spec and data model.
   non-essential status, discounts, total).
 - **Monthly stats** — total spend, an essential vs. non-essential split, and
   spend broken down by category, for any month with completed trips.
-- **Mascot** — a small hand-drawn companion on the Shopping List page shows
-  what's going on: idle normally, scanning while a receipt is being
-  processed, and happy once results are ready to review.
-- **Tab navigation** — Shopping List, History, and Stats are reachable from
-  the tab bar or by swiping left/right between them, with a slide
-  transition either way.
+- **Mascot** — a small hand-drawn companion shows what's going on: idle
+  normally, scanning while a receipt is being processed, and happy once
+  results are ready to review — also the visual anchor on the Home page.
+- **Home page** — a mascot-led welcome screen with a friendly "I'm ready to
+  shop" button into the shopping list, shown automatically on a genuinely
+  fresh app open. A same-session reload instead restores whichever tab you
+  were last on, and is never bounced back to Home.
+- **Tab navigation** — Shopping List, History, Stats, and Customize are
+  reachable from the tab bar or by swiping left/right between them, with a
+  slide transition either way. Home and About sit outside that swipeable
+  set, reached only via their corner icons.
+- **About page** — app name, version, a quick rundown of what the app does,
+  credit, and what's planned next, reachable from the top-right info icon.
 - **Installable PWA** — add to your phone's home screen for offline-capable,
   app-like use; no app store involved.
 
