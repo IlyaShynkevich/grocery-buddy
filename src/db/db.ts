@@ -76,9 +76,9 @@ export interface AppStateEntry {
  * A free-text personal note under one category (see src/db/categories.ts),
  * describing what the user personally considers essential/non-essential
  * within it (e.g. under "Frozen": "nuggets, frozen pizza"). Written and
- * managed on the Customize page; feeding these into the extraction prompt
- * so the AI can use them is a separate follow-up, not implemented here —
- * this table is just the storage + CRUD surface for them.
+ * managed on the Customize page; fed into the receipt-extraction prompt via
+ * getCategoryNoteHints below so the AI can use them when a scanned item's
+ * name matches one.
  */
 export interface CategoryNote {
   id: number
@@ -143,6 +143,18 @@ export function newItem(
 
 export function newCategoryNote(categoryKey: string, text: string): Omit<CategoryNote, 'id'> {
   return { categoryKey, text, createdAt: Date.now() }
+}
+
+/** All categoryNotes, grouped by category — the shape the extraction API expects. Categories with no notes are omitted. */
+export async function getCategoryNoteHints(): Promise<{ category: string; notes: string[] }[]> {
+  const all = await db.categoryNotes.toArray()
+  const grouped = new Map<string, string[]>()
+  for (const note of all) {
+    const notes = grouped.get(note.categoryKey) ?? []
+    notes.push(note.text)
+    grouped.set(note.categoryKey, notes)
+  }
+  return [...grouped.entries()].map(([category, notes]) => ({ category, notes }))
 }
 
 export async function recomputeTripTotal(tripId: number): Promise<number> {

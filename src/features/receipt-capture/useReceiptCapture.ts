@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import {
   claimReceiptForProcessing,
   db,
+  getCategoryNoteHints,
   getOrCreateActiveTrip,
   newItem,
   recomputeTripTotal,
@@ -57,7 +58,8 @@ export function useReceiptCapture() {
     receipt = claimed
 
     try {
-      const extractedItems = await extractReceiptItems(receipt.imageBlob)
+      const categoryNotes = await getCategoryNoteHints()
+      const extractedItems = await extractReceiptItems(receipt.imageBlob, categoryNotes)
 
       const addedItemIds: number[] = []
       const suggestedMatches: SuggestedItemMatch[] = []

@@ -1,4 +1,4 @@
-import { CATEGORIES } from '../../src/db/categories.js'
+import { CATEGORIES, getCategory } from '../../src/db/categories.js'
 
 const OPENAI_MODEL = 'gpt-4.1-mini'
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions'
@@ -16,6 +16,67 @@ export interface ExtractedItem {
   category: string
   /** true for a coupon/discount line, not a purchasable product */
   isDiscount?: boolean
+  /** null unless a personal category note (see CategoryNoteHint) flagged this item as an exception to its category's usual essential/non-essential default */
+  essentialOverride?: boolean | null
+}
+
+/** A category's personal notes (Customize page), grouped for the extraction prompt. */
+export interface CategoryNoteHint {
+  /** key into CATEGORIES */
+  category: string
+  notes: string[]
+}
+
+const MAX_NOTE_CATEGORIES = CATEGORIES.length
+const MAX_NOTES_PER_CATEGORY = 25
+const MAX_NOTE_LENGTH = 200
+
+/**
+ * Defensive validation for the client-supplied `notes` field: drops
+ * anything malformed instead of failing the whole extraction over it, since
+ * personalization is a nice-to-have, not core to the request. Also caps
+ * sizes so a buggy/adversarial client can't balloon the prompt.
+ */
+export function normalizeNoteHints(raw: unknown): CategoryNoteHint[] {
+  if (!Array.isArray(raw)) return []
+
+  const hints: CategoryNoteHint[] = []
+  for (const entry of raw.slice(0, MAX_NOTE_CATEGORIES)) {
+    if (!entry || typeof entry !== 'object') continue
+    const record = entry as Record<string, unknown>
+    const category = typeof record.category === 'string' ? record.category : ''
+    if (!CATEGORY_KEYS.includes(category)) continue
+    if (!Array.isArray(record.notes)) continue
+
+    const notes = record.notes
+      .filter((note): note is string => typeof note === 'string' && note.trim().length > 0)
+      .map((note) => note.trim().slice(0, MAX_NOTE_LENGTH))
+      .slice(0, MAX_NOTES_PER_CATEGORY)
+    if (notes.length > 0) hints.push({ category, notes })
+  }
+  return hints
+}
+
+/**
+ * The per-request personalization block appended to the user message when
+ * the client sent any category notes — null (added nowhere) otherwise, so a
+ * user with no notes set gets the exact same request as before this existed.
+ */
+export function buildPersonalizationText(notes: CategoryNoteHint[]): string | null {
+  if (notes.length === 0) return null
+
+  const lines = notes.map((hint) => {
+    const category = getCategory(hint.category)
+    const defaultLabel = category.essential ? 'essential by default' : 'non-essential by default'
+    return `- ${category.label} (${defaultLabel}): ${hint.notes.join(', ')}`
+  })
+
+  return [
+    "The user has personal notes for some categories, from a separate customization step (not from this receipt):",
+    ...lines,
+    'If an extracted item\'s name closely matches one of the words/phrases listed for a category above, use that category, and set "essentialOverride" to the OPPOSITE of that category\'s stated default above — each note marks an item as an exception to its category\'s norm.',
+    'Leave "essentialOverride": null for every item that does not match any note.',
+  ].join('\n')
 }
 
 /**
@@ -52,12 +113,13 @@ function isTokenLimitBody(body: string): boolean {
 const CATEGORY_KEYS = CATEGORIES.map((category) => category.key)
 
 const SYSTEM_PROMPT = `You extract line items from a photo of a grocery store receipt.
-Respond with ONLY a JSON object of the shape {"items": [{"name": string, "price": number, "category": string, "isDiscount": boolean}]}.
+Respond with ONLY a JSON object of the shape {"items": [{"name": string, "price": number, "category": string, "isDiscount": boolean, "essentialOverride": boolean|null}]}.
 - "price" is the item's paid price in the receipt's currency, as a plain number (no currency symbol, no thousands separators).
 - "category" must be exactly one of: ${CATEGORY_KEYS.join(', ')}. Pick the closest match; use "other" if unsure.
 - Skip subtotal, tax, total, and payment-method lines — only include purchased items and discounts.
 - Coupon/discount lines (e.g. "Coupon Herzstuecke -0,38") are not purchasable products: include them with "isDiscount": true, "price" as a negative number equal to the discount amount, and "category" set to "other".
 - For regular purchased items, set "isDiscount": false.
+- "essentialOverride" is null unless the user's own personal category notes (given separately in the user message, if any) say this specific item is an exception to its category's usual essential/non-essential status — see those instructions if present.
 - If the photo is not a legible receipt, respond with {"items": []}.
 Output raw JSON only. No markdown code fences, no commentary before or after.`
 
@@ -70,10 +132,18 @@ Output raw JSON only. No markdown code fences, no commentary before or after.`
 export async function extractReceiptItems(
   imageDataUrl: string,
   apiKey: string,
+  notes: CategoryNoteHint[] = [],
   fetchImpl: typeof fetch = fetch,
 ): Promise<ExtractedItem[]> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
+
+  const personalization = buildPersonalizationText(notes)
+  const userContent = [
+    { type: 'text' as const, text: 'Extract the items from this receipt.' },
+    ...(personalization ? [{ type: 'text' as const, text: personalization }] : []),
+    { type: 'image_url' as const, image_url: { url: imageDataUrl, detail: 'high' as const } },
+  ]
 
   let response: Response
   try {
@@ -87,13 +157,7 @@ export async function extractReceiptItems(
         model: OPENAI_MODEL,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Extract the items from this receipt.' },
-              { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
-            ],
-          },
+          { role: 'user', content: userContent },
         ],
         temperature: 0,
         max_completion_tokens: MAX_COMPLETION_TOKENS,
@@ -311,7 +375,8 @@ function itemsFromRaw(rawItems: unknown[]): ExtractedItem[] {
     if (!isDiscount && rawPrice < 0) continue
     const price = isDiscount ? -Math.abs(rawPrice) : rawPrice
     const category = CATEGORY_KEYS.includes(categoryRaw) ? categoryRaw : 'other'
-    items.push({ name, price, category, isDiscount })
+    const essentialOverride = record.essentialOverride === true || record.essentialOverride === false ? record.essentialOverride : null
+    items.push({ name, price, category, isDiscount, essentialOverride })
   }
 
   return items
