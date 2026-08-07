@@ -26,7 +26,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
-      res.status(500).json({ error: 'Server is not configured with OPENAI_API_KEY' })
+      // A public deployment (e.g. a Vercel Preview without secrets
+      // configured) shouldn't 500 here — that reads as a server crash. This
+      // is a deliberate, detectable "the AI step is turned off" response
+      // instead, so the frontend can show a friendly demo-mode explanation
+      // rather than a generic error (see extractReceipt.ts's demo check).
+      res.status(200).json({ items: [], demo: true })
       return
     }
 
