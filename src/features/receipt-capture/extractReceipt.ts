@@ -4,6 +4,15 @@ export interface ExtractedItem {
   category: string
   /** true for a coupon/discount line, not a purchasable product */
   isDiscount?: boolean
+  /** null unless a personal category note flagged this item as an exception to its category's usual essential/non-essential default */
+  essentialOverride?: boolean | null
+}
+
+/** A category's personal notes (see useCategoryNotes/CustomizePage), grouped for the extraction request. */
+export interface CategoryNoteHint {
+  /** key into CATEGORIES */
+  category: string
+  notes: string[]
 }
 
 /** Thrown for a non-2xx /api/extract-receipt response; carries the real HTTP status. */
@@ -26,13 +35,15 @@ const JPEG_QUALITY = 0.8
  * MB) plus base64's ~37% overhead can exceed Vercel's 4.5MB function
  * request-body limit, so this keeps requests reliably small.
  */
-export async function extractReceiptItems(imageBlob: Blob): Promise<ExtractedItem[]> {
+export async function extractReceiptItems(imageBlob: Blob, categoryNotes: CategoryNoteHint[] = []): Promise<ExtractedItem[]> {
   const dataUrl = await toUploadDataUrl(imageBlob)
 
   const response = await fetch('/api/extract-receipt', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: dataUrl }),
+    // "notes" is only included when non-empty, so a user with no category
+    // notes set sends the exact same request body as before this existed.
+    body: JSON.stringify(categoryNotes.length > 0 ? { image: dataUrl, notes: categoryNotes } : { image: dataUrl }),
   })
 
   const body = await response.json().catch(() => null)

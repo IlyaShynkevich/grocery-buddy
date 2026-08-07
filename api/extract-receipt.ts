@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { extractReceiptItems, OpenAiHttpError } from './_lib/openaiExtract.js'
+import { extractReceiptItems, normalizeNoteHints, OpenAiHttpError } from './_lib/openaiExtract.js'
 
 // openaiExtract.ts aborts its own OpenAI call at 25s; without this, Vercel's
 // platform default (10s Hobby / 15s Pro) would kill the function first on a
@@ -16,11 +16,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    const image = (req.body as { image?: unknown } | null)?.image
+    const body = req.body as { image?: unknown; notes?: unknown } | null
+    const image = body?.image
     if (typeof image !== 'string' || !image.startsWith('data:image/')) {
       res.status(400).json({ error: 'Missing or invalid "image" data URL' })
       return
     }
+    const notes = normalizeNoteHints(body?.notes)
 
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
@@ -29,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-      const items = await extractReceiptItems(image, apiKey)
+      const items = await extractReceiptItems(image, apiKey, notes)
       res.status(200).json({ items })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown extraction error'
