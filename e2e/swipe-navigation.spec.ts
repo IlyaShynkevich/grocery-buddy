@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures'
 
 // Touch emulation must be on for TouchEvent/Touch to behave like a real
 // device in Chromium — this is what lets these tests exercise the actual

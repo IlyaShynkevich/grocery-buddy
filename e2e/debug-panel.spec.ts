@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test('DB Debug Panel is collapsed by default and can be opened/closed via its toggle', async ({ page }) => {
   await page.goto('/')
