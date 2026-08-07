@@ -16,7 +16,7 @@ export interface ExtractedItem {
   category: string
   /** true for a coupon/discount line, not a purchasable product */
   isDiscount?: boolean
-  /** null unless a personal category note (see CategoryNoteHint) flagged this item as an exception to its category's usual essential/non-essential default */
+  /** null unless a personal category note (see CategoryNoteHint) matched this item — a match always means false (non-essential), never true */
   essentialOverride?: boolean | null
 }
 
@@ -67,14 +67,13 @@ export function buildPersonalizationText(notes: CategoryNoteHint[]): string | nu
 
   const lines = notes.map((hint) => {
     const category = getCategory(hint.category)
-    const defaultLabel = category.essential ? 'essential by default' : 'non-essential by default'
-    return `- ${category.label} (${defaultLabel}): ${hint.notes.join(', ')}`
+    return `- ${category.label}: ${hint.notes.join(', ')}`
   })
 
   return [
-    "The user has personal notes for some categories, from a separate customization step (not from this receipt):",
+    'The user has personal notes for some categories, from a separate customization step (not from this receipt). Each note names an item the user personally considers NOT essential:',
     ...lines,
-    'If an extracted item\'s name closely matches one of the words/phrases listed for a category above, use that category, and set "essentialOverride" to the OPPOSITE of that category\'s stated default above — each note marks an item as an exception to its category\'s norm.',
+    'If an extracted item\'s name closely matches one of the words/phrases listed for a category above, use that category AND set "essentialOverride" to false. Literally false — a match always means non-essential, regardless of whether that category itself is essential or non-essential by default. Never set it to true from a note match.',
     'Leave "essentialOverride": null for every item that does not match any note.',
   ].join('\n')
 }
@@ -119,7 +118,7 @@ Respond with ONLY a JSON object of the shape {"items": [{"name": string, "price"
 - Skip subtotal, tax, total, and payment-method lines — only include purchased items and discounts.
 - Coupon/discount lines (e.g. "Coupon Herzstuecke -0,38") are not purchasable products: include them with "isDiscount": true, "price" as a negative number equal to the discount amount, and "category" set to "other".
 - For regular purchased items, set "isDiscount": false.
-- "essentialOverride" is null unless the user's own personal category notes (given separately in the user message, if any) say this specific item is an exception to its category's usual essential/non-essential status — see those instructions if present.
+- "essentialOverride" is null by default. Only set it to false when the user's own personal category notes (given separately in the user message, if any) name this specific item — see those instructions if present. Never set it to true.
 - If the photo is not a legible receipt, respond with {"items": []}.
 Output raw JSON only. No markdown code fences, no commentary before or after.`
 

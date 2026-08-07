@@ -36,7 +36,7 @@ async function saveTrip(page: Page) {
   await expect.poll(() => page.getByTestId('shopping-list').getAttribute('data-trip-id')).not.toBe(tripId)
 }
 
-test('a category note is sent with the extraction request, and its essentialOverride flips the item off its category default', async ({
+test('a category note is sent with the extraction request, and a note match always marks the item non-essential — regardless of its category\'s own default', async ({
   page,
 }) => {
   let requestBody: Record<string, unknown> | undefined
@@ -46,9 +46,13 @@ test('a category note is sent with the extraction request, and its essentialOver
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        // Frozen is essential by default (see src/db/categories.ts) — this
-        // response simulates the model flagging Nuggets as the exception
-        // the "nuggets" note under Frozen describes.
+        // Frozen is essential by default (see src/db/categories.ts). A note
+        // match always means essentialOverride: false — a literal
+        // non-essential status, not "the opposite of whatever this
+        // category's default happens to be" (that was the actual bug: it
+        // coincidentally computes to false here too, but the model was
+        // observed setting true from the old "opposite of default" prompt
+        // wording — see buildPersonalizationText).
         items: [{ name: 'Nuggets', price: 3.5, category: 'frozen', essentialOverride: false }],
       }),
     })
