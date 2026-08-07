@@ -35,6 +35,28 @@ const TABS: Array<{ name: TabName; label: string; testId: string; Icon: Componen
 // Single source of truth for swipe/tab order, shared with the tab bar above.
 const TAB_ORDER: TabName[] = TABS.map((tab) => tab.name)
 
+const ACTIVE_TAB_STORAGE_KEY = 'grocery-buddy:activeTab'
+
+/**
+ * Reads the last-active tab back out of localStorage for the initial render,
+ * so a reload lands back where the user was instead of always defaulting to
+ * Shopping List. Read as the useState initializer (not an effect) so it's
+ * already correct on the very first render — TabTransition only animates a
+ * tab that differs from the previous one it saw, so an effect-based restore
+ * (landing on "shopping" for one render, then jumping to the real tab) would
+ * have visibly slid in instead of just being there.
+ */
+function readStoredTab(): TabName {
+  try {
+    const stored = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)
+    return stored !== null && (TAB_ORDER as string[]).includes(stored) ? (stored as TabName) : 'shopping'
+  } catch {
+    // e.g. Safari private browsing throws on any localStorage access — this
+    // is a nice-to-have, not core functionality, so just fall back silently.
+    return 'shopping'
+  }
+}
+
 // Minimum horizontal travel (px) before a gesture counts as an intentional
 // swipe, versus being e.g. a static tap or a proceeded-but-quickly-released
 // touch that shouldn't switch tabs.
@@ -63,7 +85,7 @@ function cornerButtonStyle(active: boolean): CSSProperties {
 }
 
 function App() {
-  const [view, setView] = useState<View>({ name: 'shopping' })
+  const [view, setView] = useState<View>(() => ({ name: readStoredTab() }))
   // trip-detail isn't its own tab — it's reached via History, so it keeps
   // the History tab highlighted rather than showing no active tab at all.
   // Home/About aren't part of the swipeable tab set at all, so neither the
@@ -71,6 +93,19 @@ function App() {
   const activeTab: TabName | null =
     view.name === 'trip-detail' ? 'history' : view.name === 'home' || view.name === 'about' ? null : view.name
   const mainRef = useRef<HTMLElement>(null)
+
+  // Persist whichever of the 4 main tabs is active (trip-detail counts as
+  // History, same as the nav highlight above) so the next reload restores it
+  // via readStoredTab above — home/about are corner icons, not part of this,
+  // so activeTab is null (and nothing written) while on either of them.
+  useEffect(() => {
+    if (activeTab === null) return
+    try {
+      localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab)
+    } catch {
+      // Safari private browsing etc. — see readStoredTab's comment.
+    }
+  }, [activeTab])
   // Which way the last tab switch happened, for TabTransition's slide
   // direction — updated by both the swipe handler and the tab-bar taps
   // below, so either input path gets the same directional animation.
