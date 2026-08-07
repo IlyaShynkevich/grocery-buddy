@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test('a draft trip left active overnight shows today\'s date on reopen, not the day it was created', async ({
   page,

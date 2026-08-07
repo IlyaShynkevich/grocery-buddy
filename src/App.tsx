@@ -36,6 +36,11 @@ const TABS: Array<{ name: TabName; label: string; testId: string; Icon: Componen
 const TAB_ORDER: TabName[] = TABS.map((tab) => tab.name)
 
 const ACTIVE_TAB_STORAGE_KEY = 'grocery-buddy:activeTab'
+// sessionStorage (not localStorage): persists across a same-tab reload but
+// resets once the tab/app is fully closed and reopened — exactly the signal
+// needed to tell "mid-session reload" (restore the last tab) apart from a
+// genuinely fresh app open (always show Home first), see readInitialView.
+const HOME_SEEN_STORAGE_KEY = 'grocery-buddy:homeSeenThisSession'
 
 /**
  * Reads the last-active tab back out of localStorage for the initial render,
@@ -55,6 +60,25 @@ function readStoredTab(): TabName {
     // is a nice-to-have, not core functionality, so just fall back silently.
     return 'shopping'
   }
+}
+
+function hasSeenHomeThisSession(): boolean {
+  try {
+    return sessionStorage.getItem(HOME_SEEN_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * A genuinely fresh app open (this browsing session has never navigated past
+ * Home) always starts on Home, regardless of whatever tab localStorage has
+ * persisted from a previous session — a mid-session reload (the flag is
+ * already set) restores that persisted tab instead, same as before Home
+ * existed.
+ */
+function readInitialView(): View {
+  return hasSeenHomeThisSession() ? { name: readStoredTab() } : { name: 'home' }
 }
 
 // Minimum horizontal travel (px) before a gesture counts as an intentional
@@ -85,7 +109,7 @@ function cornerButtonStyle(active: boolean): CSSProperties {
 }
 
 function App() {
-  const [view, setView] = useState<View>(() => ({ name: readStoredTab() }))
+  const [view, setView] = useState<View>(readInitialView)
   // trip-detail isn't its own tab — it's reached via History, so it keeps
   // the History tab highlighted rather than showing no active tab at all.
   // Home/About aren't part of the swipeable tab set at all, so neither the
@@ -97,11 +121,15 @@ function App() {
   // Persist whichever of the 4 main tabs is active (trip-detail counts as
   // History, same as the nav highlight above) so the next reload restores it
   // via readStoredTab above — home/about are corner icons, not part of this,
-  // so activeTab is null (and nothing written) while on either of them.
+  // so activeTab is null (and nothing written) while on either of them. The
+  // same condition is also exactly "the user navigated away from Home into
+  // the CTA or a nav tab" (About doesn't count, matching the spec), so this
+  // is also where the homeSeen flag gets set for readInitialView above.
   useEffect(() => {
     if (activeTab === null) return
     try {
       localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, activeTab)
+      sessionStorage.setItem(HOME_SEEN_STORAGE_KEY, '1')
     } catch {
       // Safari private browsing etc. — see readStoredTab's comment.
     }
@@ -310,7 +338,7 @@ function App() {
       {view.name === 'trip-detail' ? (
         <TripDetailPage tripId={view.tripId} onBack={() => setView({ name: 'history' })} />
       ) : view.name === 'home' ? (
-        <HomePage />
+        <HomePage onShop={() => setView({ name: 'shopping' })} />
       ) : view.name === 'about' ? (
         <AboutPage />
       ) : (

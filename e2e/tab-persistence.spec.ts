@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 test('reloading the app restores the tab that was active, not always Shopping List', async ({ page }) => {
   await page.goto('/')

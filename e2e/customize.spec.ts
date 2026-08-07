@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures'
 
 function categoryAccordion(page: Page, key: string) {
   return page.locator(`[data-testid="category-accordion"][data-category-key="${key}"]`)

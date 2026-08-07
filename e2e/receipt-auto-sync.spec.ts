@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 // Same 1x1 PNG fixture used in the other receipt specs.
 const SAMPLE_IMAGE = Buffer.from(

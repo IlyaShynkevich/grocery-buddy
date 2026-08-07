@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 // Smallest possible valid PNG (1x1 red pixel) — a stand-in for a receipt
 // photo. Playwright's setInputFiles hands the <input type=file> a File

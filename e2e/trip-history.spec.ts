@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures'
 
 async function addItem(page: Page, name: string) {
   await page.getByTestId('add-item-input').fill(name)

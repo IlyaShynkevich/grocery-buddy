@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures'
 
 // Same 1x1 PNG fixture used in e2e/receipt-capture.spec.ts.
 const SAMPLE_IMAGE = Buffer.from(
