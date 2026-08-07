@@ -3,7 +3,7 @@ import type { PendingReceipt, ReceiptStatus } from '../../db/db'
 import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { useMascotPose } from '../mascot/useMascotPose'
-import { getUserFacingErrorMessage } from './errorMessage'
+import { getUserFacingErrorMessage, isDemoModeError } from './errorMessage'
 import { ReceiptThumbnail } from './ReceiptThumbnail'
 import { useReceiptCapture } from './useReceiptCapture'
 
@@ -191,9 +191,17 @@ function ReceiptRow({
     return () => clearTimeout(timeout)
   }, [receipt, onProcess])
 
+  // Demo mode (no OPENAI_API_KEY on this deployment) isn't really a
+  // "failure" — no auto-retry gets scheduled for it either (see
+  // useReceiptCapture.ts), so the alarming red error styling and the
+  // "will retry" wording would both be misleading here.
+  const demoMode = receipt.status === 'failed' && receipt.lastError !== undefined && isDemoModeError(receipt.lastError)
+
   const statusText = isWaitingToRetry
     ? `Retrying in ${Math.max(0, Math.ceil((receipt.retryAt! - now) / 1000))}s`
-    : STATUS_LABEL[receipt.status]
+    : demoMode
+      ? 'Demo mode'
+      : STATUS_LABEL[receipt.status]
 
   return (
     <li
@@ -204,9 +212,11 @@ function ReceiptRow({
       <ReceiptThumbnail blob={receipt.imageBlob} />
       <div style={{ flex: 1 }}>
         <div data-testid="receipt-status">{statusText}</div>
-        <div style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>{new Date(receipt.capturedAt).toLocaleString()}</div>
+        <div data-testid="receipt-timestamp" style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
+          {new Date(receipt.capturedAt).toLocaleString()}
+        </div>
         {receipt.status === 'failed' && receipt.lastError && (
-          <div data-testid="receipt-error" style={{ fontSize: '0.75rem', color: 'var(--danger)' }}>
+          <div data-testid="receipt-error" style={{ fontSize: '0.75rem', color: demoMode ? 'var(--text-muted)' : 'var(--danger)' }}>
             {getUserFacingErrorMessage(receipt.lastError, receipt.lastErrorStatus)}
           </div>
         )}

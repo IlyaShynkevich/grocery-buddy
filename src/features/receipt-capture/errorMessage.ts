@@ -25,6 +25,18 @@ export function isOpenAiTruncationError(rawMessage: string): boolean {
 }
 
 /**
+ * True for the "no OPENAI_API_KEY configured on this deployment" case
+ * (tagged client-side in extractReceipt.ts with a stable "(demo mode)"
+ * marker) — a public demo deployment with the AI step deliberately turned
+ * off, not a real failure. Callers should show a friendly explanation
+ * instead of the generic error styling/copy, and never treat it as
+ * retryable (retrying just reaches the same demo response again).
+ */
+export function isDemoModeError(rawMessage: string): boolean {
+  return /\(demo mode\)/.test(rawMessage)
+}
+
+/**
  * Maps a raw extraction error (OpenAI's own error text, a parse failure, a
  * network error, etc.) to a short, human-readable message for display.
  * The raw error is still logged via console.error wherever it's caught —
@@ -37,6 +49,10 @@ export function isOpenAiTruncationError(rawMessage: string): boolean {
  * that didn't make it through for some other reason.
  */
 export function getUserFacingErrorMessage(rawMessage: string, status?: number): string {
+  if (isDemoModeError(rawMessage)) {
+    return "Receipt scanning is disabled in this public demo. This is a personal project — check the README to run it with your own API key."
+  }
+
   // Checked before the generic JSON-parse-failure regex below, since a
   // truncation message legitimately contains "JSON"/"message content" text
   // too and would otherwise be swallowed by that broader, less specific match.

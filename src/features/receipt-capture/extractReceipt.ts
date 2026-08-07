@@ -56,6 +56,14 @@ export async function extractReceiptItems(imageBlob: Blob, categoryNotes: Catego
     )
   }
 
+  if ((body as { demo?: unknown } | null)?.demo === true) {
+    // Tagged with a stable "(demo mode)" marker, same convention
+    // openaiExtract.ts already uses for "(token limit)"/"(truncated)", so
+    // errorMessage.ts's isDemoModeError can tell this apart from a real
+    // failure and show a friendly explanation instead of a generic error.
+    throw new Error('Receipt scanning is disabled (demo mode): this deployment has no OPENAI_API_KEY configured')
+  }
+
   const items = (body as { items?: unknown } | null)?.items
   if (!Array.isArray(items)) {
     throw new Error('Extraction response was malformed')
