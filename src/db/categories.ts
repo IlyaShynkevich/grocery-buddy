@@ -32,7 +32,10 @@ export function isEssentialByDefault(categoryKey: string): boolean {
 
 /**
  * An item's effective essential/non-essential status: the category's default,
- * unless the user has explicitly overridden it for that item.
+ * unless the user has explicitly overridden it for that item. `essentialOverride`
+ * (when non-null) is the item's literal resulting status, not a flip/delta
+ * relative to the category default — every writer of this field (the manual
+ * debug-panel toggle, the AI extraction path) must set it that way.
  */
 export function resolveEssential(item: {
   category: string
