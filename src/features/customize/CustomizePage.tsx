@@ -90,8 +90,7 @@ export function CustomizePage() {
     <section data-testid="customize-page" style={pageStyle}>
       <h1 style={{ fontSize: '1.5rem' }}>Customize</h1>
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>
-        Add personal notes about what's essential or non-essential for you within each category — e.g. under Frozen:
-        "nuggets, frozen pizza."
+        Add personal notes on what's essential per category.
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>

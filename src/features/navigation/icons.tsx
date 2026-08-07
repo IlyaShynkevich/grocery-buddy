@@ -78,24 +78,19 @@ export function BarChartIcon({ size = 20 }: IconProps) {
   )
 }
 
-// Adapted from the reference gear/settings icon at ICONS/gear-icon.png (a
-// filled cog-with-hole glyph) into this set's stroke-only style: one
-// continuous outline path — 8 teeth joined directly to a circular root, via
-// arcs for the valleys between teeth — plus a plain stroked circle for the
-// center hole, instead of that reference's filled silhouette. Being a single
-// path (not separate overlapping shapes, which is what earlier hand-drawn
-// attempts used) is what makes strokeLinejoin: round (set globally in
-// svgProps) soften every tooth corner for free, matching the reference's
-// rounded-tooth look, and it's also what avoids any gap/seam between teeth
-// and body — the failure mode of those earlier attempts. Coordinates were
-// generated with a small script (8-fold symmetry: each tooth is a trapezoid
-// between the root radius and the tip radius, joined by a root-radius arc
-// through the valley) rather than hand-typed, so the teeth are exactly
-// evenly spaced. Sized so the tip radius (~8.3) roughly matches Info/Clock's
-// circle radius (8.5), and the center hole (r 3.4) is proportioned like the
-// reference's.
+// A stroke-only gear/settings outline, 6-fold symmetry (each tooth a
+// rectangular tab between the root and tip radius, joined by a root-radius
+// arc through the valley). The earlier 8-tooth version used tooth walls only
+// ~2.9 units apart at viewBox scale — with the shared 1.8 strokeWidth
+// tracing both walls, the un-stroked gap between them shrank to ~1px at the
+// rendered 20px size and anti-aliased away, so the whole cog painted as a
+// solid blob instead of a thin outline, reading brighter/heavier than every
+// other nav icon. This version has fewer, proportionally wider teeth (root
+// chord ~3.6 units) so the stroked walls stay visually separated at 20px.
+// Tip radius (8.8) still roughly matches Info/Clock's circle radius (8.5),
+// and the center hole (r 3.4) is unchanged.
 const GEAR_PATH =
-  'M 10.55 6.59 L 10.56 3.83 L 13.44 3.83 L 13.45 6.59 A 5.6 5.6 0 0 1 14.8 7.15 L 16.76 5.2 L 18.8 7.24 L 16.85 9.2 A 5.6 5.6 0 0 1 17.41 10.55 L 20.17 10.56 L 20.17 13.44 L 17.41 13.45 A 5.6 5.6 0 0 1 16.85 14.8 L 18.8 16.76 L 16.76 18.8 L 14.8 16.85 A 5.6 5.6 0 0 1 13.45 17.41 L 13.44 20.17 L 10.56 20.17 L 10.55 17.41 A 5.6 5.6 0 0 1 9.2 16.85 L 7.24 18.8 L 5.2 16.76 L 7.15 14.8 A 5.6 5.6 0 0 1 6.59 13.45 L 3.83 13.44 L 3.83 10.56 L 6.59 10.55 A 5.6 5.6 0 0 1 7.15 9.2 L 5.2 7.24 L 7.24 5.2 L 9.2 7.15 A 5.6 5.6 0 0 1 10.55 6.59 Z'
+  'M 10.21 5.96 L 9.5 3.56 L 14.5 3.56 L 13.79 5.96 A 6.3 6.3 0 0 1 16.34 7.43 L 18.06 5.62 L 20.56 9.95 L 18.13 10.53 A 6.3 6.3 0 0 1 18.13 13.47 L 20.56 14.05 L 18.06 18.38 L 16.34 16.57 A 6.3 6.3 0 0 1 13.79 18.04 L 14.5 20.44 L 9.5 20.44 L 10.21 18.04 A 6.3 6.3 0 0 1 7.66 16.57 L 5.94 18.38 L 3.44 14.05 L 5.87 13.47 A 6.3 6.3 0 0 1 5.87 10.53 L 3.44 9.95 L 5.94 5.62 L 7.66 7.43 A 6.3 6.3 0 0 1 10.21 5.96 Z'
 
 export function GearIcon({ size = 20 }: IconProps) {
   return (
