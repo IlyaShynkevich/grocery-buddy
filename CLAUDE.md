@@ -48,9 +48,20 @@ changed — see `DOCS/CHANGELOG.md`.
 - **Auto-scroll to top after confirming/dismissing a receipt review.**
   Right now the user has to manually scroll up to reach Save trip after a
   review resolves.
-- **Full mascot/icon redesign**, waiting on custom artwork. Currently a
-  placeholder gray shopping-bag icon is used everywhere it appears: the app
-  icon, the favicon, and the footer.
+
+## Known gotchas
+
+- **Double-check exact env var names before anything else, when a "server
+  not configured with X" error persists despite everything else looking
+  right.** A Vercel env var typo (`OPEN_API_KEY` instead of
+  `OPENAI_API_KEY`) once caused a long, confusing debugging session where
+  the code, `.env.local`, and every other layer looked correct — the typo
+  was the only thing wrong.
+- **A working deploy can look completely broken (blank/solid color) on a
+  real phone from stale PWA/service-worker caching**, even when the same
+  URL works fine on desktop or in emulation. Always test in an
+  incognito/private tab first to rule out caching before assuming the code
+  is broken.
 
 ## Commands
 
