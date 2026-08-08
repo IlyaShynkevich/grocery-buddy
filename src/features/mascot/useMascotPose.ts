@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usePendingReceipt } from '../receipt-review/usePendingReceipt'
 import { useActiveTripId } from '../trip/useActiveTripId'
 
-export type MascotPose = 'idle' | 'scanning' | 'happy'
+export type MascotPose = 'idle' | 'scanning' | 'happy' | 'error' | 'thumbsup' | 'thankyou' | 'excited' | 'onit'
 
 /**
  * scanning while a receipt is actively being extracted, happy once
@@ -14,12 +14,16 @@ export type MascotPose = 'idle' | 'scanning' | 'happy'
  * only actually saving the trip (a new active tripId) does, since that's
  * the point a fresh, not-yet-successful trip begins.
  *
- * `isProcessing` is passed in rather than derived here from another
- * `useReceiptCapture()` call — that hook also wires up the online-sync
- * effect and stranded-processing reclaim, which must stay singletons; this
- * hook only needs the boolean its caller already has.
+ * error shows whenever a receipt is sitting in 'failed' status, but only
+ * once neither scanning nor happy applies — a failed earlier receipt
+ * shouldn't cover up an in-flight or just-succeeded one alongside it.
+ *
+ * `isProcessing` and `hasFailed` are passed in rather than derived here
+ * from another `useReceiptCapture()` call — that hook also wires up the
+ * online-sync effect and stranded-processing reclaim, which must stay
+ * singletons; this hook only needs the booleans its caller already has.
  */
-export function useMascotPose(isProcessing: boolean): MascotPose {
+export function useMascotPose(isProcessing: boolean, hasFailed: boolean): MascotPose {
   const tripId = useActiveTripId()
   const pendingReceipt = usePendingReceipt()
   const [showHappy, setShowHappy] = useState(false)
@@ -42,5 +46,6 @@ export function useMascotPose(isProcessing: boolean): MascotPose {
 
   if (isProcessing) return 'scanning'
   if (showHappy) return 'happy'
+  if (hasFailed) return 'error'
   return 'idle'
 }

@@ -4,6 +4,11 @@ const MASCOT_SRC: Record<MascotPose, string> = {
   idle: '/mascot/idle.png',
   scanning: '/mascot/scanning.png',
   happy: '/mascot/happy.png',
+  error: '/mascot/error.png',
+  thumbsup: '/mascot/thumbsup.png',
+  thankyou: '/mascot/thankyou.png',
+  excited: '/mascot/excited.png',
+  onit: '/mascot/onit.png',
 }
 
 export function Mascot({ pose, size = 64 }: { pose: MascotPose; size?: number }) {
