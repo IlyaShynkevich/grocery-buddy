@@ -1016,3 +1016,79 @@ summary of each milestone below and points back here for details.
     contract with `/api/extract-receipt` itself (`{ items: [...] }` /
     `{ error: string }` + real HTTP status) didn't change, so only the
     mocked error-body text needed reshaping.
+- **Mascot pose expansion (thumbsup/thankyou/excited/onit/error) beyond the
+  Shopping List page**: done and verified in production. Until now the
+  mascot only existed as the idle/scanning/happy trio tied to receipt
+  state, shown in one place (`ReceiptCapture.tsx`). Five new posed source
+  images (`thumbsup`, `thankyou`, `excited`, `onit`, `error`, provided by
+  the user, same 256×256 RGBA sizing as the existing three) put a mascot on
+  every other page too, most of them with no state logic behind them at
+  all:
+  - `src/features/mascot/useMascotPose.ts`'s `MascotPose` union and
+    `src/features/mascot/Mascot.tsx`'s pose→`src` map both extended with
+    the 5 new names — `Mascot.tsx` itself needed no other change, it was
+    already a dumb `pose -> <img>` lookup.
+  - Home (`HomePage.tsx`) swapped its large centered mascot from `idle` to
+    `thumbsup`, unconditionally. About (`AboutPage.tsx`) gained one too
+    (`thankyou`), same large-centered-under-the-title treatment as Home,
+    for visual consistency between the two corner-icon pages. Customize and
+    Stats each gained a large centered mascot as a first pass (`excited`
+    and `onit` respectively) — later shrunk down, see the follow-up entry
+    below.
+  - The Shopping List page's own mascot logic gained a 4th, lower-priority
+    state: `error`, shown whenever any pending receipt is `status ===
+    'failed'`. `useMascotPose` now takes a second boolean parameter
+    (`hasFailed`, computed in `ReceiptCapture.tsx` the same way
+    `isProcessing` already was — `pendingReceipts.some(...)`) alongside
+    `isProcessing`. Priority order is `scanning > happy > error > idle`,
+    matching how `scanning`/`happy` already prioritized against each other
+    — a failed receipt sitting alongside an in-flight or just-succeeded one
+    doesn't cover it up.
+  - The 5 new source PNGs were initially added to the project's `MASCOT/`
+    source-art directory (same place the original 3 poses' full-res
+    sources live) rather than `public/mascot/`, the actual served path —
+    copied over before wiring anything up, same as every other pose asset.
+  - `e2e/mascot-pose.spec.ts` gained two tests for the new `error` state
+    (reusing `receipt-retry.spec.ts`'s "unrecognized 429 message" mock,
+    which deterministically lands a receipt in `failed` with no auto-retry
+    countdown racing the assertions): one confirming `error` shows while a
+    receipt is failed, one confirming `scanning`/`happy` still take
+    priority over it when a second receipt is captured and succeeds.
+    Capturing a second receipt while a failed one is still in the list
+    surfaced a real test-authoring gap in the shared `captureAndProcess`
+    helper — the failed row's "Retry" button shares the same testid as the
+    new row's "Process" button, so the click needed `.first()` (the
+    newest-first sort already guarantees that's the one just captured) to
+    avoid a Playwright strict-mode violation once two rows both render one.
+    `e2e/home.spec.ts`'s existing pose assertion updated from `idle` to
+    `thumbsup`. Full suite: 95/95 passing.
+- **Mascot follow-up: small inline icon on Stats/Customize + a 6th pose
+  (`receiptfound`) on History**: done and verified in production, based on
+  visual feedback on the entry above. The large centered mascot on Stats
+  and Customize pushed page content down further than intended, and on
+  Customize specifically threatened the page's existing single-screen,
+  no-scroll layout for all 11 categories.
+  - Stats and Customize both changed from a large (96px) centered mascot
+    below the `<h1>` to a small (32px) icon inline with it — the heading
+    became a `display: flex, justifyContent: 'space-between'` row with the
+    mascot on the right, roughly nav-bar-icon-sized (those default to
+    20px) but a bit larger, rather than a page-level illustration. Home and
+    About's large centered treatment was left untouched — confirmed still
+    correct, not part of this complaint.
+  - History (`HistoryPage.tsx`), which had never had a mascot at all, got
+    the same small-inline-next-to-title treatment using a new 6th pose,
+    `receiptfound` — added to `useMascotPose.ts`'s `MascotPose` union and
+    `Mascot.tsx`'s pose map the same way the previous 5 were, with its PNG
+    copied from `MASCOT/` into `public/mascot/` the same way too.
+  - Verified visually rather than assumed: `browser-harness` (the usual
+    visual-verification tool) wasn't installed in this environment and
+    setup would have required a fresh clone, so a small one-off Playwright
+    script drove `npm run preview` directly at a 390×844 mobile viewport
+    instead — screenshotted History/Stats/Customize (confirming the small
+    inline icon) and Home/About (confirming no visual change), plus a
+    `document.documentElement.scrollHeight <= window.innerHeight` check on
+    Customize specifically, which came back true (844px page height in an
+    844px viewport) — confirming all 11 categories plus the header row
+    still fit with room to spare now that the mascot is smaller. Full
+    suite: 95/95 passing (no test changes needed — nothing under test
+    asserted the old large-mascot layout).
