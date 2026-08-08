@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react'
 import { formatPrice } from '../../lib/formatPrice'
 import { cardStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
+import { Mascot } from '../mascot/Mascot'
 import { useMonthlyStats, useStatsMonths } from './useMonthlyStats'
 
 const barTrackStyle: CSSProperties = {
@@ -42,6 +43,9 @@ export function StatsPage() {
   return (
     <section data-testid="stats-page" style={pageStyle}>
       <h1 style={{ fontSize: '1.5rem' }}>Stats</h1>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <Mascot pose="onit" size={96} />
+      </div>
 
       {groups.length === 0 && (
         <p data-testid="stats-empty" style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>

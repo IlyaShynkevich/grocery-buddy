@@ -11,7 +11,7 @@ test('a genuinely fresh app open shows Home, with the mascot and a CTA to Shoppi
 
   await expect(page.getByTestId('home-page')).toBeVisible()
   await expect(page.getByTestId('home-page')).toContainText('Grocery Buddy')
-  await expect(page.getByTestId('mascot')).toHaveAttribute('data-pose', 'idle')
+  await expect(page.getByTestId('mascot')).toHaveAttribute('data-pose', 'thumbsup')
   await expect(page.getByTestId('shopping-list')).toHaveCount(0)
 
   await page.getByTestId('home-shop-button').click()

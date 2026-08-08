@@ -1,5 +1,6 @@
 import packageJson from '../../../package.json'
 import { PAGE_MAX_WIDTH, mutedTextStyle } from '../../lib/ui'
+import { Mascot } from '../mascot/Mascot'
 
 // Reached only via the top-right About icon (outside the swipeable tab set,
 // same pattern as Home) — same centered, minimal layout language as
@@ -28,6 +29,12 @@ export function AboutPage() {
         <p data-testid="about-version" style={{ ...mutedTextStyle, fontSize: '0.8rem', marginTop: '0.2rem' }}>
           v{packageJson.version}
         </p>
+      </div>
+
+      {/* Same negative-margin-under-the-title treatment as HomePage's
+          mascot, for a consistent "standing just below it" read. */}
+      <div style={{ marginTop: '-0.5rem' }}>
+        <Mascot pose="thankyou" size={150} />
       </div>
 
       {/* Left-aligned within the otherwise-centered page — bullet text reads

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { CATEGORIES, type Category } from '../../db/categories'
 import { cardStyle, iconButtonStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
+import { Mascot } from '../mascot/Mascot'
 import { useCategoryNotes } from './useCategoryNotes'
 
 /**
@@ -89,6 +90,9 @@ export function CustomizePage() {
   return (
     <section data-testid="customize-page" style={pageStyle}>
       <h1 style={{ fontSize: '1.5rem' }}>Customize</h1>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <Mascot pose="excited" size={96} />
+      </div>
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>
         Add personal notes on items that are NOT essential for you, within each category.
       </p>

@@ -20,7 +20,8 @@ export function ReceiptCapture() {
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const isProcessing = pendingReceipts.some((receipt) => receipt.status === 'processing')
-  const mascotPose = useMascotPose(isProcessing)
+  const hasFailed = pendingReceipts.some((receipt) => receipt.status === 'failed')
+  const mascotPose = useMascotPose(isProcessing, hasFailed)
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]

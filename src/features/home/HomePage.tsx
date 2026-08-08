@@ -32,7 +32,7 @@ export function HomePage({ onShop }: HomePageProps) {
       {/* Negative margin pulls the mascot right up under the title, reading
           as "standing just below it" rather than floating with its own gap. */}
       <div style={{ marginTop: '-0.5rem' }}>
-        <Mascot pose="idle" size={150} />
+        <Mascot pose="thumbsup" size={150} />
       </div>
       <button
         type="button"
