@@ -296,6 +296,26 @@ control are ignored outright (those need full native touch ownership).
 during the ambiguous window is what stops the browser from also
 rubber-banding the page horizontally underneath a committed swipe.
 
+**Mascot** (`src/features/mascot/`) appears on every tab, but only one of
+them drives it off live state. `Mascot.tsx` is a dumb `<img>` keyed by a
+`MascotPose` union (`idle`/`scanning`/`happy`/`error`/`thumbsup`/
+`thankyou`/`excited`/`onit`/`receiptfound`, each mapped to a
+`public/mascot/*.png`) — it has no logic of its own. `useMascotPose.ts` is
+the one hook with actual pose logic, and it's only wired up on Shopping
+List (`ReceiptCapture.tsx`): `scanning` while any pending receipt is
+`processing`, else `happy` once a done-and-unreviewed receipt shows up
+(persisting until the trip is saved), else `error` while any receipt is
+`failed`, else `idle` — that priority order (`scanning > happy > error >
+idle`) is deliberate, so an in-flight or just-succeeded scan is never
+covered up by an older failure sitting alongside it. Every other page just
+renders `<Mascot pose="..." />` with a fixed pose and no hook involved:
+Home (`thumbsup`) and About (`thankyou`) show it large and centered as a
+page-level illustration; History (`receiptfound`), Stats (`onit`), and
+Customize (`excited`) show it small (32px) inline next to the `<h1>` — kept
+small on those three specifically so it doesn't push list/chart/accordion
+content down (Customize in particular needs all 11 categories to fit one
+screen without scrolling).
+
 ## 7. Testing approach
 
 **E2E tests run against `npm run preview` (a real production build), never
