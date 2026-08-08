@@ -42,9 +42,9 @@ export function StatsPage() {
 
   return (
     <section data-testid="stats-page" style={pageStyle}>
-      <h1 style={{ fontSize: '1.5rem' }}>Stats</h1>
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <Mascot pose="onit" size={96} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 style={{ fontSize: '1.5rem' }}>Stats</h1>
+        <Mascot pose="onit" size={32} />
       </div>
 
       {groups.length === 0 && (

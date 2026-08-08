@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
 import { cardStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
+import { Mascot } from '../mascot/Mascot'
 import { groupTripsByMonth, useHistory } from './useHistory'
 
 export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) => void }) {
@@ -13,7 +14,10 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
 
   return (
     <section data-testid="history-page" style={pageStyle}>
-      <h1 style={{ fontSize: '1.5rem' }}>History</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 style={{ fontSize: '1.5rem' }}>History</h1>
+        <Mascot pose="receiptfound" size={32} />
+      </div>
 
       {trips.length === 0 && <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>No saved trips yet.</p>}
 
