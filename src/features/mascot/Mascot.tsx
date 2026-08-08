@@ -9,6 +9,7 @@ const MASCOT_SRC: Record<MascotPose, string> = {
   thankyou: '/mascot/thankyou.png',
   excited: '/mascot/excited.png',
   onit: '/mascot/onit.png',
+  receiptfound: '/mascot/receiptfound.png',
 }
 
 export function Mascot({ pose, size = 64 }: { pose: MascotPose; size?: number }) {

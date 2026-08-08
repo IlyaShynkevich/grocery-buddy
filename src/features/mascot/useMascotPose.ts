@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usePendingReceipt } from '../receipt-review/usePendingReceipt'
 import { useActiveTripId } from '../trip/useActiveTripId'
 
-export type MascotPose = 'idle' | 'scanning' | 'happy' | 'error' | 'thumbsup' | 'thankyou' | 'excited' | 'onit'
+export type MascotPose = 'idle' | 'scanning' | 'happy' | 'error' | 'thumbsup' | 'thankyou' | 'excited' | 'onit' | 'receiptfound'
 
 /**
  * scanning while a receipt is actively being extracted, happy once

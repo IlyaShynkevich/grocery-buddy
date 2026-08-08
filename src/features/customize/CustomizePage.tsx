@@ -89,9 +89,9 @@ function CategoryNotes({ category }: { category: Category }) {
 export function CustomizePage() {
   return (
     <section data-testid="customize-page" style={pageStyle}>
-      <h1 style={{ fontSize: '1.5rem' }}>Customize</h1>
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <Mascot pose="excited" size={96} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 style={{ fontSize: '1.5rem' }}>Customize</h1>
+        <Mascot pose="excited" size={32} />
       </div>
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>
         Add personal notes on items that are NOT essential for you, within each category.
