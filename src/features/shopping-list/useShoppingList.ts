@@ -37,10 +37,14 @@ export function useShoppingList() {
     await db.items.delete(itemId)
   }
 
+  const toggleItemChecked = async (itemId: number, checked: boolean) => {
+    await db.items.update(itemId, { checked })
+  }
+
   const saveTrip = async () => {
     if (!tripId) return
     await completeTrip(tripId)
   }
 
-  return { trip, items: items ?? [], addItem, renameItem, removeItem, saveTrip }
+  return { trip, items: items ?? [], addItem, renameItem, removeItem, toggleItemChecked, saveTrip }
 }

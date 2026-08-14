@@ -5,7 +5,7 @@ import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../
 import { useShoppingList } from './useShoppingList'
 
 export function ShoppingListPage() {
-  const { trip, items, addItem, renameItem, removeItem, saveTrip } = useShoppingList()
+  const { trip, items, addItem, renameItem, removeItem, toggleItemChecked, saveTrip } = useShoppingList()
   const [draftName, setDraftName] = useState('')
 
   // The list is always collapsible via the toggle, in either direction, at
@@ -74,11 +74,25 @@ export function ShoppingListPage() {
             style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.5rem' }}
           >
             <input
+              type="checkbox"
+              checked={item.checked}
+              onChange={(e) => toggleItemChecked(item.id, e.target.checked)}
+              aria-label={item.checked ? `Mark ${item.name} as not grabbed` : `Mark ${item.name} as grabbed`}
+              data-testid="shopping-list-item-checkbox"
+            />
+            <input
               type="text"
               value={item.name}
               onChange={(e) => renameItem(item.id, e.target.value)}
               aria-label={`Edit ${item.name}`}
-              style={{ flex: 1, background: 'transparent', border: '1px solid transparent' }}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: '1px solid transparent',
+                ...(item.checked
+                  ? { textDecoration: 'line-through', color: 'var(--text-muted)' }
+                  : {}),
+              }}
             />
             <button
               type="button"
