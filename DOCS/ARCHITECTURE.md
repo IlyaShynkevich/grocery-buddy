@@ -224,11 +224,39 @@ possibly succeed differently.
 ## 5. PWA/offline behavior
 
 Configured via `vite-plugin-pwa` in `vite.config.ts` (`registerType:
-'autoUpdate'`, Workbox `generateSW` strategy precaching every built
-`js/css/html/png/svg/ico` asset). **`npm run dev` has no service worker at
-all** — Vite's dev server doesn't build one; this is exactly why offline/PWA
-behavior has to be tested against `npm run preview` (a real production
-build), see §7.
+'autoUpdate'`, Workbox `generateSW` strategy). **`npm run dev` has no
+service worker at all** — Vite's dev server doesn't build one; this is
+exactly why offline/PWA behavior has to be tested against `npm run
+preview` (a real production build), see §7.
+
+**Caching strategy is deliberately split by resource type.** JS/CSS/images
+(`workbox.globPatterns: ['**/*.{js,css,png,svg,ico}']`) are precached and
+served cache-first, same as any typical PWA asset — their content isn't
+secret and `middleware.ts` (§8) already gates them at the network layer
+for any request that does reach it. **The HTML documents
+(`index.html`/`login.html`) are deliberately excluded from precaching
+entirely**, and navigations (`request.mode === 'navigate'`) instead go
+through a `runtimeCaching` entry using Workbox's `NetworkFirst` handler
+(`cacheName: 'pages'`, `networkTimeoutSeconds: 4`) — every navigation
+tries the real network first, falling back to whatever was last
+successfully cached only when genuinely offline. This is load-bearing for
+§8's auth gate, not just an offline nicety: `middleware.ts` only ever runs
+for requests that actually reach Vercel, so a cache-first navigation
+strategy (Workbox's `generateSW` default, `navigateFallback:
+'index.html'`) would let a returning visitor's cached app shell bypass the
+gate forever, silently, for every single visit — not a one-time stale-SW
+transition. Setting `navigateFallback: ''` alone does **not** disable this
+on its own: `workbox-precaching`'s `precacheAndRoute()` registers its own
+route with a `directoryIndex: 'index.html'` default, matching `/` against
+whatever's precached, registered *before* any `runtimeCaching` route and
+completely independent of `navigateFallback` — the HTML files have to be
+kept out of the precache manifest entirely (via `globPatterns`) for that
+built-in route to have nothing left to match. Verified with a throwaway
+probe reading a counter from inside the service worker's own execution
+context (`context.serviceWorkers()[0].evaluate(...)`) — `page.route()`/
+`context.route()` can't observe this distinction at all, since a response
+Workbox answers purely from Cache Storage never becomes a new
+network-level request in the first place.
 
 **What works fully offline**: viewing/editing the shopping list, adding
 items, capturing a receipt photo (stored straight into IndexedDB as a
@@ -390,6 +418,17 @@ cookie (`api/_lib/auth.ts`, Web Crypto HMAC-SHA256 over an expiry
 timestamp, keyed by `APP_PASSWORD` itself) — no session store, verified
 fresh on every request in both the Edge (`middleware.ts`) and Node
 (`api/login.ts`) runtimes from the one shared module.
+
+This gate only works because navigations are network-first, not
+cache-first — see §5's caching-strategy split for why, and why a
+cache-first shell would otherwise let it be silently bypassed forever by
+any returning visitor. `vercel.json` additionally sets
+`Cache-Control: no-cache` on `/sw.js` so browsers never skip their own
+service-worker update check due to HTTP caching on the SW script itself —
+Workbox's own documented best practice, and the fastest realistic lever
+for an already-affected visitor's browser to pick up a fix like this one,
+short of them knowing to unregister the service worker manually in
+DevTools.
 
 Per `CLAUDE.md`'s git workflow: pushing to `main` triggers a Production
 deploy; any other branch or open PR gets its own auto-generated Preview
