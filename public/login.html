@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Log in — Grocery Buddy</title>
+    <style>
+      :root {
+        /* Same grayscale palette as src/index.css, duplicated here since
+           this page is a standalone static file (not part of the Vite
+           build) and must be reachable before any app asset loads. */
+        --text: #1a1a1a;
+        --text-muted: rgba(26, 26, 26, 0.62);
+        --bg: #ffffff;
+        --surface: #f5f5f6;
+        --surface-hover: #ebebec;
+        --border: #e0e0e0;
+        --border-strong: #b7b7bc;
+        --accent: #3f3f46;
+        --accent-hover: #27272a;
+        --accent-contrast: #ffffff;
+        --danger: #c62828;
+        --radius: 10px;
+        --radius-sm: 6px;
+
+        color-scheme: light dark;
+        font: 16px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --text: #f3f4f6;
+          --text-muted: rgba(243, 244, 246, 0.6);
+          --bg: #16171d;
+          --surface: #1e1f27;
+          --surface-hover: #262733;
+          --border: #2d2e38;
+          --border-strong: #63646f;
+          --accent: #a1a1aa;
+          --accent-hover: #c3c3ca;
+          --accent-contrast: #16171d;
+          --danger: #f28b82;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100svh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      main {
+        width: 100%;
+        max-width: 320px;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        margin: 0;
+        text-align: center;
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+
+      input[type='password'] {
+        font: inherit;
+        color: var(--text);
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 0.6rem 0.7rem;
+      }
+
+      input[type='password']:focus-visible {
+        outline: 2px solid var(--border-strong);
+        outline-offset: 2px;
+      }
+
+      button {
+        font: inherit;
+        font-weight: 600;
+        color: var(--accent-contrast);
+        background: var(--accent);
+        border: 1px solid var(--accent);
+        border-radius: var(--radius-sm);
+        padding: 0.6rem 0.9rem;
+        cursor: pointer;
+      }
+
+      button:hover:not(:disabled) {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      p[data-error] {
+        margin: 0;
+        color: var(--danger);
+        font-size: 0.85rem;
+        min-height: 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Grocery Buddy</h1>
+      <form id="login-form">
+        <input
+          type="password"
+          name="password"
+          data-testid="login-password"
+          placeholder="Password"
+          aria-label="Password"
+          autocomplete="current-password"
+          autofocus
+          required
+        />
+        <button type="submit" data-testid="login-submit">Log in</button>
+        <p data-error data-testid="login-error" role="alert"></p>
+      </form>
+    </main>
+
+    <script>
+      const form = document.getElementById('login-form')
+      const errorEl = form.querySelector('[data-error]')
+      const submitButton = form.querySelector('button')
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault()
+        errorEl.textContent = ''
+        submitButton.disabled = true
+
+        const password = new FormData(form).get('password')
+        try {
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ password }),
+          })
+          if (res.ok) {
+            const params = new URLSearchParams(window.location.search)
+            const next = params.get('next')
+            // Only ever redirect to a same-site path — a leading "//" would
+            // be a protocol-relative URL (e.g. "//evil.com"), so it's
+            // explicitly excluded alongside anything not starting with "/".
+            const isSafeNext = next && next.startsWith('/') && !next.startsWith('//')
+            window.location.href = isSafeNext ? next : '/'
+            return
+          }
+          const data = await res.json().catch(() => null)
+          errorEl.textContent = data?.error || 'Login failed — try again.'
+        } catch {
+          errorEl.textContent = 'Connection issue — try again.'
+        } finally {
+          submitButton.disabled = false
+        }
+      })
+    </script>
+  </body>
+</html>

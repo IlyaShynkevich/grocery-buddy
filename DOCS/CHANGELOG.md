@@ -1092,3 +1092,68 @@ summary of each milestone below and points back here for details.
     still fit with room to spare now that the mascot is smaller. Full
     suite: 95/95 passing (no test changes needed — nothing under test
     asserted the old large-mascot layout).
+- **Password gate for the Production deployment**: done and verified in
+  production. Both `grocery-buddy` (personal, real `OPENAI_API_KEY`) and
+  `grocery-buddy-demo` (public showcase, no key) were previously wide open
+  — anyone with the Production URL could trigger `api/extract-receipt.ts`
+  and run up a real OpenAI bill. Vercel's built-in Password Protection only
+  covers Preview deployments on Hobby, not Production, so this had to be
+  built into the app/serverless layer itself. Plan reviewed and approved
+  before implementation (security approach, especially how
+  `extract-receipt` gets protected server-side rather than just hidden
+  behind a client-side login screen).
+  - New Vercel Edge Middleware (`middleware.ts`, repo root) runs on every
+    request by default (no `config.matcher`, deliberately — the gate has to
+    cover the SPA shell, static assets, and `api/extract-receipt`, not a
+    hand-picked subset). Gated on a new `APP_PASSWORD` env var using the
+    exact same convention `OPENAI_API_KEY`/demo-mode already established:
+    unset entirely on the Demo project → the middleware's first line is a
+    no-op pass-through, so Demo stays byte-for-byte as open as before
+    despite sharing the identical file.
+  - Session is a stateless, signed cookie (`gb_auth`, ~180 days) — no
+    session store, no database. `api/_lib/auth.ts` (new) mints/verifies a
+    `"<expiresAtMs>.<hex HMAC-SHA256 signature>"` token via Web Crypto
+    `crypto.subtle`, signed with `APP_PASSWORD` itself as the HMAC key
+    (rotating the password instantly invalidates every existing session —
+    a feature, not an oversight). Shared unmodified between `middleware.ts`
+    (Edge runtime) and the new `api/login.ts` (Node runtime, `@vercel/node`)
+    since both expose Web Crypto.
+  - Unauthenticated requests: `/login.html` and `/api/login` always pass
+    through; `/api/*` otherwise gets a `401` JSON response (the actual
+    protection for `extract-receipt`, enforced before the function ever
+    runs — not a client-side screen a determined user could bypass in
+    devtools); anything else redirects (307) to
+    `/login.html?next=<original path>`.
+  - New `public/login.html` — a standalone static page (not a React route;
+    the SPA has no URL router at all, everything is in-memory `view` state
+    in `App.tsx`), reachable before any app JS loads since Vite copies
+    `public/` straight to the build root. Styled with the same CSS custom
+    properties `src/index.css` defines (light/dark via
+    `prefers-color-scheme`), duplicated inline since this file sits outside
+    the Vite build. Redirects to `?next=` on success, guarding against an
+    open-redirect via a protocol-relative `next` value (e.g. `//evil.com`).
+  - `api/login.ts` compares the submitted password with Node's
+    `crypto.timingSafeEqual` (constant-time) and, on match, sets the
+    `Set-Cookie` header via `signSession()`. No rate-limiting/lockout in
+    application code — deliberately deferred to a native Vercel Firewall
+    rate-limit rule (Settings → Firewall, free on Hobby) scoped to
+    `/api/login` and `/api/extract-receipt`, configured directly in the
+    dashboard rather than adding a KV/Upstash dependency for a personal,
+    single-user app's threat model.
+  - `tsconfig.api.json`'s `include` extended to cover the new root-level
+    `middleware.ts` so `npm run build`'s `tsc -b` type-checks it too, same
+    as everything under `api/`.
+  - Test coverage split across what's actually exercisable under `vite
+    preview` (Vercel Edge Middleware doesn't run there, same constraint
+    `extract-receipt` already lives with via `page.route` mocking): a new
+    `e2e/auth-session.spec.ts` imports `api/_lib/auth.ts` directly (no
+    `page` needed — Playwright test bodies run in Node) to cover the actual
+    security-critical sign/verify logic — valid round-trip, wrong secret,
+    tampered signature, tampered expiry, expired token, malformed input; a
+    new `e2e/login-page.spec.ts` covers `login.html`'s own client-side
+    behavior against a mocked `/api/login` (wrong password shows an inline
+    error, correct password redirects to `/` or a safe `?next=`, an unsafe
+    `?next=` falls back to `/`, a network failure shows a friendly
+    message). The actual server-side enforcement (middleware redirecting an
+    unauthenticated request, a real cookie round-tripping) was verified
+    manually against a Preview deployment instead, per the plan.

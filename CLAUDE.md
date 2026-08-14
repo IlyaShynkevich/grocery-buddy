@@ -27,6 +27,10 @@ section is just a short index into it.
   history's internally-scrollable trip list with a sticky month header, and
   several Groq extraction reliability fixes (429 handling, retry-backoff
   races, output-token truncation).
+- **Password gate**: the Production deployment (not the public demo) is
+  gated behind a shared password, enforced server-side via a Vercel Edge
+  Middleware (`middleware.ts`) — see `DOCS/ARCHITECTURE.md` §8 and the
+  `APP_PASSWORD` entry in `README.md`'s Environment variables section.
 
 See "Known limitations" and "Planned" below for what's still outstanding.
 For the full narrative — what broke, how it was diagnosed, and exactly what
