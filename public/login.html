@@ -121,11 +121,20 @@
         font-size: 0.85rem;
         min-height: 1.2em;
       }
+
+      .mascot {
+        display: block;
+        margin: 0 auto -0.5rem;
+      }
     </style>
   </head>
   <body>
     <main>
       <h1>Grocery Buddy</h1>
+      <!-- Same centered-mascot-below-title layout as HomePage/AboutPage
+           (negative margin pulls it up under the title) — no Mascot.tsx
+           here since this is a standalone static page, not a React route. -->
+      <img class="mascot" src="/mascot/idle.png" alt="" width="120" height="120" data-testid="login-mascot" />
       <form id="login-form">
         <input
           type="password"

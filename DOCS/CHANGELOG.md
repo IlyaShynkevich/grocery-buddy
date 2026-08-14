@@ -1157,6 +1157,9 @@ summary of each milestone below and points back here for details.
     message). The actual server-side enforcement (middleware redirecting an
     unauthenticated request, a real cookie round-tripping) was verified
     manually against a Preview deployment instead, per the plan.
+HEAD
+Updated upstream
+origin/main
 - **Fix: a cache-first service worker silently bypassed the password gate
   for any returning visitor**: done and verified in production. Manual
   post-deploy testing found the real bug — a browser with a service worker
@@ -1228,3 +1231,18 @@ summary of each milestone below and points back here for details.
     gate needs the same network-first navigation strategy or it's silently
     unenforceable forever for a returning visitor, not just during a
     one-time stale-SW transition window.
+HEAD
+- **Auth polish: shorter session, mascot on the login page**: done and
+  verified in production.
+  - `SESSION_DURATION_MS` (`api/_lib/auth.ts`) reduced from ~180 days to 7
+    — both `middleware.ts`'s verification and `api/login.ts`'s cookie
+    `Max-Age` derive from this one constant, so both stayed in sync
+    automatically with no separate edit needed.
+  - `public/login.html` gained the mascot (`idle` pose,
+    `/mascot/idle.png`, plain `<img>` since this is a standalone static
+    page with no `Mascot.tsx` available), positioned above the "Grocery
+    Buddy" title with the same negative-margin "standing just below it"
+    treatment Home/About already use. Verified visually with a Playwright
+    screenshot in both light and dark mode before calling it done.
+Stashed changes
+origin/main
