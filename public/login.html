@@ -130,11 +130,12 @@
   </head>
   <body>
     <main>
-      <h1>Grocery Buddy</h1>
-      <!-- Same centered-mascot-below-title layout as HomePage/AboutPage
-           (negative margin pulls it up under the title) — no Mascot.tsx
-           here since this is a standalone static page, not a React route. -->
+      <!-- Mascot above the title (negative bottom margin pulls the title up
+           closer to it), same centered-mascot-above-title layout as
+           HomePage/AboutPage — no Mascot.tsx here since this is a
+           standalone static page, not a React route. -->
       <img class="mascot" src="/mascot/idle.png" alt="" width="120" height="120" data-testid="login-mascot" />
+      <h1>Grocery Buddy</h1>
       <form id="login-form">
         <input
           type="password"

@@ -1157,9 +1157,6 @@ summary of each milestone below and points back here for details.
     message). The actual server-side enforcement (middleware redirecting an
     unauthenticated request, a real cookie round-tripping) was verified
     manually against a Preview deployment instead, per the plan.
-HEAD
-Updated upstream
-origin/main
 - **Fix: a cache-first service worker silently bypassed the password gate
   for any returning visitor**: done and verified in production. Manual
   post-deploy testing found the real bug — a browser with a service worker
@@ -1231,7 +1228,6 @@ origin/main
     gate needs the same network-first navigation strategy or it's silently
     unenforceable forever for a returning visitor, not just during a
     one-time stale-SW transition window.
-HEAD
 - **Auth polish: shorter session, mascot on the login page**: done and
   verified in production.
   - `SESSION_DURATION_MS` (`api/_lib/auth.ts`) reduced from ~180 days to 7
@@ -1244,5 +1240,39 @@ HEAD
     Buddy" title with the same negative-margin "standing just below it"
     treatment Home/About already use. Verified visually with a Playwright
     screenshot in both light and dark mode before calling it done.
-Stashed changes
-origin/main
+- **Fix: mascot on the login page rendered blank and sat in the wrong
+  position**: done and verified in production. Confirmed via screenshot
+  on the real deployment — the previous entry's local `vite preview`
+  screenshot couldn't have caught this, since `middleware.ts` (the actual
+  cause) doesn't run there.
+  - Root cause: `middleware.ts` only ever excluded `/login.html` and
+    `/api/login` from the auth gate. An unauthenticated request for
+    `/mascot/idle.png` (exactly the state you're in while looking at the
+    login page) got the same `307` redirect to `/login.html` as any other
+    gated path — and since the browser requested it as an `<img>`, it
+    rendered the resulting HTML response as a broken image instead of a
+    picture. Fixed by also passing through any `/mascot/*` path
+    (decorative art, no cost/security concern in serving it to a
+    logged-out visitor, same rationale as the two paths already excluded).
+  - Also fixed the visual order in `public/login.html`: the mascot
+    `<img>` now comes before the `<h1>` (with the negative bottom margin
+    moved onto the image instead), matching Home/About's actual
+    mascot-above-title layout — the previous pass had copied Home's DOM
+    order literally (title first) without noticing Home's own mascot
+    visually reads as *below* its title, not above it.
+  - Added `e2e/middleware-static-assets.spec.ts`, importing and calling
+    `middleware.ts`'s default export directly in Node (same technique
+    `auth-session.spec.ts` uses for `api/_lib/auth.ts` — no Edge runtime
+    needed, since middleware.ts only touches standard Web APIs +
+    `@vercel/edge`'s `next()`) — the only way to exercise this file's
+    routing logic at all, since it never runs under `vite preview`.
+    Confirmed the mascot-passthrough spec genuinely catches the bug by
+    running it against the pre-fix `middleware.ts` and watching it fail
+    before restoring the fix. Full suite: 114/114 passing.
+  - Also found and cleaned up unrelated leftover merge/stash conflict
+    debris already committed into `DOCS/CHANGELOG.md` (stray `HEAD`/
+    `Updated upstream`/`Stashed changes`/`origin/main` label lines, from
+    an earlier merge — the actual `<<<<<<<`/`=======`/`>>>>>>>` markers
+    were already gone, just these stray labels remained) — noticed while
+    editing this file for the entry above, unrelated to the login-page fix
+    itself.
