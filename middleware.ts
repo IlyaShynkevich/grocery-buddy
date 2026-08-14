@@ -27,7 +27,16 @@ export default async function middleware(request: Request) {
   if (!appPassword) return next()
 
   const url = new URL(request.url)
-  if (url.pathname === '/login.html' || url.pathname === '/api/login') return next()
+  // /mascot/* is decorative art the login page itself needs to render
+  // (public/login.html's <img src="/mascot/idle.png">) — without this,
+  // that request gets 307-redirected to /login.html same as any other
+  // unauthenticated path, and the browser renders that HTML response as a
+  // broken image since it asked for one. No security concern in serving
+  // these to a logged-out visitor: static, non-secret art, same rationale
+  // already applied to /login.html and /api/login below.
+  if (url.pathname === '/login.html' || url.pathname === '/api/login' || url.pathname.startsWith('/mascot/')) {
+    return next()
+  }
 
   if (await verifySession(getCookie(request, AUTH_COOKIE_NAME), appPassword)) return next()
 
