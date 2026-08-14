@@ -34,6 +34,8 @@ export interface Item {
    * in recomputeTripTotal so the trip total matches the receipt.
    */
   isDiscount: boolean
+  /** Whether the item has been physically grabbed while shopping — purely a UI checkbox, unrelated to essential/price. */
+  checked: boolean
 }
 
 export interface SuggestedItemMatch {
@@ -110,6 +112,12 @@ db.version(3).stores({
   categoryNotes: '++id, categoryKey',
 })
 
+db.version(4)
+  .stores({})
+  .upgrade(async (tx) => {
+    await tx.table('items').toCollection().modify({ checked: false })
+  })
+
 function todayDateString(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -137,6 +145,7 @@ export function newItem(
     essentialOverride: null,
     source: 'typed',
     isDiscount: false,
+    checked: false,
     ...overrides,
   }
 }
