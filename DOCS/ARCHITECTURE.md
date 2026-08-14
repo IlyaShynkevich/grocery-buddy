@@ -28,11 +28,15 @@ Three pieces, two of which never talk to each other directly:
   normally" even when the app has no `OPENAI_API_KEY` at all (demo mode,
   §3/§4/§8) — those features never depended on the server in the first
   place.
-- **The only server-side code is one function.** `api/extract-receipt.ts`
-  exists purely to keep the OpenAI API key off the client (a browser can't
-  hold a secret). It does no persistence of its own — every request is
-  stateless in, JSON out. `api/_lib/openaiExtract.ts` is the actual OpenAI
-  client + response parser, imported by that one handler.
+- **Server-side code is two small functions plus one middleware.**
+  `api/extract-receipt.ts` exists purely to keep the OpenAI API key off the
+  client (a browser can't hold a secret); `api/_lib/openaiExtract.ts` is
+  the actual OpenAI client + response parser it imports. `api/login.ts`
+  verifies the shared app password and issues a signed session cookie.
+  `middleware.ts` (Vercel Edge Middleware, §8) gates every request —
+  including both functions above — behind that cookie. None of these hold
+  any persistence of their own: every request is stateless in, JSON/cookie
+  out.
 - **No accounts, no sync, no server database.** Single-user by design (see
   the spec) — everything durable lives in the browser's IndexedDB via
   Dexie. Reinstalling the PWA or clearing site data loses everything;
@@ -367,7 +371,25 @@ configured differently:
   instead of a 500, which the frontend turns into a friendly "scanning is
   disabled in this public demo" message rather than an alarming error.
   Every other feature works identically to Production, since none of them
-  touch the API key at all (§1).
+  touch the API key at all (§1). `APP_PASSWORD` (below) is likewise never
+  set here, so Demo also stays open with no login gate.
+
+Production is additionally gated behind a shared password —
+`middleware.ts` (Vercel Edge Middleware, repo root) checks an
+`APP_PASSWORD` env var on every request before it reaches either a static
+asset or a serverless function, redirecting an unauthenticated page
+request to `public/login.html` and returning a `401` for an unauthenticated
+`/api/*` request (including `extract-receipt`) — the actual cost-risk
+route is blocked server-side, not just hidden behind a client-side screen.
+Exactly the same "env var absence turns the feature off" convention as
+`OPENAI_API_KEY`/demo-mode above: `APP_PASSWORD` is set only on the
+Production project's dashboard, never on Demo, so `middleware.ts`'s first
+line (`if (!process.env.APP_PASSWORD) return`) is a no-op there despite
+both projects running the identical file. Session is a stateless signed
+cookie (`api/_lib/auth.ts`, Web Crypto HMAC-SHA256 over an expiry
+timestamp, keyed by `APP_PASSWORD` itself) — no session store, verified
+fresh on every request in both the Edge (`middleware.ts`) and Node
+(`api/login.ts`) runtimes from the one shared module.
 
 Per `CLAUDE.md`'s git workflow: pushing to `main` triggers a Production
 deploy; any other branch or open PR gets its own auto-generated Preview

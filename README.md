@@ -1,7 +1,8 @@
 # Grocery Buddy
 
 Personal, mobile-first grocery budget tracker, built as an installable PWA.
-Single-user, no auth. See
+Single-user, gated behind one shared password on the Production deployment
+(the public demo below stays open). See
 [`DOCS/grocery-buddy-spec.md`](DOCS/grocery-buddy-spec.md) for the original
 concept spec and data model.
 
@@ -101,6 +102,20 @@ they don't share values:
   Production and Preview). Vercel does **not** read `.env.local` — if the
   key is only in `.env.local`, the deployed app's serverless function will
   fail with an auth error even though local dev works fine.
+
+`APP_PASSWORD` gates access to the whole app (a Vercel Edge Middleware —
+`middleware.ts` — checks it on every request, including
+`api/extract-receipt.ts`, before anything else runs). Same two-places
+framing as `OPENAI_API_KEY`, plus one more wrinkle:
+
+- Set it in the Vercel dashboard the same way, but **only on the
+  Production project** — leave it unset on the Demo project
+  (`grocery-buddy-demo`), which is what keeps Demo publicly open. Setting
+  it there too would gate the public showcase, defeating its purpose.
+- If unset entirely (e.g. local dev, or Demo), `middleware.ts` is a
+  complete no-op — same "absent env var turns the feature off" convention
+  `OPENAI_API_KEY`'s demo-mode branch already uses, so local dev never
+  needs a password to work with.
 
 ## Testing
 
