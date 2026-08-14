@@ -1157,3 +1157,74 @@ summary of each milestone below and points back here for details.
     message). The actual server-side enforcement (middleware redirecting an
     unauthenticated request, a real cookie round-tripping) was verified
     manually against a Preview deployment instead, per the plan.
+- **Fix: a cache-first service worker silently bypassed the password gate
+  for any returning visitor**: done and verified in production. Manual
+  post-deploy testing found the real bug — a browser with a service worker
+  registered from before the password-gate deploy kept serving the app
+  directly, never touching the network, so `middleware.ts` never ran.
+  Investigated (not guessed) before proposing a fix, per the plan: read the
+  generated `dist/sw.js` and empirically tested against the real build
+  with a throwaway Playwright probe.
+  - Root cause was two layers deep, and the first attempted fix (setting
+    `workbox.navigateFallback: ''` alone) genuinely did not work — verified
+    with the same probe, still 0 network fetches after rebuilding.
+    `vite-plugin-pwa`'s `generateSW` default (`navigateFallback:
+    'index.html'`) registers a catch-all `NavigationRoute` answering every
+    navigation from Cache Storage, but disabling it isn't sufficient:
+    `workbox-precaching`'s `precacheAndRoute()` separately registers its
+    own route with a `directoryIndex: 'index.html'` default
+    (`node_modules/workbox-precaching/src/utils/generateURLVariations.ts`),
+    matching `/` against the precache manifest, registered *before* any
+    custom route and completely independent of `navigateFallback`.
+  - Real fix, verified working: dropped `html` from
+    `vite.config.ts`'s `workbox.globPatterns` (so `index.html`/`login.html`
+    are never precached at all — nothing left for `directoryIndex`
+    matching to intercept) and added a `runtimeCaching` entry matching
+    `request.mode === 'navigate'` with Workbox's `NetworkFirst` handler
+    (`cacheName: 'pages'`, `networkTimeoutSeconds: 4`). Confirmed via the
+    probe: online reload went from 0 to 1 network fetch attempted inside
+    the SW's own execution context. Confirmed offline still works too:
+    after one online reload (priming the `pages` cache),
+    `context.setOffline(true)` + reload still rendered real app content,
+    not a browser error page — `NetworkFirst`'s built-in cache fallback
+    covers "already-visited, now offline" for free. JS/CSS/images
+    untouched (still precached/cache-first, per the explicit ask — not a
+    security boundary, and `middleware.ts` already gates them at the
+    network layer for any request that does reach it).
+  - `page.route()`/`context.route()` cannot observe any of this — a
+    response Workbox answers purely from Cache Storage never becomes a new
+    network-level request, so route interception simply never fires either
+    way. The technique that worked: reading a counter/cache-entry-count
+    from *inside* the service worker's own execution context via
+    `context.serviceWorkers()[0].evaluate(...)`.
+  - Existing-user remediation: the currently-deployed old client already
+    has automatic update-detect-then-reload wired up
+    (`registerType: 'autoUpdate'` + `main.tsx`'s `registerSW({immediate:
+    true})` → `vite-plugin-pwa`'s `register.js` auto-reloads on SW
+    activation, no prompt needed — already exceeds "at minimum, prompt
+    them"). The actual gap was update-*detection* latency (browsers
+    throttle the automatic check to ~once/24h, further maskable by HTTP
+    caching on `sw.js` itself), not missing reload logic — and no
+    client-side trick can retroactively fix a tab already stuck on old JS,
+    stated plainly rather than overclaiming an instant fix. Added a new
+    `vercel.json` setting `Cache-Control: no-cache` on `/sw.js` (Workbox's
+    own documented best practice, and the highest-leverage lever available
+    since it benefits the very next check the browser performs on its own
+    schedule, with zero dependency on any currently-affected user's stale
+    JS) and an explicit `registration.update()` call in `main.tsx` after
+    `registerSW` (tightens detection for every future deploy once a
+    browser has picked up this fix by whatever path it does).
+  - Added `e2e/sw-navigation-strategy.spec.ts`: one spec asserting an
+    online reload results in exactly 1 entry in the `pages` runtime cache
+    (0 before, since the very first `goto` is never SW-controlled — a page
+    can't be intercepted by the service worker it's in the middle of
+    registering); one spec confirming an offline reload after a prior
+    online visit still renders real content. Confirmed the first spec
+    genuinely regression-tests the fix (not accidentally-always-green) by
+    running it against the pre-fix config and watching it fail (0 vs
+    expected 1) before restoring the fix. Full suite: 111/111 passing.
+  - Documented as a "Known gotcha" in `CLAUDE.md` — a server-side auth
+    check only runs for requests that reach the network, so any future
+    gate needs the same network-first navigation strategy or it's silently
+    unenforceable forever for a returning visitor, not just during a
+    one-time stale-SW transition window.

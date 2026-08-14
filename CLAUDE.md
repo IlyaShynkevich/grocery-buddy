@@ -31,6 +31,10 @@ section is just a short index into it.
   gated behind a shared password, enforced server-side via a Vercel Edge
   Middleware (`middleware.ts`) — see `DOCS/ARCHITECTURE.md` §8 and the
   `APP_PASSWORD` entry in `README.md`'s Environment variables section.
+  Post-deploy fix: the service worker's navigation caching strategy had to
+  change from cache-first to network-first, or a returning visitor's
+  cached app shell silently bypassed the gate forever — see "Known
+  gotchas" below.
 
 See "Known limitations" and "Planned" below for what's still outstanding.
 For the full narrative — what broke, how it was diagnosed, and exactly what
@@ -66,6 +70,24 @@ changed — see `DOCS/CHANGELOG.md`.
   URL works fine on desktop or in emulation. Always test in an
   incognito/private tab first to rule out caching before assuming the code
   is broken.
+- **A server-side gate (middleware.ts's auth check) only runs for requests
+  that actually reach the network — a cache-first service worker
+  navigation strategy silently defeats it, permanently, not just as a
+  one-time stale-SW transition.** `vite-plugin-pwa`'s `generateSW` default
+  (`navigateFallback: 'index.html'`, plus `workbox-precaching`'s own
+  built-in `directoryIndex: 'index.html'` matching, which fires
+  independently of `navigateFallback`) answers every navigation straight
+  from Cache Storage once precached. Fixed by dropping `html` from
+  `workbox.globPatterns` in `vite.config.ts` (so nothing's left for that
+  built-in route to match) and adding a `runtimeCaching` entry for
+  `request.mode === 'navigate'` using `NetworkFirst` instead — verified
+  empirically (`context.serviceWorkers()[0].evaluate(...)` reading a
+  counter/cache-entry count from inside the SW's own execution context;
+  `page.route()`/`context.route()` can't observe this at all, since a
+  response Workbox answers purely from Cache Storage never becomes a new
+  network-level request). Any future server-side check gets the same
+  treatment for free, since it's the navigation strategy that changed, not
+  something specific to this one gate.
 
 ## Commands
 
