@@ -8,9 +8,13 @@ import { cardStyle, dangerButtonStyle, dangerFilledButtonStyle, mutedTextStyle, 
 
 // Otherwise read-only by construction: no inputs, no per-item remove
 // buttons, nothing that mutates db.items — a completed trip is done, this
-// is just for looking back at what was bought. The one mutation is
-// deleting the whole trip, which is gated behind an explicit confirmation
-// step since it's destructive and irreversible.
+// is just for looking back at what was bought. The two mutations are
+// deleting the whole trip (gated behind an explicit confirmation step
+// since it's destructive and irreversible) and toggling an item's
+// essential/non-essential badge, which is safe to leave editable even on
+// a completed trip — it's a personal classification, not a record of what
+// happened, and Stats picks up the change live since it queries db.items
+// directly rather than trusting a snapshot.
 export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () => void }) {
   const trip = useLiveQuery(() => db.trips.get(tripId), [tripId])
   const items = useLiveQuery(() => db.items.where('tripId').equals(tripId).sortBy('id'), [tripId], [])
@@ -22,6 +26,13 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
   const handleDelete = async () => {
     await deleteTrip(tripId)
     onBack()
+  }
+
+  // Literal-boolean write, per resolveEssential's contract: the badge always
+  // shows the resolved status, so toggling it writes that status's literal
+  // opposite — never a delta off the raw (possibly-null) essentialOverride.
+  const toggleEssential = async (item: (typeof items)[number]) => {
+    await db.items.update(item.id, { essentialOverride: !resolveEssential(item) })
   }
 
   return (
@@ -76,21 +87,27 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
             <li key={item.id} data-testid="trip-detail-item" style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>{item.name}</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span
+                <button
+                  type="button"
                   data-testid="trip-detail-item-essential"
                   data-essential={essential}
+                  onClick={() => toggleEssential(item)}
+                  aria-label={`Mark ${item.name} as ${essential ? 'non-essential' : 'essential'}`}
                   style={{
                     fontSize: '0.7rem',
                     fontWeight: 600,
-                    padding: '0.15rem 0.5rem',
+                    padding: '0.35rem 0.6rem',
+                    minHeight: '1.75rem',
                     borderRadius: 999,
                     background: essential ? 'var(--accent)' : 'transparent',
                     color: essential ? 'var(--accent-contrast)' : 'var(--text-muted)',
                     border: essential ? 'none' : '1px solid var(--border-strong)',
+                    cursor: 'pointer',
+                    lineHeight: 1,
                   }}
                 >
                   {essential ? 'essential' : 'non-essential'}
-                </span>
+                </button>
                 <span>{formatPrice(item.price)}</span>
               </span>
             </li>
