@@ -228,12 +228,12 @@ async function seedTrips(page: Page, count: number) {
   }
 }
 
-test('with more than 9 trips, the trip list scrolls internally instead of growing the page', async ({ page }) => {
+test('with more than 7 trips, the trip list scrolls internally instead of growing the page', async ({ page }) => {
   await page.goto('/')
-  // 10, not some larger round number — the point of this test is the exact
-  // boundary (9 fits, 10 doesn't), not "many trips scroll," so it should
+  // 8, not some larger round number — the point of this test is the exact
+  // boundary (7 fits, 8 doesn't), not "many trips scroll," so it should
   // fail if the scroll container's height is ever off by one row again.
-  await seedTrips(page, 10)
+  await seedTrips(page, 8)
 
   await page.getByTestId('nav-history').click()
   await expect(page.getByTestId('history-page')).toBeVisible()
@@ -243,7 +243,7 @@ test('with more than 9 trips, the trip list scrolls internally instead of growin
   // Wait for the actual rows before measuring scroll dimensions, or a slow
   // enough query (e.g. under parallel-test load) reads scrollHeight/
   // clientHeight as 0/0 on an as-yet-childless container.
-  await expect(page.getByTestId('history-trip')).toHaveCount(10)
+  await expect(page.getByTestId('history-trip')).toHaveCount(8)
 
   const scrollBox = page.getByTestId('history-list-scroll')
   const { scrollHeight, clientHeight } = await scrollBox.evaluate((el) => ({
@@ -258,20 +258,19 @@ test('with more than 9 trips, the trip list scrolls internally instead of growin
   await expect(page.getByTestId('app-footer')).toBeInViewport()
 })
 
-test('with 9 or fewer trips, the trip list has no internal scrollbar', async ({ page }) => {
+test('with 7 or fewer trips, the trip list has no internal scrollbar', async ({ page }) => {
   await page.goto('/')
-  // Exactly 9, the true boundary — the scroll container's height is sized
-  // for precisely 9 rows plus one month header; this is the case that was
-  // actually broken before (only 8 rows fit, with dead space below), which
-  // a smaller trip count like 3 would never have caught.
-  await seedTrips(page, 9)
+  // Exactly 7, the true boundary — the scroll container's height is sized
+  // for precisely 7 rows plus one month header; a smaller trip count like 3
+  // wouldn't catch the container being off by even a full row.
+  await seedTrips(page, 7)
 
   await page.getByTestId('nav-history').click()
   await expect(page.getByTestId('history-page')).toBeVisible()
   // See the comment in the test above — wait for the live-query-backed rows
   // to actually render before measuring, not just the (always-present)
   // page shell.
-  await expect(page.getByTestId('history-trip')).toHaveCount(9)
+  await expect(page.getByTestId('history-trip')).toHaveCount(7)
 
   const scrollBox = page.getByTestId('history-list-scroll')
   const { scrollHeight, clientHeight } = await scrollBox.evaluate((el) => ({
