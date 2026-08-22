@@ -24,6 +24,7 @@ const SAMPLE_ITEM_NAMES = ['Milk', 'Bread', 'Chips', 'Soda', 'Apples', 'Chicken 
 export function DbDebugPanel() {
   const [trips, setTrips] = useState<TripWithItems[]>([])
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null)
+  const [dateEditError, setDateEditError] = useState<string | null>(null)
   const activePointer = useLiveQuery(() => db.appState.get(ACTIVE_TRIP_KEY))
 
   const refresh = async () => {
@@ -79,6 +80,32 @@ export function DbDebugPanel() {
     await db.appState.put({ key: ACTIVE_TRIP_KEY, value: trip.id })
   }
 
+  /**
+   * Corrective tool for backfilling historical trips: a trip's date is
+   * otherwise only ever set at creation (always "today"), so re-entering a
+   * month's worth of receipts by hand after a data loss would leave every
+   * one of them dated today instead of its real purchase date without this.
+   * Writes straight through Dexie (not raw IndexedDB, unlike some e2e test
+   * helpers), so the live-query-driven History/Stats views pick the change
+   * up immediately on their own. This panel's own `trips` list is *not* a
+   * live query though — it's plain state, normally refreshed only by the
+   * itemsSignal effect above whenever db.items changes — so without an
+   * explicit refresh() here, a date edit (which touches only db.trips)
+   * would leave this panel showing the stale date and the controlled
+   * <input> snapping back to it on the next unrelated render.
+   */
+  const updateTripDate = async (trip: Trip, newDate: string) => {
+    if (!newDate) return
+    setDateEditError(null)
+    try {
+      await db.trips.update(trip.id, { date: newDate })
+      await refresh()
+    } catch (err) {
+      console.error('Grocery Buddy debug panel: failed to update trip date', err)
+      setDateEditError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const resetAll = async () => {
     // See resetAllData's own doc comment (db.ts) for why this can't just be
     // four separate .clear() calls — it needs to wipe and re-pin a fresh
@@ -123,6 +150,12 @@ export function DbDebugPanel() {
           </button>
         </div>
 
+        {dateEditError && (
+          <p role="alert" data-testid="debug-trip-date-error" style={{ color: 'var(--danger)' }}>
+            Failed to update trip date: {dateEditError}
+          </p>
+        )}
+
         {trips.length === 0 && <p>No trips yet — create one to test.</p>}
 
         {trips.map((trip) => (
@@ -150,6 +183,15 @@ export function DbDebugPanel() {
                 {formatPrice(trip.items.reduce((sum, item) => sum + (item.price ?? 0), 0))} — {trip.status}
                 {trip.id === activePointer?.value ? ' — ACTIVE' : ''}
               </strong>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+              Edit date:
+              <input
+                type="date"
+                data-testid="debug-trip-date-input"
+                value={trip.date}
+                onChange={(e) => updateTripDate(trip, e.target.value)}
+              />
             </label>
             {trip.id !== activePointer?.value && (
               <button type="button" data-testid="debug-make-active" onClick={() => makeActive(trip)} style={{ marginBottom: '0.5rem' }}>
