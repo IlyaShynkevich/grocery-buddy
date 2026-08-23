@@ -39,8 +39,9 @@ Three pieces, two of which never talk to each other directly:
   out.
 - **No accounts, no sync, no server database.** Single-user by design (see
   the spec) — everything durable lives in the browser's IndexedDB via
-  Dexie. Reinstalling the PWA or clearing site data loses everything;
-  there's no backup/export path today.
+  Dexie. Reinstalling the PWA or clearing site data loses everything that
+  hasn't been exported — the one escape hatch is the manual JSON
+  export/import in `src/db/backup.ts` (§2), not automatic sync of any kind.
 - **Deployment is Vercel-native**: the React app is a static build served
   by Vercel's CDN, `api/*.ts` files become individual serverless functions
   automatically (no separate backend to deploy or scale).
@@ -85,15 +86,40 @@ resolveEssential(item) = item.essentialOverride ?? isEssentialByDefault(item.cat
 `essentialOverride` is `null` (inherit the category default) unless
 something set it explicitly — and critically, **when set, it's the item's
 literal resulting status, not a delta/flip relative to the category
-default.** Every writer of this field (the manual toggle in
-`DbDebugPanel.tsx`, and the AI extraction path — see §3/§4) has to respect
-that literal semantics. This was the exact site of a real bug: an earlier
-prompt told the model to set `essentialOverride` to "the opposite of the
-category's default," which the model didn't reliably compute, producing
-wrong results for categories whose default was itself non-essential. The
-fix (and a comment on `resolveEssential` itself) replaced that with a
-literal, direction-independent instruction — see `DOCS/CHANGELOG.md` for
-the incident, `categories.ts`'s doc comment for the standing rule.
+default.** Every writer of this field (the manual toggles in
+`DbDebugPanel.tsx` and `TripDetailPage.tsx`, and the AI extraction path —
+see §3/§4) has to respect that literal semantics. This was the exact site
+of a real bug: an earlier prompt told the model to set `essentialOverride`
+to "the opposite of the category's default," which the model didn't
+reliably compute, producing wrong results for categories whose default was
+itself non-essential. The fix (and a comment on `resolveEssential` itself)
+replaced that with a literal, direction-independent instruction — see
+`DOCS/CHANGELOG.md` for the incident, `categories.ts`'s doc comment for the
+standing rule.
+
+**Trip detail (`TripDetailPage.tsx`, History) is otherwise read-only by
+construction** — no inputs, once a trip is `complete` it's meant to be a
+record of what happened, not something to keep editing. Two mutations are
+intentional, scoped exceptions: toggling an item's essential/non-essential
+badge (a personal classification, not a record of what happened — Stats
+picks it up live since it queries `items` directly rather than trusting a
+snapshot) and deleting one or more items — a cleanup tool for leftover
+unmatched rows the review flow left behind (e.g. a typed "milk" the AI's
+translation-unaware fuzzy match in §3 couldn't pair with a receipt's German
+"Milch," leaving both as separate items). A tap on an item shows an inline
+confirm before deleting it, same pattern as the page's own "Delete trip"
+confirm; a long-press (500ms) instead enters multi-select — further taps
+add/remove items from the selection — and a single "Delete these N items?"
+confirm removes them all in one Dexie transaction with one
+`recomputeTripTotal` call. Deleting the whole trip (`deleteTrip`) is the
+third mutation, gated behind its own explicit confirm since it's
+destructive and irreversible. Tap-vs-long-press is decided entirely off
+pointer events (`pointerdown`/`up`/`leave`/`cancel`), not the browser's own
+`click` — a long `mousedown`-then-`mouseup` doesn't reliably fire a
+trailing `click` under Playwright's synthetic input, so relying on it to
+suppress "the tap right after a long-press fired" was unreliable; pointer
+events sidestep that and are the more correct approach for real touch
+devices regardless.
 
 **Discounts and stats reconciliation**: a discount/coupon line has no
 reliable link back to which purchased item it discounted (the extraction
@@ -104,6 +130,24 @@ item — in practice landing under "Other" (essential by default), reducing
 the essential total. This keeps the essential/non-essential split and the
 per-category breakdown both exactly reconciled with the trip total; not
 doing this was a real production bug.
+
+**Backup & restore** ([`src/db/backup.ts`](../src/db/backup.ts), UI in
+`BackupSection.tsx` on History) is the one escape hatch against IndexedDB
+being wiped (cache clear, uninstall, switching phones) — there's no
+server-side copy of anything. Export builds a single JSON document from
+every table above (`trips`, `items`, `categoryNotes`, `pendingReceipts`,
+`appState`), encoding each `pendingReceipts.imageBlob` as a data URL since
+a `Blob` can't survive `JSON.stringify`; the download itself goes through a
+`Blob` + anchor-tag `click()` (not `window.open`/`location`), the pattern
+that reliably works on Android Chrome, revoking the object URL on a delay
+since revoking it immediately after `click()` has been observed to
+silently drop the download there. Import validates the file's shape (JSON
+syntax, a schema-version field, all required tables present) before ever
+touching Dexie — a malformed or unrelated JSON file throws a typed
+`BackupValidationError` with a readable message instead of crashing — and
+restore itself is additive: `bulkPut` (upsert by id) for every table inside
+one transaction, never a wipe-and-replace, and only runs after an explicit
+two-step confirm in the UI showing what the file contains.
 
 ## 3. Receipt extraction flow, end to end
 

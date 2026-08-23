@@ -1276,3 +1276,168 @@ summary of each milestone below and points back here for details.
     were already gone, just these stray labels remained) — noticed while
     editing this file for the entry above, unrelated to the login-page fix
     itself.
+- **Backup & restore: emergency export/import**: done and verified in
+  production. The app's history lives only in IndexedDB with no
+  server-side copy — clearing site data, uninstalling, or switching
+  phones could wipe it permanently, with no way back.
+  - New `src/db/backup.ts` builds a single JSON backup of every Dexie
+    table (trips, items, categoryNotes, pendingReceipts, appState),
+    encoding `pendingReceipts.imageBlob` as a data URL since Blobs can't
+    survive `JSON.stringify`. The download goes through a Blob +
+    anchor-tag click (not `window.open`/`location`) — the pattern that
+    reliably works on Android Chrome — revoking the object URL on a
+    delay, since revoking immediately after `click()` has been observed
+    to silently drop the download on Android.
+  - An imported file's shape (JSON syntax, schema version, required
+    tables) is validated before it ever touches Dexie, throwing a typed
+    `BackupValidationError` with a clear message instead of crashing on a
+    malformed or incompatible file. Restore is additive — upsert by id
+    via `bulkPut` inside one transaction — and only runs after an
+    explicit two-step confirm in the UI, never a silent overwrite.
+  - New "Backup & restore" section (`BackupSection.tsx`, first added to
+    Customize) with Export/Import buttons, an import-confirmation panel
+    summarizing what the file contains, and inline error display for
+    both export and import failures.
+  - `e2e/backup.spec.ts`: export matches current data, import into a
+    cleared database restores everything (including reload-persistence),
+    cancelling import makes no changes, and both a JSON-syntax-invalid
+    file and a well-formed-but-unrelated JSON file show a clear error
+    instead of crashing.
+- **Backup UI moved to History, trip list tightened, trip date editor
+  added**: done and verified in production. Backup/restore belongs with
+  the rest of a user's data (History), not buried in Customize; making
+  room meant tightening the visible trip list, and re-entering a month
+  of receipts by hand needed a way to correct a trip's date afterward
+  (otherwise everything saves with today's date).
+  - `BackupSection` moved from `src/features/customize` to
+    `src/features/history`, rendered below the trip list.
+  - History's visible trip list shrank from 9 rows to 7 before internal
+    scrolling kicks in — re-measured row height/gap/header overhead live
+    against a real preview build rather than assuming the old numbers
+    still held, retuning `maxHeight` to `25.75rem`.
+  - A per-trip date editor added to the DB Debug Panel (dev tool only):
+    writes straight through `db.trips.update`, with errors caught,
+    logged, and surfaced inline rather than swallowed; also fixed the
+    panel's own trip list not refreshing after a date edit, since it was
+    plain state rather than a live query.
+  - `e2e/backup.spec.ts` updated to drive History (and assert the
+    section is absent from Customize); `history-improvements.spec.ts`'s
+    boundary tests retuned to the 7/8 split; `debug-panel.spec.ts` gained
+    coverage for editing a trip's date, confirming History picks it up
+    and it survives a reload.
+- **Collapsible post-scan review panel, inline price editing**: done and
+  verified in production. The "Here's what we found" review panel opened
+  fully expanded the moment a scan finished, pushing the shopping list
+  (and Save trip) out of view.
+  - Now opens collapsed by default — a compact total + Confirm, reusing
+    the same `<details>`/`<summary>` show/hide pattern already used for
+    the shopping list's own collapse toggle. Expanding reveals the full
+    item-by-item list; Confirm moves to the *bottom* of that list rather
+    than staying pinned above it.
+  - Item prices became editable inline (names stay read-only), writing
+    to Dexie on change; the collapsed summary's total recalculates live
+    from any edited price, not the AI's original total. Category and
+    essential/non-essential now show per item in the expanded view.
+  - Invalid price edits and Dexie write failures are logged, not
+    silently swallowed.
+  - New `e2e/receipt-review-collapse.spec.ts` covers collapse/expand,
+    the live total, edits surviving a collapse, and confirming from the
+    bottom of the expanded view; verified visually with mobile-viewport
+    screenshots of both states.
+- **Custom white-outline icons for camera/gallery and export/import**:
+  done and verified in production. Replaced the emoji placeholders
+  (📷/🖼️/⬇️/⬆️) with user-supplied white-outline PNG art
+  (`public/icons/`).
+  - New `src/lib/IconChip.tsx`: a small reusable dark circular badge to
+    hold the white-outline art — needed since flat white pixels placed
+    directly on the app's light-mode `--surface` button background would
+    be invisible; a fixed dark backdrop (not `--accent`, which flips to
+    a *light* gray in dark mode) keeps the icons visible in both themes.
+  - `ReceiptCapture.tsx`'s Camera/Choose-from-Photos menu and
+    `BackupSection.tsx`'s Export/Import buttons both swapped to the new
+    icons via `IconChip`, same size/spacing as the emoji they replaced;
+    `BackupSection` also gained a small top margin so it no longer
+    visually touches the trip list card above it on History.
+- **Staged receipt review — nothing touches the shopping list until
+  Confirm**: done and verified in production. A real architecture
+  question, investigated before any code changed: scanned items
+  previously landed in `db.items` immediately on extraction, before any
+  review — dismissing the panel or deleting the receipt photo left them
+  behind regardless, and the shopping list was never purely "what the
+  user typed."
+  - `PendingReceipt` now holds `stagedItems` (the extraction result,
+    held on the receipt row itself so it survives a reload while review
+    is still open) and a reworked `SuggestedItemMatch` (`stagedIndex` +
+    a deferred `decision`), replacing `addedItemIds`. `processReceipt`
+    stages extracted items instead of writing them to `db.items`, and
+    does *not* recompute the trip total until Confirm.
+  - `useReceiptReview.ts`'s `addedItems`/`matches` now derive from the
+    staged data; `resolveMatch`/`removeItem`/`updatePrice` all write
+    back to the `pendingReceipts` row only. `finishReview` split into
+    `confirmReview` (one transaction: apply any resolved merges,
+    `bulkAdd` the survivors into `items`, recompute the total, clear
+    staging) and `dismissReview` (clear staging, zero `items` writes —
+    as if the scan never happened).
+  - "Save trip" is now disabled while a review is pending, with a
+    visible inline explanation (not just a hover-only title, since this
+    is a mobile-first app) rather than silently discarding or
+    auto-confirming an un-reviewed scan.
+  - Rewrote 8 existing specs whose assertions assumed immediate
+    insertion (including flipping "dismissing keeps the items" into
+    "dismissing discards them"); added `save-trip-gating.spec.ts`, a
+    delete-receipt-discards-everything test, and a
+    reload-preserves-staged-edit test. `DOCS/ARCHITECTURE.md` §3 updated
+    to match.
+- **Trip detail: delete leftover items (single + multi-select), footer
+  width capped to match content**: done and verified in production.
+  Trip detail had no way to remove a leftover unmatched item — e.g. a
+  typed "milk" the AI's translation-unaware fuzzy match couldn't pair
+  with a receipt's German "Milch," leaving both as separate rows.
+  - Tapping an item shows an inline confirm/cancel (same pattern as
+    "Delete trip"); long-pressing (500ms) enters multi-select — tap more
+    items to add them, then a single "Delete these N items?" confirm
+    removes them all in one transaction with one `recomputeTripTotal`
+    call.
+  - Gesture handling (tap vs. long-press) is driven entirely off pointer
+    events (down/up/leave/cancel), not the browser's `click` — testing
+    surfaced that a long mousedown-then-mouseup doesn't reliably fire a
+    trailing `click` under Playwright's synthetic input, and pointer-only
+    handling is also the more correct approach for real touch devices
+    regardless.
+  - Also reverted an earlier deliberate full-bleed footer decision: the
+    footer now uses `pageStyle`'s capped `maxWidth: 480` + centering,
+    same as every other page section, instead of stretching edge to
+    edge.
+  - New `e2e/trip-detail-delete-items.spec.ts` and
+    `e2e/footer-width.spec.ts`.
+- **Fix: a stray white outline stuck on an item after cancelling
+  multi-select**: done and verified in production. Root cause was a CSS
+  shorthand/longhand interaction, not a state-management bug — the
+  React/Dexie selection state cleared correctly, but the *visual* style
+  didn't.
+  - The selected-row style mixed a shorthand (`cardStyle`'s `border:
+    '1px solid var(--border)'`) with a separate longhand override
+    (`borderColor: 'var(--accent)'`) applied only while selected. When
+    React removes that `borderColor` key on deselect, clearing an inline
+    longhand doesn't restore the color the `border` shorthand had set —
+    it falls back to CSS's initial `currentColor`, which in dark mode is
+    `--text` (near-white), reading as a stray light outline.
+  - Fixed by keeping the override in the same shorthand form (`border:
+    '1px solid var(--accent)'`) so deselecting cleanly reverts it.
+    Extended `e2e/trip-detail-delete-items.spec.ts` with a case that
+    selects two items, cancels, and asserts computed `borderColor`
+    matches a never-selected row's — confirmed it fails against the
+    pre-fix code and passes against the fix.
+- **Disable the browser's default tap-highlight flash**: done and
+  verified in production. Chrome's translucent blue tap highlight on
+  every button/link tap was reading as "website," not "installed app."
+  - `-webkit-tap-highlight-color: transparent` added to `index.css`'s
+    existing universal `*` selector; confirmed via computed style that
+    it applies globally.
+  - Every `<button>` already has its own `:active` feedback
+    (`background: var(--border)`) from the global button styles, so nav
+    bar, toggles, and checkboxes are unaffected. One spot flagged, not
+    changed, per the instruction not to add new feedback speculatively:
+    `TripDetailPage`'s clickable item rows are plain `<li>`s with no
+    press feedback of their own — worth a look if tapping one ever feels
+    unresponsive on a real device.
