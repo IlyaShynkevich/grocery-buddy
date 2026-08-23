@@ -60,7 +60,9 @@ test('case A: no prior typed items — review panel shows a plain confirmation, 
   // dismissing.
   await expect.poll(() => itemNames(page)).toEqual(['Milk', 'Bread'])
 
-  // Remove the wrongly-scanned "Bread" line via the review panel.
+  // Remove the wrongly-scanned "Bread" line via the review panel — the item
+  // list is collapsed by default, so it has to be expanded first.
+  await page.getByTestId('receipt-review-toggle').click()
   await reviewItems.nth(1).getByTestId('receipt-review-item-remove').click()
   await expect(reviewItems).toHaveCount(1)
 
