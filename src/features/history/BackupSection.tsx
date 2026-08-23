@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { BackupValidationError, backupFileName, buildBackup, downloadBackup, parseBackup, restoreBackup, type BackupData } from '../../db/backup'
+import { IconChip } from '../../lib/IconChip'
 import { cardStyle, dangerButtonStyle, dangerFilledButtonStyle, mutedTextStyle } from '../../lib/ui'
 
 function describeErr(err: unknown): string {
@@ -86,7 +87,7 @@ export function BackupSection() {
   }
 
   return (
-    <section data-testid="backup-section" style={{ ...cardStyle, marginBottom: '0.75rem' }}>
+    <section data-testid="backup-section" style={{ ...cardStyle, marginTop: '1.25rem', marginBottom: '0.75rem' }}>
       <h2 style={{ fontSize: '1.05rem', marginBottom: '0.25rem' }}>Backup & restore</h2>
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginBottom: '0.6rem' }}>
         Your trips and history live only on this device. Export a backup before clearing browser
@@ -94,11 +95,25 @@ export function BackupSection() {
       </p>
 
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        <button type="button" data-testid="backup-export-button" onClick={handleExport} disabled={exporting}>
-          {exporting ? 'Exporting…' : '⬇️ Export data'}
+        <button
+          type="button"
+          data-testid="backup-export-button"
+          onClick={handleExport}
+          disabled={exporting}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          <IconChip src="/icons/icon-export.png" />
+          {exporting ? 'Exporting…' : 'Export data'}
         </button>
-        <button type="button" data-testid="backup-import-button" onClick={handleChooseFile} disabled={importing}>
-          ⬆️ Import data
+        <button
+          type="button"
+          data-testid="backup-import-button"
+          onClick={handleChooseFile}
+          disabled={importing}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          <IconChip src="/icons/icon-import.png" />
+          Import data
         </button>
       </div>
 

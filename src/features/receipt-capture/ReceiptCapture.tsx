@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { PendingReceipt, ReceiptStatus } from '../../db/db'
+import { IconChip } from '../../lib/IconChip'
 import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { useMascotPose } from '../mascot/useMascotPose'
@@ -87,9 +88,10 @@ export function ReceiptCapture() {
                       setMenuOpen(false)
                       cameraInputRef.current?.click()
                     }}
-                    style={{ textAlign: 'left', width: '100%' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left', width: '100%' }}
                   >
-                    📷 Camera
+                    <IconChip src="/icons/icon-camera.png" />
+                    Camera
                   </button>
                   <button
                     type="button"
@@ -98,9 +100,10 @@ export function ReceiptCapture() {
                       setMenuOpen(false)
                       galleryInputRef.current?.click()
                     }}
-                    style={{ textAlign: 'left', width: '100%' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left', width: '100%' }}
                   >
-                    🖼️ Choose from Photos
+                    <IconChip src="/icons/icon-gallery.png" />
+                    Choose from Photos
                   </button>
                 </div>
               </>
