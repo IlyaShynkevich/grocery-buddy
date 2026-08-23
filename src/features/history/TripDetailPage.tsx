@@ -262,7 +262,17 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                 alignItems: 'center',
                 cursor: 'pointer',
                 userSelect: 'none',
-                ...(isSelected ? { borderColor: 'var(--accent)', background: 'var(--surface-hover)' } : {}),
+                // `border` (not the longhand `borderColor`) so this and
+                // cardStyle's own `border: '1px solid var(--border)'` are
+                // the same style key — React can then just revert it
+                // cleanly on deselect. Mixing a shorthand with a longhand
+                // override here previously left a stale border-color once
+                // the longhand key was removed: clearing an inline
+                // `borderColor` doesn't restore the color the `border`
+                // shorthand had set, it falls back to the CSS-initial
+                // `currentColor` — which reads as a stray white/light
+                // outline in dark mode (`--text` there is near-white).
+                ...(isSelected ? { border: '1px solid var(--accent)', background: 'var(--surface-hover)' } : {}),
               }}
             >
               {isPendingSingleDelete ? (
