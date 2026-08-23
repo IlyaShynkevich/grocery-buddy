@@ -124,6 +124,37 @@ test('cancelling out of multi-select mode leaves items untouched', async ({ page
   await expect(page.getByTestId('trip-detail-total')).toContainText('8,97')
 })
 
+test('cancelling out of multi-select clears the selected-item styling, not just the selection state', async ({
+  page,
+}) => {
+  await openTripDetailWithItems(page)
+
+  await longPress(page, itemRow(page, 'Milk'))
+  await itemRow(page, 'Eggs').click()
+  await expect(itemRow(page, 'Milk')).toHaveAttribute('data-selected', 'true')
+  await expect(itemRow(page, 'Eggs')).toHaveAttribute('data-selected', 'true')
+
+  await page.getByTestId('trip-detail-multiselect-cancel').click()
+  await expect(page.getByTestId('trip-detail-multiselect-bar')).toHaveCount(0)
+
+  // The data attribute clears...
+  await expect(itemRow(page, 'Milk')).toHaveAttribute('data-selected', 'false')
+  await expect(itemRow(page, 'Eggs')).toHaveAttribute('data-selected', 'false')
+
+  // ...and so does the visual styling itself: the previously-selected rows'
+  // border must match a row that was never selected (Bread), not remain on
+  // the selected-state accent border (or, worse, fall back to the browser's
+  // CSS-initial currentColor once a stray inline borderColor is cleared —
+  // the actual bug this guards against).
+  const [milkBorder, eggsBorder, breadBorder] = await Promise.all([
+    itemRow(page, 'Milk').evaluate((el) => getComputedStyle(el).borderColor),
+    itemRow(page, 'Eggs').evaluate((el) => getComputedStyle(el).borderColor),
+    itemRow(page, 'Bread').evaluate((el) => getComputedStyle(el).borderColor),
+  ])
+  expect(milkBorder).toBe(breadBorder)
+  expect(eggsBorder).toBe(breadBorder)
+})
+
 test('cancelling the bulk-delete confirm returns to the selection instead of deleting', async ({ page }) => {
   await openTripDetailWithItems(page)
 
