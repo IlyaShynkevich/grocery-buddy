@@ -42,6 +42,13 @@
 
 * {
   box-sizing: border-box;
+  /* Disables the default translucent blue tap-highlight flash on mobile
+     Chrome/Android for every button/link in the app — this app already
+     shows its own tap feedback (:active background/border changes on
+     buttons — see button:active below; toggles like the essential badge
+     and shopping-list checkbox visibly change state on tap too), so the
+     browser's overlay was redundant, not load-bearing. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
