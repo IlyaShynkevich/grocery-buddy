@@ -84,6 +84,7 @@ test('editing an item price live-updates the total, and the edit survives collap
 
 test('Confirm at the bottom of the expanded view saves edits and closes the panel', async ({ page }) => {
   await captureAndProcess(page)
+  await page.getByTestId('debug-panel-toggle').click()
   await page.getByTestId('receipt-review-toggle').click()
 
   const milkPrice = page.getByTestId('receipt-review-item').nth(0).getByTestId('receipt-review-item-price')
@@ -100,4 +101,28 @@ test('Confirm at the bottom of the expanded view saves edits and closes the pane
 
   await confirm.click()
   await expect(page.getByTestId('receipt-review-panel')).toHaveCount(0)
+
+  // The edited price (not the AI's original 3.49) is what actually landed
+  // in Dexie.
+  const activeTripDiv = page.locator('[data-testid="debug-trip"][data-active="true"]')
+  const milkRow = activeTripDiv.getByTestId('debug-item').filter({ hasText: 'Milk' })
+  await expect(milkRow).toContainText('5,00')
+})
+
+test('an edit survives a reload while the review is still pending — it was written to Dexie, not just held in memory', async ({
+  page,
+}) => {
+  await captureAndProcess(page)
+  await page.getByTestId('receipt-review-toggle').click()
+
+  const milkPrice = page.getByTestId('receipt-review-item').nth(0).getByTestId('receipt-review-item-price')
+  await milkPrice.fill('5.00')
+  await expect(page.getByTestId('receipt-review-total')).toContainText('7,49')
+
+  await page.reload()
+
+  // Still staged (never inserted into the shopping list)...
+  await expect(page.getByTestId('shopping-list-item')).toHaveCount(0)
+  // ...but the edit itself wasn't lost.
+  await expect(page.getByTestId('receipt-review-total')).toContainText('7,49')
 })

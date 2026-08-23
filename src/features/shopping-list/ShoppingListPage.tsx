@@ -110,17 +110,29 @@ export function ShoppingListPage() {
 
   return (
     <section data-testid="shopping-list" data-trip-id={trip?.id ?? ''} style={pageStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
         <h1 style={{ fontSize: '1.5rem' }}>Shopping List</h1>
         {trip && (
-          <button
-            type="button"
-            data-testid="save-trip-button"
-            onClick={saveTrip}
-            style={{ background: 'transparent', color: 'var(--accent)', borderColor: 'var(--accent)' }}
-          >
-            Save trip
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+            <button
+              type="button"
+              data-testid="save-trip-button"
+              onClick={saveTrip}
+              disabled={hasPendingReview}
+              title={hasPendingReview ? 'Resolve the receipt review below before saving this trip' : undefined}
+              style={{ background: 'transparent', color: 'var(--accent)', borderColor: 'var(--accent)' }}
+            >
+              Save trip
+            </button>
+            {hasPendingReview && (
+              <span
+                data-testid="save-trip-disabled-hint"
+                style={{ ...mutedTextStyle, fontSize: '0.7rem', textAlign: 'right' }}
+              >
+                Resolve the receipt review first
+              </span>
+            )}
+          </div>
         )}
       </div>
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>

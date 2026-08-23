@@ -63,6 +63,11 @@ test('the shopping list auto-collapses once a receipt review becomes pending', a
 
 test('the collapsed shopping list can be manually expanded while a review is still pending', async ({ page }) => {
   await page.goto('/')
+  // A typed item so the expanded list has real (non-zero-height) content to
+  // assert visible on — the scanned item itself stays staged on the review
+  // panel, not in the shopping list, until it's confirmed.
+  await page.getByTestId('add-item-input').fill('Bananas')
+  await page.getByTestId('add-item-submit').click()
   await captureAndProcess(page)
 
   await expect(page.getByTestId('add-item-input')).toBeHidden()

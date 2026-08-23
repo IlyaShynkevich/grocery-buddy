@@ -30,7 +30,7 @@ async function itemNames(page: Page): Promise<string[]> {
   )
 }
 
-test('successful extraction adds items to the shopping list and marks the receipt processed', async ({
+test('successful extraction stages items for review, and only Confirm adds them to the shopping list', async ({
   page,
 }) => {
   await page.route('**/api/extract-receipt', (route) =>
@@ -53,6 +53,13 @@ test('successful extraction adds items to the shopping list and marks the receip
 
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed')
   await expect(page.getByTestId('receipt-process-button')).toHaveCount(0)
+
+  // Extraction succeeding doesn't touch the shopping list by itself —
+  // items are staged on the review panel until explicitly confirmed.
+  await expect.poll(() => itemNames(page)).toEqual([])
+  await expect(page.getByTestId('receipt-review-item')).toHaveCount(2)
+
+  await page.getByTestId('receipt-review-confirm').click()
   await expect.poll(() => itemNames(page)).toEqual(['Milk', 'Bread'])
 })
 
@@ -79,11 +86,18 @@ test('coupon/discount lines reduce the trip total but do not appear as shopping 
   await page.getByTestId('receipt-process-button').click()
 
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed')
+
+  // Nothing lands on the trip — list or total — until Confirm.
+  await expect.poll(() => itemNames(page)).toEqual([])
+  const activeTripDiv = page.locator('[data-testid="debug-trip"][data-active="true"]')
+  await expect(activeTripDiv).toContainText('0,00')
+
+  await page.getByTestId('receipt-review-confirm').click()
+
   // the discount line must never show up as something to buy again
   await expect.poll(() => itemNames(page)).toEqual(['Milk'])
 
   // but it must still be reflected in the trip total: 3.49 - 0.38 = 3.11
-  const activeTripDiv = page.locator('[data-testid="debug-trip"][data-active="true"]')
   await expect(activeTripDiv).toContainText('3,11')
 })
 
@@ -120,6 +134,7 @@ test('a server error marks the receipt failed, shows the message, and allows ret
   await page.getByTestId('receipt-process-button').click()
 
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed')
+  await page.getByTestId('receipt-review-confirm').click()
   await expect.poll(() => itemNames(page)).toEqual(['Eggs'])
 })
 

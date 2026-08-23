@@ -38,9 +38,28 @@ export interface Item {
   checked: boolean
 }
 
+/**
+ * One extraction result, held for review — not yet an `Item` row. `removed`
+ * (not splicing it out of the array) keeps every other staged item's index
+ * stable for as long as the review is open, since `SuggestedItemMatch`
+ * below references a staged item by that index.
+ */
+export interface StagedReceiptItem {
+  item: Omit<Item, 'id'>
+  removed: boolean
+}
+
 export interface SuggestedItemMatch {
   typedItemId: number
-  extractedItemId: number
+  /** Index into the owning receipt's `stagedItems`. */
+  stagedIndex: number
+  /**
+   * Unset while still awaiting the user's yes/no in the review panel. Once
+   * set, it's *recorded* but not yet acted on — merging (deleting the typed
+   * row) only actually happens at Confirm, same as inserting the staged
+   * items themselves.
+   */
+  decision?: 'merge' | 'separate'
 }
 
 export interface PendingReceipt {
@@ -57,11 +76,13 @@ export interface PendingReceipt {
   /** timestamp to auto-retry at, when lastError parsed a rate-limit wait time */
   retryAt?: number
   /**
-   * Ids of the Item rows created from this receipt's extraction, once
-   * status is 'done' — items are added immediately (see M5 part 1), this
-   * just tracks which ones came from this receipt for the review panel.
+   * The extraction result, staged for review — deliberately NOT written to
+   * `items` until the user taps Confirm (see `confirmReview` in
+   * useReceiptReview.ts). Dismissing the review or deleting this receipt
+   * discards these with zero `items` writes ever having happened. Present
+   * once status is 'done'; cleared once reviewed (confirmed or dismissed).
    */
-  addedItemIds?: number[]
+  stagedItems?: StagedReceiptItem[]
   /** Best-effort typed/extracted item pairs the review panel offers to merge. */
   suggestedMatches?: SuggestedItemMatch[]
   /** Whether the user has confirmed/dismissed the post-scan review panel. */
