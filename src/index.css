@@ -49,6 +49,16 @@
      and shopping-list checkbox visibly change state on tap too), so the
      browser's overlay was redundant, not load-bearing. */
   -webkit-tap-highlight-color: transparent;
+  /* Hides the visible scrollbar track/thumb everywhere — html/body and any
+     internally-scrollable container (e.g. History's trip-list scroll div)
+     alike, since this is a universal selector — without disabling
+     scrolling itself; scrollWidth/scrollTop/wheel/touch scrolling are all
+     unaffected, only the browser's own scrollbar rendering is suppressed. */
+  scrollbar-width: none; /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge (Chromium) */
 }
 
 body {
