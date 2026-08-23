@@ -184,13 +184,13 @@ test('discount entries no longer show category/essential controls anywhere', asy
   await page.getByTestId('receipt-process-button').click()
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed')
 
-  // Never shown as something to buy again (existing behavior, reasserted here).
-  await expect.poll(() => itemNames(page)).toEqual(['Milk'])
-
   // Review panel never shows it as an editable item either.
   await expect(page.getByTestId('receipt-review-item')).toHaveCount(1)
   await expect(page.getByTestId('receipt-review-item')).toContainText('Milk')
   await page.getByTestId('receipt-review-confirm').click()
+
+  // Never shown as something to buy again (existing behavior, reasserted here).
+  await expect.poll(() => itemNames(page)).toEqual(['Milk'])
 
   // Debug panel: discount line is a plain deduction row with no category
   // dropdown or essential toggle; the regular item still has both.

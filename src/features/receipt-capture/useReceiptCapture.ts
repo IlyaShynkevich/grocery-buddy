@@ -6,8 +6,8 @@ import {
   getCategoryNoteHints,
   getOrCreateActiveTrip,
   newItem,
-  recomputeTripTotal,
   type PendingReceipt,
+  type StagedReceiptItem,
   type SuggestedItemMatch,
 } from '../../db/db'
 import { isLikelyMatch } from '../../lib/itemMatch'
@@ -61,7 +61,7 @@ export function useReceiptCapture() {
       const categoryNotes = await getCategoryNoteHints()
       const extractedItems = await extractReceiptItems(receipt.imageBlob, categoryNotes)
 
-      const addedItemIds: number[] = []
+      const stagedItems: StagedReceiptItem[] = []
       const suggestedMatches: SuggestedItemMatch[] = []
 
       if (receipt.tripId) {
@@ -77,9 +77,8 @@ export function useReceiptCapture() {
           .toArray()
         const matchedTypedIds = new Set<number>()
 
-        for (const extracted of extractedItems) {
-          const newId = await db.items.add(newItem(tripId, { ...extracted, source: 'ai' }))
-          addedItemIds.push(newId)
+        extractedItems.forEach((extracted, stagedIndex) => {
+          stagedItems.push({ item: newItem(tripId, { ...extracted, source: 'ai' }), removed: false })
 
           if (!extracted.isDiscount) {
             const match = typedItems.find(
@@ -87,23 +86,22 @@ export function useReceiptCapture() {
             )
             if (match) {
               matchedTypedIds.add(match.id)
-              suggestedMatches.push({ typedItemId: match.id, extractedItemId: newId })
+              suggestedMatches.push({ typedItemId: match.id, stagedIndex })
             }
           }
-        }
-
-        await recomputeTripTotal(tripId)
+        })
       }
 
-      // The review panel (see receipt-review feature) shows automatically
-      // for any 'done' receipt with reviewed: false — items are already
-      // added at this point either way, so ignoring the panel never loses
-      // anything, it just leaves the (harmless) duplicates/typos for later.
+      // Deliberately nothing written to `items` and no trip-total recompute
+      // here — extracted items are held on this receipt row until the user
+      // taps Confirm in the review panel (see confirmReview in
+      // useReceiptReview.ts). The review panel (see receipt-review feature)
+      // shows automatically for any 'done' receipt with reviewed: false.
       await db.pendingReceipts.update(receipt.id, {
         status: 'done',
-        addedItemIds,
+        stagedItems,
         suggestedMatches,
-        reviewed: addedItemIds.length === 0,
+        reviewed: stagedItems.length === 0,
       })
     } catch (err) {
       // Full raw error for our own diagnosis — the UI only ever shows a

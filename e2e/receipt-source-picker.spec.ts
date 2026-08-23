@@ -73,6 +73,7 @@ test('Camera entry point: capturing and processing a receipt reaches the same su
   await page.getByTestId('receipt-process-button').click()
 
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed')
+  await page.getByTestId('receipt-review-confirm').click()
   await expect.poll(() => itemNames(page)).toEqual(['Milk'])
 })
 
@@ -103,6 +104,7 @@ test('Choose from Photos entry point: picking an existing image reaches the same
   await page.getByTestId('receipt-process-button').click()
 
   await expect(page.getByTestId('receipt-status').first()).toHaveText('Processed')
+  await page.getByTestId('receipt-review-confirm').click()
   await expect.poll(() => itemNames(page)).toEqual(['Bread'])
 })
 

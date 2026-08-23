@@ -67,6 +67,10 @@ test('a category note is sent with the extraction request, and a note match alwa
 
   expect(requestBody).toMatchObject({ notes: [{ category: 'frozen', notes: ['nuggets'] }] })
 
+  // Save trip is disabled while the scan is still unconfirmed (see
+  // save-trip-disabled-hint) — confirm first so the item actually lands on
+  // the trip before saving.
+  await page.getByTestId('receipt-review-confirm').click()
   await saveTrip(page)
   await page.getByTestId('nav-history').click()
   await page.getByTestId('history-trip').click()

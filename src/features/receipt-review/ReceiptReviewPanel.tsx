@@ -14,7 +14,13 @@ import { useReceiptReview } from './useReceiptReview'
  * value driven straight off item.price would reset the cursor/selection on
  * every character typed.
  */
-function PriceInput({ item, onChange }: { item: Item; onChange: (item: Item, event: ChangeEvent<HTMLInputElement>) => void }) {
+function PriceInput({
+  item,
+  onChange,
+}: {
+  item: Omit<Item, 'id'>
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void
+}) {
   const [value, setValue] = useState(item.price !== null ? String(item.price) : '')
   return (
     <input
@@ -25,7 +31,7 @@ function PriceInput({ item, onChange }: { item: Item; onChange: (item: Item, eve
       aria-label={`Price for ${item.name}`}
       onChange={(e) => {
         setValue(e.target.value)
-        onChange(item, e)
+        onChange(e)
       }}
       style={{ width: '5rem' }}
     />
@@ -34,26 +40,30 @@ function PriceInput({ item, onChange }: { item: Item; onChange: (item: Item, eve
 
 // Deliberately not a blocking modal/backdrop — the rest of the app (shopping
 // list, another receipt capture) must stay usable while this is showing, and
-// if the user never interacts with it at all the extracted items are still
-// there (added up front in processReceipt), just unreviewed.
+// if the user never interacts with it at all nothing has touched the
+// shopping list yet either — extracted items are staged on the receipt
+// itself (see useReceiptReview) until Confirm.
 export function ReceiptReviewPanel() {
-  const { receipt, addedItems, matches, resolveMatch, removeItem, updatePrice, finishReview } = useReceiptReview()
+  const { receipt, addedItems, matches, resolveMatch, removeItem, updatePrice, confirmReview, dismissReview } =
+    useReceiptReview()
   // Collapsed by default so the panel doesn't push the shopping list (and
   // Save trip) out of view the moment processing finishes — same idea as
   // ShoppingListPage's own collapsible list, reusing the <details>/<summary>
-  // show/hide pattern. Expanding/collapsing never touches the underlying
-  // items (which live in Dexie via addedItems), so edits survive either way.
+  // show/hide pattern. Expanding/collapsing never touches the staged items,
+  // so edits survive either way.
   const [isOpen, setIsOpen] = useState(false)
 
   if (!receipt) return null
 
   const title = matches.length > 0 ? 'Review your scan' : "Here's what we found"
-  // Derived straight from the live-queried addedItems (see useReceiptReview),
-  // so an edited price flows through Dexie -> useLiveQuery -> this sum
-  // automatically — no separate "edited total" state to keep in sync.
-  const total = addedItems.reduce((sum, item) => sum + (item.price ?? 0), 0)
+  // Derived straight from the staged items held on the receipt (see
+  // useReceiptReview), so an edited price flows through Dexie ->
+  // useLiveQuery -> this sum automatically — no separate "edited total"
+  // state to keep in sync, and it's still the AI's total until Confirm
+  // actually writes anything.
+  const total = addedItems.reduce((sum, { item }) => sum + (item.price ?? 0), 0)
 
-  const handlePriceChange = (item: Item, event: ChangeEvent<HTMLInputElement>) => {
+  const handlePriceChange = (stagedIndex: number, itemName: string, event: ChangeEvent<HTMLInputElement>) => {
     const raw = event.target.value
     // Mid-edit (e.g. the field briefly empty while retyping) isn't an
     // invalid price yet — nothing to write, nothing to report.
@@ -61,17 +71,17 @@ export function ReceiptReviewPanel() {
 
     const price = event.target.valueAsNumber
     if (Number.isNaN(price)) {
-      console.error(`Ignored invalid price edit for "${item.name}": ${JSON.stringify(raw)}`)
+      console.error(`Ignored invalid price edit for "${itemName}": ${JSON.stringify(raw)}`)
       return
     }
 
-    updatePrice(item.id, price).catch((error: unknown) => {
-      console.error(`Failed to save price for "${item.name}"`, error)
+    updatePrice(stagedIndex, price).catch((error: unknown) => {
+      console.error(`Failed to save price for "${itemName}"`, error)
     })
   }
 
   const confirmButton = (
-    <button type="button" data-testid="receipt-review-confirm" onClick={finishReview} style={primaryButtonStyle}>
+    <button type="button" data-testid="receipt-review-confirm" onClick={confirmReview} style={primaryButtonStyle}>
       Confirm
     </button>
   )
@@ -98,7 +108,7 @@ export function ReceiptReviewPanel() {
           type="button"
           data-testid="receipt-review-dismiss"
           aria-label="Dismiss review"
-          onClick={finishReview}
+          onClick={dismissReview}
           style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
         >
           ✕
@@ -115,7 +125,7 @@ export function ReceiptReviewPanel() {
             >
               <div>
                 Is <strong>{match.typedItem.name}</strong> the same as{' '}
-                <strong>{match.extractedItem.name}</strong> ({formatPrice(match.extractedItem.price)})?
+                <strong>{match.stagedItem.name}</strong> ({formatPrice(match.stagedItem.price)})?
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
                 <button
@@ -159,11 +169,11 @@ export function ReceiptReviewPanel() {
         </summary>
 
         <ul style={{ listStyle: 'none', padding: 0, margin: '0.75rem 0' }} data-testid="receipt-review-items">
-          {addedItems.map((item) => {
+          {addedItems.map(({ stagedIndex, item }) => {
             const essential = resolveEssential(item)
             return (
               <li
-                key={item.id}
+                key={stagedIndex}
                 data-testid="receipt-review-item"
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0', borderBottom: '1px solid var(--border)' }}
               >
@@ -173,12 +183,12 @@ export function ReceiptReviewPanel() {
                     {getCategory(item.category).label} · {essential ? 'essential' : 'non-essential'}
                   </span>
                 </span>
-                <PriceInput item={item} onChange={handlePriceChange} />
+                <PriceInput item={item} onChange={(e) => handlePriceChange(stagedIndex, item.name, e)} />
                 <button
                   type="button"
                   data-testid="receipt-review-item-remove"
                   aria-label={`Remove ${item.name}`}
-                  onClick={() => removeItem(item.id)}
+                  onClick={() => removeItem(stagedIndex)}
                   style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
                 >
                   ✕

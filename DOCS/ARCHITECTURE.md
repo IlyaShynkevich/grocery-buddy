@@ -57,7 +57,7 @@ indexed), but adding a new table or a new *indexed* field needs a new
 |---|---|---|
 | `trips` | `id`, `date`, `status` (`draft`\|`complete`), `total`, `completedAt` | One row per shopping trip. Exactly one `draft` trip is ever "active" at a time. |
 | `items` | `id`, `tripId`, `name`, `price`, `category`, `essentialOverride`, `source` (`typed`\|`ai`\|`manual`), `isDiscount` | Line items, typed or AI-extracted, belonging to a trip. |
-| `pendingReceipts` | `id`, `tripId`, `imageBlob`, `status` (`pending`\|`processing`\|`failed`\|`done`), `lastError`, `retryAt`, `addedItemIds`, `suggestedMatches`, `reviewed` | The offline-capable receipt queue — see §3. |
+| `pendingReceipts` | `id`, `tripId`, `imageBlob`, `status` (`pending`\|`processing`\|`failed`\|`done`), `lastError`, `retryAt`, `stagedItems`, `suggestedMatches`, `reviewed` | The offline-capable receipt queue — see §3. `stagedItems` is the extraction result held for review; nothing in it is an `items` row until Confirm. |
 | `appState` | `key`, `value` | Single-row-per-key pointer table; today only holds `activeTripId`. |
 | `categoryNotes` | `id`, `categoryKey`, `text` | Freeform personal notes per category, written on Customize — see §3/§4. |
 
@@ -141,10 +141,15 @@ doing this was a real production bug.
    500. Otherwise it calls `extractReceiptItems()` in
    `api/_lib/openaiExtract.ts`, the actual OpenAI client (see §4 for the
    request/response details and error taxonomy).
-6. **Items land immediately** — extracted items are written to `items`
-   (`source: 'ai'`) as soon as the response parses, *not* gated behind the
-   review step below. This is deliberate: ignoring or dismissing the review
-   panel never loses anything, it's purely a reconciliation pass.
+6. **Items are staged, not written** — extracted items are held on the
+   `PendingReceipt` row itself (`stagedItems: Omit<Item, 'id'>[]`), *not*
+   written to `items` yet. The shopping list is purely the user's own typed
+   notes plus whatever's been explicitly confirmed from a scan — a scan
+   that's dismissed, or a receipt that's deleted before ever being
+   confirmed, never touched `items` at all. Editing a staged price or
+   removing a staged line (in the review panel) writes back to this same
+   `pendingReceipts` row, not to `items` — so those edits survive a reload
+   while the review is still open, without ever creating an `items` row.
 7. **Match suggestions** — for each extracted item, `isLikelyMatch()`
    (`src/lib/itemMatch.ts`) checks it against any already-typed items on
    the trip, to suggest merges (e.g. typed "Milk" vs. scanned "Milch 1L").
@@ -152,16 +157,30 @@ doing this was a real production bug.
    distance, both after NFD diacritic stripping) and **not
    translation-aware** — "eggs" won't match "Eier". A false positive is a
    one-tap dismiss in the review panel; a false negative just leaves two
-   separate entries. See CLAUDE.md's "Known limitations" for the standing
-   call not to fix this speculatively.
+   separate entries. A `SuggestedItemMatch` references its staged item by
+   index into `stagedItems` (`stagedIndex`), not by an `items` id — there
+   isn't one yet. See CLAUDE.md's "Known limitations" for the standing call
+   not to fix the translation gap speculatively.
 8. **Review/merge panel** (`ReceiptReviewPanel.tsx` /
    `useReceiptReview.ts`) — shown automatically for any `done`,
-   not-yet-`reviewed` receipt. Lets the user edit/remove a misread line and
-   confirm/reject each suggested match; confirming a match deletes the
-   typed duplicate and keeps the AI-extracted row (so anything the AI set
-   on it, like `essentialOverride`, survives the merge for free).
+   not-yet-`reviewed` receipt, collapsed by default (a compact total +
+   Confirm; the full item-by-item list, with editable prices, only on
+   request). Lets the user edit/remove a staged line and answer each
+   suggested match, but none of that is acted on until **Confirm**:
+   `confirmReview` (in a single Dexie transaction) deletes the typed
+   duplicate for any match answered "yes", `bulkAdd`s the surviving staged
+   items into `items`, and recomputes the trip total. **Dismiss**
+   (`dismissReview`) instead just discards `stagedItems` — zero `items`
+   writes, as if the scan never happened. Deleting the receipt photo
+   (`removeReceipt`) needs no special-case cleanup for this either: the
+   staged items live on that same row, so deleting it discards them too.
 9. **Save trip** — `completeTrip()` marks the trip `complete` and
    immediately creates+pins a fresh empty draft as the new active trip.
+   Disabled (with a visible explanation, not just greyed out) while any
+   receipt for the active trip is `done` and not yet `reviewed` — otherwise
+   a still-staged scan would go nowhere: completing the trip switches the
+   active-trip pointer, and the review panel only ever surfaces the active
+   trip's pending receipt.
 
 ## 4. AI integration specifics
 
