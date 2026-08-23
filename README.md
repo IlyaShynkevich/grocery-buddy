@@ -20,14 +20,21 @@ receipt scanning.
 
 ## What it does
 
-- **Shopping list** — build a running list as you shop, item by item.
+- **Shopping list** — build a running list as you shop, item by item,
+  checking each one off as you grab it. It's purely your own typed notes
+  plus whatever you've explicitly confirmed from a scan (see below) — a
+  scan never lands on the list on its own.
 - **Receipt scanning** — snap a photo with the camera or pick an existing
   one from your photo library at checkout; an OpenAI vision model extracts
   line items, prices, and a suggested category directly from the receipt.
-- **Review & reconcile** — after a scan, a review panel lets you fix or drop
-  a misread line, and auto-suggests merges between typed items and their
-  scanned counterpart (e.g. a typed "Milk" matched against a scanned "Milch
-  1L") so you don't end up with duplicates.
+- **Staged review, nothing added until you confirm** — after a scan, a
+  collapsed summary (total + Confirm) appears without pushing the rest of
+  the page out of view; expanding it shows the full item list with editable
+  prices, and auto-suggested merges between a typed item and its scanned
+  counterpart (e.g. typed "Milk" matched against scanned "Milch 1L") so you
+  don't end up with duplicates. None of it touches your shopping list until
+  you tap Confirm — dismissing the review, or deleting the receipt photo,
+  discards the scan as if it never happened.
 - **Personalized category notes** — on the Customize page, jot down specific
   items you personally treat as an exception within a category (e.g. under
   Frozen: "nuggets, frozen pizza"). These feed into the receipt-scanning
@@ -40,9 +47,18 @@ receipt scanning.
 - **Trip history** — completed trips are saved and grouped by month, most
   recent first; the month label sticks to the top of the list as you scroll
   and swaps to the next month automatically, and the list scrolls
-  internally (about 9 trips visible at once) instead of growing the page.
-  Each trip has a read-only detail view (items, prices, essential/
-  non-essential status, discounts, total).
+  internally (about 7 trips visible at once) instead of growing the page.
+  Each trip has a detail view (items, prices, essential/non-essential
+  status, discounts, total) that's otherwise read-only, aside from two
+  intentional exceptions: toggling an item's essential/non-essential badge,
+  and cleaning up a leftover unmatched item — tap one for an inline
+  delete confirm, or long-press to multi-select several and delete them
+  together.
+- **Backup & restore** — export your entire history to a JSON file anytime,
+  and restore it (on this device or a new one) with an explicit confirm
+  step first. The only way your data survives clearing site data,
+  uninstalling, or switching phones, since everything lives client-side
+  with no server-side copy.
 - **Monthly stats** — total spend, an essential vs. non-essential split, and
   spend broken down by category, for any month with completed trips.
 - **Mascot** — a small hand-drawn companion shows what's going on: idle
