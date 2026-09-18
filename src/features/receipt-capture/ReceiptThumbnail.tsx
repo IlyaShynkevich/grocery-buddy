@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-export function ReceiptThumbnail({ blob }: { blob: Blob }) {
+export function ReceiptThumbnail({ blob, onLoad }: { blob: Blob; onLoad?: () => void }) {
   const [url, setUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -15,6 +15,8 @@ export function ReceiptThumbnail({ blob }: { blob: Blob }) {
     <img
       src={url}
       alt="Receipt thumbnail"
+      onLoad={onLoad}
+      onError={() => console.error('Receipt thumbnail failed to load', { type: blob.type, size: blob.size })}
       style={{
         width: 48,
         height: 48,

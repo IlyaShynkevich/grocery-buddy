@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures'
+import { expect, openDebugPanel, test } from './fixtures'
 
 async function addItem(page: import('@playwright/test').Page, name: string) {
   await page.getByTestId('add-item-input').fill(name)
@@ -12,13 +12,6 @@ async function itemNames(page: import('@playwright/test').Page): Promise<string[
   return page.getByTestId('shopping-list-item').locator('input[type="text"]').evaluateAll((inputs) =>
     inputs.map((input) => (input as HTMLInputElement).value),
   )
-}
-
-// The debug panel is collapsed by default (native <details>) — its contents
-// stay in the DOM either way, but any button inside needs the panel opened
-// first or Playwright's actionability check on .click() fails as "hidden".
-async function openDebugPanel(page: import('@playwright/test').Page) {
-  await page.getByTestId('debug-panel-toggle').click()
 }
 
 test('debug-panel trip creation does not steal the active trip, even across reload', async ({ page }) => {
@@ -41,6 +34,7 @@ test('debug-panel trip creation does not steal the active trip, even across relo
   // this is the exact regression: reload must not hand "active" to the new empty trip
   await expect.poll(() => itemNames(page)).toEqual(['Milk', 'Eggs', 'Cucumber'])
 
+  await openDebugPanel(page)
   const activeTripDiv = page.locator('[data-testid="debug-trip"][data-active="true"]')
   await expect(activeTripDiv).toHaveCount(1)
   await expect(activeTripDiv).toHaveAttribute('data-trip-id', shoppingListTripId ?? '')
@@ -65,6 +59,7 @@ test('root cause: reset-then-create-trip-then-reload does not orphan the active 
 
   await expect.poll(() => itemNames(page)).toEqual(['Milk', 'Eggs', 'Cucumber'])
 
+  await openDebugPanel(page)
   const activeTripDiv = page.locator('[data-testid="debug-trip"][data-active="true"]')
   await expect(activeTripDiv).toHaveCount(1)
   await expect(activeTripDiv).toHaveAttribute('data-trip-id', shoppingListTripId ?? '')
@@ -86,5 +81,6 @@ test('reset all data then reload bootstraps exactly one trip, not phantom duplic
   await page.reload()
 
   await expect.poll(() => itemNames(page)).toEqual([])
+  await openDebugPanel(page)
   await expect(page.getByTestId('debug-trip')).toHaveCount(1)
 })

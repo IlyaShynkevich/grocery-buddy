@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures'
+import { expect, openDebugPanel, test, type Page } from './fixtures'
 
 async function addItem(page: Page, name: string) {
   await page.getByTestId('add-item-input').fill(name)
@@ -140,6 +140,7 @@ test('deleting the trip currently pinned as active starts a fresh empty draft', 
   const newTripId = await page.getByTestId('shopping-list').getAttribute('data-trip-id')
   expect(newTripId).not.toBe(trip1Id)
 
+  await openDebugPanel(page)
   const newTripRow = page.locator(`[data-testid="debug-trip"][data-trip-id="${newTripId}"]`)
   await expect(newTripRow).toHaveAttribute('data-active', 'true')
 })

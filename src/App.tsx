@@ -8,6 +8,8 @@ import { TripDetailPage } from './features/history/TripDetailPage'
 import { HomePage } from './features/home/HomePage'
 import { BarChartIcon, ClockIcon, GearIcon, HomeIcon, InfoIcon, ShoppingBagIcon, type IconProps } from './features/navigation/icons'
 import { TabTransition, type SlideDirection } from './features/navigation/TabTransition'
+import { PerfOverlay } from './features/perf/PerfOverlay'
+import { PERF_ENABLED } from './features/perf/perfLog'
 import { ReceiptCapture } from './features/receipt-capture/ReceiptCapture'
 import { ReceiptReviewPanel } from './features/receipt-review/ReceiptReviewPanel'
 import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
@@ -365,6 +367,8 @@ function App() {
         {activeTab === 'shopping' && <DbDebugPanel />}
         <Footer />
       </div>
+      {/* TEMPORARY — ?perf=1 only, see features/perf/perfLog.ts */}
+      {PERF_ENABLED && <PerfOverlay />}
     </main>
   )
 }
