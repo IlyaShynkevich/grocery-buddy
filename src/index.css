@@ -161,8 +161,19 @@ summary {
   to { transform: translateX(100%); }
 }
 
+/* Gentle "still working" pulse, e.g. ReceiptCapture's "Waiting for photo…" */
+.gb-pulse {
+  animation: gb-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes gb-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .gb-tab-slide {
+  .gb-tab-slide,
+  .gb-pulse {
     animation: none !important;
   }
 }

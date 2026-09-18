@@ -1,3 +1,5 @@
+import { perfMark } from '../perf/perfLog'
+
 export interface ExtractedItem {
   name: string
   price: number
@@ -49,6 +51,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 export async function extractReceipt(imageBlob: Blob, categoryNotes: CategoryNoteHint[] = []): Promise<ExtractionResult> {
   const dataUrl = await toUploadDataUrl(imageBlob)
 
+  perfMark(`request sent (${Math.round(dataUrl.length / 1024)} KB)`)
   const response = await fetch('/api/extract-receipt', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -56,6 +59,7 @@ export async function extractReceipt(imageBlob: Blob, categoryNotes: CategoryNot
     // notes set sends the exact same request body as before this existed.
     body: JSON.stringify(categoryNotes.length > 0 ? { image: dataUrl, notes: categoryNotes } : { image: dataUrl }),
   })
+  perfMark(`response received (${response.status})`)
 
   const body = await response.json().catch(() => null)
 

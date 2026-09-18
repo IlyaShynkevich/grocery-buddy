@@ -4,6 +4,7 @@ import { IconChip } from '../../lib/IconChip'
 import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { useMascotPose } from '../mascot/useMascotPose'
+import { perfArmNextReceipt, perfMark, perfNewReceiptMilestone } from '../perf/perfLog'
 import { getUserFacingErrorMessage, isDemoModeError } from './errorMessage'
 import { ReceiptThumbnail } from './ReceiptThumbnail'
 import { useReceiptCapture } from './useReceiptCapture'
@@ -20,17 +21,63 @@ export function ReceiptCapture() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  // True from tapping Camera/Photos until the photo is saved (or the picker
+  // is cancelled). Handing off to the camera app and back can take several
+  // seconds on a real phone before the page gets the photo at all — without
+  // this, nothing on screen changes during that gap and the app looks
+  // frozen.
+  const [awaitingPhoto, setAwaitingPhoto] = useState(false)
+  const [captureError, setCaptureError] = useState<string | null>(null)
   const isProcessing = pendingReceipts.some((receipt) => receipt.status === 'processing')
   const hasFailed = pendingReceipts.some((receipt) => receipt.status === 'failed')
   const mascotPose = useMascotPose(isProcessing, hasFailed)
 
-  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      await captureReceipt(file)
+  // The picker/camera being dismissed without a photo fires `cancel` on the
+  // input (Chrome 113+, Safari 16.4+) and no `change` — React has no prop
+  // for it on <input>, so it's wired natively.
+  useEffect(() => {
+    const inputs = [cameraInputRef.current, galleryInputRef.current].filter((input) => input !== null)
+    const onCancel = () => {
+      perfMark('photo picker cancelled')
+      setAwaitingPhoto(false)
     }
-    // Reset so picking the same file again still fires a change event.
-    event.target.value = ''
+    inputs.forEach((input) => input.addEventListener('cancel', onCancel))
+    return () => inputs.forEach((input) => input.removeEventListener('cancel', onCancel))
+  }, [])
+
+  const openPicker = (input: HTMLInputElement | null, perfLabel: string) => {
+    setMenuOpen(false)
+    if (!input) {
+      console.error('Receipt capture: photo input is not mounted')
+      setCaptureError('The photo picker is not available — reload the app and try again.')
+      return
+    }
+    perfMark(perfLabel)
+    setCaptureError(null)
+    setAwaitingPhoto(true)
+    input.click()
+  }
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.target
+    const file = input.files?.[0]
+    try {
+      if (!file) {
+        perfMark('photo picker returned no file')
+        return
+      }
+      perfMark(`photo received (${(file.size / 1e6).toFixed(1)} MB, ${file.type || 'unknown type'})`)
+      perfArmNextReceipt()
+      await captureReceipt(file)
+      perfMark('photo saved')
+    } catch (err) {
+      console.error('RECEIPT_CAPTURE_ERROR:', err)
+      setCaptureError(`Couldn't save the photo: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setAwaitingPhoto(false)
+      // Reset so picking the same file again still fires a change event.
+      input.value = ''
+    }
   }
 
   return (
@@ -84,10 +131,7 @@ export function ReceiptCapture() {
                   <button
                     type="button"
                     data-testid="receipt-camera-option"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      cameraInputRef.current?.click()
-                    }}
+                    onClick={() => openPicker(cameraInputRef.current, 'Camera tap')}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left', width: '100%' }}
                   >
                     <IconChip src="/icons/icon-camera.png" />
@@ -96,10 +140,7 @@ export function ReceiptCapture() {
                   <button
                     type="button"
                     data-testid="receipt-gallery-option"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      galleryInputRef.current?.click()
-                    }}
+                    onClick={() => openPicker(galleryInputRef.current, 'Photos tap')}
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left', width: '100%' }}
                   >
                     <IconChip src="/icons/icon-gallery.png" />
@@ -141,7 +182,36 @@ export function ReceiptCapture() {
         style={{ display: 'none' }}
       />
 
-      {pendingReceipts.length === 0 && (
+      {captureError && (
+        <p role="alert" data-testid="receipt-capture-error" style={{ color: 'var(--danger)', marginTop: '0.75rem' }}>
+          {captureError}
+        </p>
+      )}
+
+      {awaitingPhoto && (
+        <div
+          role="status"
+          data-testid="receipt-waiting-for-photo"
+          style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem' }}
+        >
+          <span className="gb-pulse" style={{ flex: 1 }}>
+            Waiting for photo…
+          </span>
+          {/* Safety valve for browsers that never fire `cancel`: only hides
+              this indicator — a photo that still arrives is saved as usual. */}
+          <button
+            type="button"
+            data-testid="receipt-waiting-dismiss"
+            aria-label="Stop waiting for photo"
+            onClick={() => setAwaitingPhoto(false)}
+            style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {pendingReceipts.length === 0 && !awaitingPhoto && (
         <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>No receipts captured yet.</p>
       )}
 
@@ -172,6 +242,11 @@ function ReceiptRow({
   onRemove: (id: number) => void
 }) {
   const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    perfNewReceiptMilestone('row', receipt.capturedAt, 'row shown')
+  }, [receipt.capturedAt])
+
   const isWaitingToRetry = receipt.status === 'failed' && receipt.retryAt !== undefined && receipt.retryAt > now
 
   // Tick the countdown display while a retry is scheduled.
@@ -213,7 +288,10 @@ function ReceiptRow({
       data-status={receipt.status}
       style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.75rem' }}
     >
-      <ReceiptThumbnail blob={receipt.imageBlob} />
+      <ReceiptThumbnail
+        blob={receipt.imageBlob}
+        onLoad={() => perfNewReceiptMilestone('thumbnail', receipt.capturedAt, 'thumbnail loaded')}
+      />
       <div style={{ flex: 1 }}>
         <div data-testid="receipt-status">{statusText}</div>
         <div data-testid="receipt-timestamp" style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
@@ -226,7 +304,15 @@ function ReceiptRow({
         )}
       </div>
       {(receipt.status === 'pending' || receipt.status === 'failed') && (
-        <button type="button" data-testid="receipt-process-button" onClick={() => onProcess(receipt)} style={primaryButtonStyle}>
+        <button
+          type="button"
+          data-testid="receipt-process-button"
+          onClick={() => {
+            perfMark(receipt.status === 'failed' ? 'Retry tap' : 'Process tap')
+            onProcess(receipt)
+          }}
+          style={primaryButtonStyle}
+        >
           {receipt.status === 'failed' ? 'Retry' : 'Process'}
         </button>
       )}

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures'
+import { expect, openDebugPanel, test, type Page } from './fixtures'
 
 async function addItem(page: Page, name: string) {
   await page.getByTestId('add-item-input').fill(name)
@@ -27,6 +27,7 @@ test('saving a trip marks it complete and immediately starts a new empty active 
   await expect.poll(() => itemNames(page)).toEqual([])
 
   // The old trip is no longer the active one in the debug panel...
+  await openDebugPanel(page)
   const oldTripRow = page.locator(`[data-testid="debug-trip"][data-trip-id="${originalTripId}"]`)
   await expect(oldTripRow).toHaveAttribute('data-active', 'false')
 

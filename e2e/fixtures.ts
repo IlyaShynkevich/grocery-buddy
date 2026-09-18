@@ -20,4 +20,18 @@ export const test = base.extend<{ page: Page }>({
 })
 
 export const expect = baseExpect
+
+/**
+ * Debug tools' contents only mount while the panel is open (see
+ * DbDebugPanel), and it's closed again after any reload or tab switch —
+ * call this before reading anything inside it. No-op if already open, since
+ * clicking the toggle then would close it.
+ */
+export async function openDebugPanel(page: Page) {
+  const panel = page.getByTestId('debug-panel')
+  if (!(await panel.evaluate((el) => (el as HTMLDetailsElement).open))) {
+    await page.getByTestId('debug-panel-toggle').click()
+  }
+  await expect(panel).toHaveAttribute('open', '')
+}
 export type { Locator, Page }
