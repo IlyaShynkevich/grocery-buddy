@@ -11,7 +11,7 @@ async function captureAndProcess(page: Page) {
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
     }),
   )
   await page.getByTestId('receipt-capture-input').setInputFiles({

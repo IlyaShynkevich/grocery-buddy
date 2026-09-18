@@ -11,7 +11,7 @@ import {
   type SuggestedItemMatch,
 } from '../../db/db'
 import { isLikelyMatch } from '../../lib/itemMatch'
-import { ExtractionRequestError, extractReceiptItems } from './extractReceipt'
+import { ExtractionRequestError, extractReceipt } from './extractReceipt'
 import { isOpenAiTokenLimitError } from './errorMessage'
 import { parseRetryAfterSeconds } from './retryAfter'
 import { useActiveTripId } from '../trip/useActiveTripId'
@@ -59,7 +59,11 @@ export function useReceiptCapture() {
 
     try {
       const categoryNotes = await getCategoryNoteHints()
-      const extractedItems = await extractReceiptItems(receipt.imageBlob, categoryNotes)
+      const {
+        items: extractedItems,
+        purchaseDate,
+        purchaseDateError,
+      } = await extractReceipt(receipt.imageBlob, categoryNotes)
 
       const stagedItems: StagedReceiptItem[] = []
       const suggestedMatches: SuggestedItemMatch[] = []
@@ -92,15 +96,18 @@ export function useReceiptCapture() {
         })
       }
 
-      // Deliberately nothing written to `items` and no trip-total recompute
-      // here — extracted items are held on this receipt row until the user
-      // taps Confirm in the review panel (see confirmReview in
-      // useReceiptReview.ts). The review panel (see receipt-review feature)
-      // shows automatically for any 'done' receipt with reviewed: false.
+      // Deliberately nothing written to `items`, no trip-total recompute and
+      // no trip-date change here — extracted items and the purchase date are
+      // held on this receipt row until the user taps Confirm in the review
+      // panel (see confirmReview in useReceiptReview.ts). The review panel
+      // (see receipt-review feature) shows automatically for any 'done'
+      // receipt with reviewed: false.
       await db.pendingReceipts.update(receipt.id, {
         status: 'done',
         stagedItems,
         suggestedMatches,
+        stagedDate: purchaseDate,
+        stagedDateError: purchaseDateError,
         reviewed: stagedItems.length === 0,
       })
     } catch (err) {

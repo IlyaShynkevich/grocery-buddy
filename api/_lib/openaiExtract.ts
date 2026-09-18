@@ -20,6 +20,20 @@ export interface ExtractedItem {
   essentialOverride?: boolean | null
 }
 
+/** The whole extraction response: line items plus the receipt-level purchase date. */
+export interface ExtractionResult {
+  items: ExtractedItem[]
+  /** ISO 'YYYY-MM-DD', or null when the receipt has no legible date (or it failed to parse — see purchaseDateError) */
+  purchaseDate: string | null
+  /**
+   * Set only when the model returned *something* for the date that couldn't
+   * be parsed — surfaced in the review panel instead of the date being
+   * silently dropped. Null when purchaseDate parsed fine or the model itself
+   * reported no date.
+   */
+  purchaseDateError: string | null
+}
+
 /** A category's personal notes (Customize page), grouped for the extraction prompt. */
 export interface CategoryNoteHint {
   /** key into CATEGORIES */
@@ -111,35 +125,39 @@ function isTokenLimitBody(body: string): boolean {
 
 const CATEGORY_KEYS = CATEGORIES.map((category) => category.key)
 
-const SYSTEM_PROMPT = `You extract line items from a photo of a grocery store receipt.
-Respond with ONLY a JSON object of the shape {"items": [{"name": string, "price": number, "category": string, "isDiscount": boolean, "essentialOverride": boolean|null}]}.
+// "purchaseDate" is deliberately first in the shape: the model generates keys
+// in order, so a response truncated mid-items (see the salvage pass below)
+// still carries the date.
+const SYSTEM_PROMPT = `You extract line items and the purchase date from a photo of a grocery store receipt.
+Respond with ONLY a JSON object of the shape {"purchaseDate": string|null, "items": [{"name": string, "price": number, "category": string, "isDiscount": boolean, "essentialOverride": boolean|null}]}.
+- "purchaseDate" is the date the purchase was made, copied exactly as printed on the receipt — date part only, no time. Receipts are usually German, so it is typically day-first: DD.MM.YYYY (e.g. "18.09.2026") or DD.MM.YY (e.g. "18.09.26"). Do not reorder, reformat, or convert it. Use null if no date is printed or it cannot be read confidently — never guess.
 - "price" is the item's paid price in the receipt's currency, as a plain number (no currency symbol, no thousands separators).
 - "category" must be exactly one of: ${CATEGORY_KEYS.join(', ')}. Pick the closest match; use "other" if unsure.
 - Skip subtotal, tax, total, and payment-method lines — only include purchased items and discounts.
 - Coupon/discount lines (e.g. "Coupon Herzstuecke -0,38") are not purchasable products: include them with "isDiscount": true, "price" as a negative number equal to the discount amount, and "category" set to "other".
 - For regular purchased items, set "isDiscount": false.
 - "essentialOverride" is null by default. Only set it to false when the user's own personal category notes (given separately in the user message, if any) name this specific item — see those instructions if present. Never set it to true.
-- If the photo is not a legible receipt, respond with {"items": []}.
+- If the photo is not a legible receipt, respond with {"purchaseDate": null, "items": []}.
 Output raw JSON only. No markdown code fences, no commentary before or after.`
 
 /**
- * Calls OpenAI's vision model to extract line items from a receipt photo.
- * `fetchImpl` is injectable so error-handling paths (timeouts, bad
- * responses, garbage content) can be exercised with a fake fetch in tests
- * without hitting the real API.
+ * Calls OpenAI's vision model to extract line items and the purchase date
+ * from a receipt photo. `fetchImpl` is injectable so error-handling paths
+ * (timeouts, bad responses, garbage content) can be exercised with a fake
+ * fetch in tests without hitting the real API.
  */
-export async function extractReceiptItems(
+export async function extractReceipt(
   imageDataUrl: string,
   apiKey: string,
   notes: CategoryNoteHint[] = [],
   fetchImpl: typeof fetch = fetch,
-): Promise<ExtractedItem[]> {
+): Promise<ExtractionResult> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS)
 
   const personalization = buildPersonalizationText(notes)
   const userContent = [
-    { type: 'text' as const, text: 'Extract the items from this receipt.' },
+    { type: 'text' as const, text: 'Extract the items and purchase date from this receipt.' },
     ...(personalization ? [{ type: 'text' as const, text: personalization }] : []),
     { type: 'image_url' as const, image_url: { url: imageDataUrl, detail: 'high' as const } },
   ]
@@ -203,12 +221,12 @@ export async function extractReceiptItems(
   }
 
   try {
-    return parseExtractedItems(content)
+    return parseExtraction(content)
   } catch (err) {
     // A 200 response can still be truncated: OpenAI sets finish_reason:
     // "length" when it stopped generating because max_completion_tokens was
     // hit, surfaced as a "successful" response with incomplete content
-    // instead of an error. Only relevant once parseExtractedItems has
+    // instead of an error. Only relevant once parseExtraction has
     // already failed to salvage anything usable — a finish_reason: "length"
     // response that still yielded complete items via salvage isn't an error
     // at all. Tagged with a "(truncated)" marker so the frontend
@@ -236,11 +254,11 @@ export async function extractReceiptItems(
 const DEBUG_TAG = '[TEMP_DEBUG_PARSE_FAILURE]'
 
 /** Exported separately so malformed/garbage-content handling can be tested directly. */
-export function parseExtractedItems(content: string): ExtractedItem[] {
+export function parseExtraction(content: string): ExtractionResult {
   const stripped = stripCodeFence(content)
 
-  const strictItems = tryStrictParse(stripped)
-  if (strictItems) return itemsFromRaw(strictItems)
+  const strict = tryStrictParse(stripped)
+  if (strict) return { items: itemsFromRaw(strict.items), ...purchaseDateFromRaw(strict.purchaseDate) }
 
   // The response as a whole isn't valid JSON — a single bad escape, an
   // unterminated string, truncation from hitting max_completion_tokens, ...
@@ -259,7 +277,7 @@ export function parseExtractedItems(content: string): ExtractedItem[] {
   if (salvaged.length === 0) {
     throw new Error('OpenAI response was not parseable JSON and no items could be salvaged from it')
   }
-  return itemsFromRaw(salvaged)
+  return { items: itemsFromRaw(salvaged), ...purchaseDateFromRaw(salvagePurchaseDate(stripped)) }
 }
 
 /**
@@ -268,15 +286,84 @@ export function parseExtractedItems(content: string): ExtractedItem[] {
  * through to the salvage pass — this function's behavior for a
  * well-formed response is unchanged from before.
  */
-function tryStrictParse(stripped: string): unknown[] | null {
+function tryStrictParse(stripped: string): { items: unknown[]; purchaseDate: unknown } | null {
   let parsed: unknown
   try {
     parsed = JSON.parse(stripped)
   } catch {
     return null
   }
-  const rawItems = Array.isArray(parsed) ? parsed : (parsed as { items?: unknown } | null)?.items
-  return Array.isArray(rawItems) ? rawItems : null
+  if (Array.isArray(parsed)) return { items: parsed, purchaseDate: null }
+  const record = parsed as { items?: unknown; purchaseDate?: unknown } | null
+  return Array.isArray(record?.items) ? { items: record.items, purchaseDate: record.purchaseDate ?? null } : null
+}
+
+/**
+ * The salvage pass's counterpart for the date: pulls "purchaseDate" out of a
+ * response that isn't valid JSON as a whole. Null (no date) when the key
+ * isn't there, or its value isn't a complete JSON string/null (e.g. the
+ * response was cut off mid-value).
+ */
+function salvagePurchaseDate(content: string): unknown {
+  const match = /"purchaseDate"\s*:\s*("(?:[^"\\]|\\.)*"|null)/.exec(content)
+  if (!match) return null
+  try {
+    return JSON.parse(match[1])
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Validates the model's raw "purchaseDate" (a date copied as printed — see
+ * SYSTEM_PROMPT) into an ISO date. Anything non-null that doesn't parse is
+ * reported via purchaseDateError rather than silently becoming "no date".
+ */
+function purchaseDateFromRaw(raw: unknown): Pick<ExtractionResult, 'purchaseDate' | 'purchaseDateError'> {
+  if (raw === null || raw === undefined) return { purchaseDate: null, purchaseDateError: null }
+  if (typeof raw !== 'string') {
+    return { purchaseDate: null, purchaseDateError: `Receipt date was not text: ${JSON.stringify(raw)}` }
+  }
+  const purchaseDate = parseReceiptDate(raw)
+  if (purchaseDate === null) {
+    return { purchaseDate: null, purchaseDateError: `Unrecognized receipt date "${raw}"` }
+  }
+  return { purchaseDate, purchaseDateError: null }
+}
+
+/**
+ * Parses a receipt date as printed into ISO 'YYYY-MM-DD', or null if it
+ * isn't a real calendar date in a recognized format. Day-first (German):
+ * DD.MM.YYYY and DD.MM.YY, with '.', '/' or '-' separators and optional
+ * leading zeros — plus plain ISO YYYY-MM-DD. A two-digit year is always 20YY.
+ * A trailing time ("18.09.2026 14:32") is ignored, in case the model copies
+ * it despite the prompt saying date only.
+ */
+export function parseReceiptDate(raw: string): string | null {
+  const text = raw.trim().replace(/\s+\d{1,2}:\d{2}(:\d{2})?$/, '')
+  let year: number
+  let month: number
+  let day: number
+
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(text)
+  const dayFirst = /^(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4})$/.exec(text)
+  if (iso) {
+    year = Number(iso[1])
+    month = Number(iso[2])
+    day = Number(iso[3])
+  } else if (dayFirst) {
+    day = Number(dayFirst[1])
+    month = Number(dayFirst[2])
+    year = dayFirst[3].length === 2 ? 2000 + Number(dayFirst[3]) : Number(dayFirst[3])
+  } else {
+    return null
+  }
+
+  // Round-trip through a UTC date to reject impossible dates (31.02., 00.13.)
+  // instead of letting Date roll them over into a different, valid one.
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null
+  return date.toISOString().slice(0, 10)
 }
 
 /**

@@ -54,7 +54,7 @@ test('Camera entry point: capturing and processing a receipt reaches the same su
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
     }),
   )
 
@@ -84,7 +84,7 @@ test('Choose from Photos entry point: picking an existing image reaches the same
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Bread', price: 2.49, category: 'bakery' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Bread', price: 2.49, category: 'bakery' }] }),
     }),
   )
 

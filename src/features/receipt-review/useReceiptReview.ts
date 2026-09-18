@@ -15,6 +15,8 @@ export interface ResolvedMatch {
   stagedItem: Omit<Item, 'id'>
 }
 
+const CLEARED_STAGING = { stagedItems: [], suggestedMatches: [], stagedDate: null, stagedDateError: null }
+
 /**
  * Drives the review panel shown automatically after a receipt finishes
  * extraction (see processReceipt in useReceiptCapture.ts). Extraction
@@ -37,6 +39,10 @@ export function useReceiptReview() {
     const rows = await db.items.bulkGet(typedIds)
     return new Map(rows.filter((row): row is Item => row !== undefined).map((row) => [row.id, row]))
   }, [receipt])
+
+  // The trip's current date — what the review shows (and what stays in
+  // place on Confirm) when the AI found no date on the receipt.
+  const trip = useLiveQuery(async () => (receipt?.tripId ? db.trips.get(receipt.tripId) : undefined), [receipt?.tripId])
 
   // Discount lines are internal accounting (already counted toward the trip
   // total at Confirm), never something to review/edit as a purchasable item
@@ -83,7 +89,13 @@ export function useReceiptReview() {
     await db.pendingReceipts.update(receipt.id, { stagedItems: updatedStaged })
   }
 
-  /** Materializes the surviving staged items into `items`, applies any resolved merges, and recomputes the trip total — all in one transaction. */
+  /** A user-picked date replaces the AI's (and resolves any error about it) — still only staged until Confirm. */
+  const updateDate = async (date: string) => {
+    if (!receipt) return
+    await db.pendingReceipts.update(receipt.id, { stagedDate: date, stagedDateError: null })
+  }
+
+  /** Materializes the surviving staged items into `items`, applies any resolved merges, recomputes the trip total, and applies the staged purchase date — all in one transaction. */
   const confirmReview = async () => {
     if (!receipt) return
     await db.transaction('rw', db.items, db.trips, db.pendingReceipts, async () => {
@@ -99,25 +111,35 @@ export function useReceiptReview() {
         await db.items.bulkAdd(survivors)
       }
 
-      if (receipt.tripId) await recomputeTripTotal(receipt.tripId)
+      if (receipt.tripId) {
+        await recomputeTripTotal(receipt.tripId)
+        // Same `date` field the debug panel's date editor writes. No staged
+        // date (the AI found none, and the user didn't pick one) leaves the
+        // trip's date untouched.
+        if (receipt.stagedDate) {
+          await db.trips.update(receipt.tripId, { date: receipt.stagedDate, dateFromReceipt: true })
+        }
+      }
 
-      await db.pendingReceipts.update(receipt.id, { reviewed: true, stagedItems: [], suggestedMatches: [] })
+      await db.pendingReceipts.update(receipt.id, { reviewed: true, ...CLEARED_STAGING })
     })
   }
 
-  /** Discards the staged items with no `items` writes — as if this scan never happened. The receipt photo itself is untouched (removeReceipt is a separate, explicit action). */
+  /** Discards the staged items and date with no `items`/`trips` writes — as if this scan never happened. The receipt photo itself is untouched (removeReceipt is a separate, explicit action). */
   const dismissReview = async () => {
     if (!receipt) return
-    await db.pendingReceipts.update(receipt.id, { reviewed: true, stagedItems: [], suggestedMatches: [] })
+    await db.pendingReceipts.update(receipt.id, { reviewed: true, ...CLEARED_STAGING })
   }
 
   return {
     receipt,
+    tripDate: trip?.date,
     addedItems,
     matches,
     resolveMatch,
     removeItem,
     updatePrice,
+    updateDate,
     confirmReview,
     dismissReview,
   }

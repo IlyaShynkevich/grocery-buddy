@@ -115,6 +115,7 @@ button:disabled {
 
 input[type='text'],
 input[type='number'],
+input[type='date'],
 select {
   font: inherit;
   color: var(--text);

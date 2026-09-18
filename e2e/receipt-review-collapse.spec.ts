@@ -12,6 +12,7 @@ async function captureAndProcess(page: Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        purchaseDate: null,
         items: [
           { name: 'Milk', price: 3.49, category: 'dairy' },
           { name: 'Bread', price: 2.49, category: 'bakery' },

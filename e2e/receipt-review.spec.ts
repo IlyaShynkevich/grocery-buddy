@@ -35,6 +35,7 @@ test('case A: no prior typed items — review panel shows a plain confirmation, 
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        purchaseDate: null,
         items: [
           { name: 'Milk', price: 3.49, category: 'dairy' },
           { name: 'Bread', price: 2.49, category: 'bakery' },
@@ -79,6 +80,7 @@ test('case B: typed item auto-matches a scanned item, confirming the match merge
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        purchaseDate: null,
         items: [{ name: 'Milch 1L', price: 1.29, category: 'dairy' }],
       }),
     }),
@@ -123,6 +125,7 @@ test('case B: typed item stays separate when the user rejects the suggested matc
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        purchaseDate: null,
         items: [{ name: 'Milch 1L', price: 1.29, category: 'dairy' }],
       }),
     }),
@@ -154,6 +157,7 @@ test('case B with no matches found: unrelated typed and scanned items are just a
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        purchaseDate: null,
         items: [{ name: 'Eggs', price: 2.99, category: 'dairy' }],
       }),
     }),
@@ -186,6 +190,7 @@ test('dismissing the review panel discards the scanned items — as if the scan 
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        purchaseDate: null,
         items: [{ name: 'Milk', price: 3.49, category: 'dairy' }],
       }),
     }),
@@ -216,6 +221,7 @@ test('deleting the receipt photo before ever confirming leaves the shopping list
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        purchaseDate: null,
         items: [{ name: 'Milk', price: 3.49, category: 'dairy' }],
       }),
     }),

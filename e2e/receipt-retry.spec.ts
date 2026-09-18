@@ -66,7 +66,7 @@ test('auto-retries after the parsed rate-limit wait, with no manual interaction'
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
     })
   })
 
@@ -93,7 +93,7 @@ test('repeats the parse-and-wait loop if the auto-retry itself hits another 429'
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Eggs', price: 4.2, category: 'dairy' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Eggs', price: 4.2, category: 'dairy' }] }),
     })
   })
 
@@ -119,7 +119,7 @@ test('manual Retry works immediately and bypasses the countdown', async ({ page 
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Bread', price: 2.49, category: 'bakery' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Bread', price: 2.49, category: 'bakery' }] }),
     })
   })
 

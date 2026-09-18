@@ -166,6 +166,7 @@ test('discount entries no longer show category/essential controls anywhere', asy
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        purchaseDate: null,
         items: [
           { name: 'Milk', price: 3.49, category: 'dairy', isDiscount: false },
           { name: 'Coupon Herzstuecke', price: -0.38, category: 'other', isDiscount: true },
