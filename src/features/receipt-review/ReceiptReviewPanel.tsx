@@ -2,6 +2,7 @@ import type { ChangeEvent } from 'react'
 import { useState } from 'react'
 import { getCategory, resolveEssential } from '../../db/categories'
 import type { Item } from '../../db/db'
+import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
 import { mutedTextStyle, PAGE_MAX_WIDTH, primaryButtonStyle } from '../../lib/ui'
 import { useReceiptReview } from './useReceiptReview'
@@ -38,14 +39,42 @@ function PriceInput({
   )
 }
 
+/** Same seed-once local state as PriceInput, for the same reason: a partially-typed date reads as '' and must not snap back to the stored value mid-edit. */
+function DateInput({ initialDate, onChange }: { initialDate: string; onChange: (date: string) => void }) {
+  const [value, setValue] = useState(initialDate)
+  return (
+    <input
+      type="date"
+      value={value}
+      data-testid="receipt-review-date-input"
+      aria-label="Purchase date"
+      onChange={(e) => {
+        setValue(e.target.value)
+        onChange(e.target.value)
+      }}
+    />
+  )
+}
+
 // Deliberately not a blocking modal/backdrop — the rest of the app (shopping
 // list, another receipt capture) must stay usable while this is showing, and
 // if the user never interacts with it at all nothing has touched the
 // shopping list yet either — extracted items are staged on the receipt
 // itself (see useReceiptReview) until Confirm.
 export function ReceiptReviewPanel() {
-  const { receipt, addedItems, matches, resolveMatch, removeItem, updatePrice, confirmReview, dismissReview } =
-    useReceiptReview()
+  const {
+    receipt,
+    tripDate,
+    addedItems,
+    matches,
+    resolveMatch,
+    removeItem,
+    updatePrice,
+    updateDate,
+    confirmReview,
+    dismissReview,
+  } = useReceiptReview()
+  const [dateSaveError, setDateSaveError] = useState<string | null>(null)
   // Collapsed by default so the panel doesn't push the shopping list (and
   // Save trip) out of view the moment processing finishes — same idea as
   // ShoppingListPage's own collapsible list, reusing the <details>/<summary>
@@ -77,6 +106,21 @@ export function ReceiptReviewPanel() {
 
     updatePrice(stagedIndex, price).catch((error: unknown) => {
       console.error(`Failed to save price for "${itemName}"`, error)
+    })
+  }
+
+  // The AI's (or user's) staged date when there is one; otherwise the trip's
+  // own date, shown as-is — that's also exactly what Confirm leaves in place.
+  const shownDate = receipt.stagedDate ?? tripDate
+
+  const handleDateChange = (date: string) => {
+    // Mid-edit (a date input reports '' until every part is filled in) —
+    // nothing to write yet, same as an emptied price field.
+    if (date === '') return
+    setDateSaveError(null)
+    updateDate(date).catch((error: unknown) => {
+      console.error('Failed to save purchase date', error)
+      setDateSaveError(error instanceof Error ? error.message : String(error))
     })
   }
 
@@ -153,11 +197,30 @@ export function ReceiptReviewPanel() {
         data-testid="receipt-review-summary"
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', margin: '0.75rem 0' }}
       >
-        <span data-testid="receipt-review-total" style={{ fontWeight: 700 }}>
-          Total: {formatPrice(total)}
+        <span style={{ display: 'flex', flexDirection: 'column' }}>
+          <span data-testid="receipt-review-total" style={{ fontWeight: 700 }}>
+            Total: {formatPrice(total)}
+          </span>
+          {shownDate && (
+            <span data-testid="receipt-review-date" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
+              Date: {formatDate(shownDate)}
+            </span>
+          )}
         </span>
         {!isOpen && confirmButton}
       </div>
+
+      {receipt.stagedDateError && (
+        <p role="alert" data-testid="receipt-review-date-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
+          Couldn't read the receipt's date ({receipt.stagedDateError}) — the trip keeps its current date unless you pick
+          one under Show items.
+        </p>
+      )}
+      {dateSaveError && (
+        <p role="alert" data-testid="receipt-review-date-save-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
+          Failed to save the date: {dateSaveError}
+        </p>
+      )}
 
       <details
         data-testid="receipt-review-collapsible"
@@ -167,6 +230,16 @@ export function ReceiptReviewPanel() {
         <summary data-testid="receipt-review-toggle" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
           {isOpen ? 'Hide items ▾' : 'Show items ▸'}
         </summary>
+
+        {shownDate && (
+          <label
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.75rem' }}
+          >
+            Purchase date
+            {/* keyed by receipt so the next queued receipt's review re-seeds it */}
+            <DateInput key={receipt.id} initialDate={shownDate} onChange={handleDateChange} />
+          </label>
+        )}
 
         <ul style={{ listStyle: 'none', padding: 0, margin: '0.75rem 0' }} data-testid="receipt-review-items">
           {addedItems.map(({ stagedIndex, item }) => {

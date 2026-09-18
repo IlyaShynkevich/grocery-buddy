@@ -53,6 +53,7 @@ test('a category note is sent with the extraction request, and a note match alwa
         // coincidentally computes to false here too, but the model was
         // observed setting true from the old "opposite of default" prompt
         // wording â€” see buildPersonalizationText).
+        purchaseDate: null,
         items: [{ name: 'Nuggets', price: 3.5, category: 'frozen', essentialOverride: false }],
       }),
     })
@@ -90,7 +91,7 @@ test('with no category notes set, the extraction request omits notes entirely â€
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
     })
   })
 

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { extractReceiptItems, normalizeNoteHints, OpenAiHttpError } from './_lib/openaiExtract.js'
+import { extractReceipt, normalizeNoteHints, OpenAiHttpError } from './_lib/openaiExtract.js'
 
 // openaiExtract.ts aborts its own OpenAI call at 25s; without this, Vercel's
 // platform default (10s Hobby / 15s Pro) would kill the function first on a
@@ -36,8 +36,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-      const items = await extractReceiptItems(image, apiKey, notes)
-      res.status(200).json({ items })
+      const { items, purchaseDate, purchaseDateError } = await extractReceipt(image, apiKey, notes)
+      res.status(200).json({ items, purchaseDate, purchaseDateError })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown extraction error'
       // Forward OpenAI's own 4xx as-is (429, 400, 413, ...) — those describe

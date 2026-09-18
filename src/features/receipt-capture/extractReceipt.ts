@@ -8,6 +8,15 @@ export interface ExtractedItem {
   essentialOverride?: boolean | null
 }
 
+/** Mirrors api/_lib/openaiExtract.ts's ExtractionResult. */
+export interface ExtractionResult {
+  items: ExtractedItem[]
+  /** ISO 'YYYY-MM-DD' read off the receipt, or null if it has no legible date */
+  purchaseDate: string | null
+  /** Set when the AI returned a date that couldn't be parsed — shown in the review panel, never dropped silently */
+  purchaseDateError: string | null
+}
+
 /** A category's personal notes (see useCategoryNotes/CustomizePage), grouped for the extraction request. */
 export interface CategoryNoteHint {
   /** key into CATEGORIES */
@@ -29,13 +38,15 @@ export class ExtractionRequestError extends Error {
 const MAX_DIMENSION = 1600
 const JPEG_QUALITY = 0.8
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
 /**
  * Sends a receipt photo to /api/extract-receipt and returns the extracted
- * items. Resizes/re-encodes the image first: phone camera photos (several
- * MB) plus base64's ~37% overhead can exceed Vercel's 4.5MB function
- * request-body limit, so this keeps requests reliably small.
+ * items and purchase date. Resizes/re-encodes the image first: phone camera
+ * photos (several MB) plus base64's ~37% overhead can exceed Vercel's 4.5MB
+ * function request-body limit, so this keeps requests reliably small.
  */
-export async function extractReceiptItems(imageBlob: Blob, categoryNotes: CategoryNoteHint[] = []): Promise<ExtractedItem[]> {
+export async function extractReceipt(imageBlob: Blob, categoryNotes: CategoryNoteHint[] = []): Promise<ExtractionResult> {
   const dataUrl = await toUploadDataUrl(imageBlob)
 
   const response = await fetch('/api/extract-receipt', {
@@ -64,12 +75,22 @@ export async function extractReceiptItems(imageBlob: Blob, categoryNotes: Catego
     throw new Error('Receipt scanning is disabled (demo mode): this deployment has no OPENAI_API_KEY configured')
   }
 
-  const items = (body as { items?: unknown } | null)?.items
+  const record = body as { items?: unknown; purchaseDate?: unknown; purchaseDateError?: unknown } | null
+  const items = record?.items
   if (!Array.isArray(items)) {
     throw new Error('Extraction response was malformed')
   }
 
-  return items as ExtractedItem[]
+  const purchaseDate = record?.purchaseDate
+  if (purchaseDate !== null && !(typeof purchaseDate === 'string' && ISO_DATE.test(purchaseDate))) {
+    throw new Error(`Extraction response had a malformed purchaseDate: ${JSON.stringify(purchaseDate)}`)
+  }
+  const purchaseDateError = record?.purchaseDateError ?? null
+  if (purchaseDateError !== null && typeof purchaseDateError !== 'string') {
+    throw new Error(`Extraction response had a malformed purchaseDateError: ${JSON.stringify(purchaseDateError)}`)
+  }
+
+  return { items: items as ExtractedItem[], purchaseDate, purchaseDateError }
 }
 
 async function toUploadDataUrl(blob: Blob): Promise<string> {

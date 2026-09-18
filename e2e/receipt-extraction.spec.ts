@@ -38,6 +38,7 @@ test('successful extraction stages items for review, and only Confirm adds them 
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        purchaseDate: null,
         items: [
           { name: 'Milk', price: 3.49, category: 'dairy' },
           { name: 'Bread', price: 2.49, category: 'bakery' },
@@ -71,6 +72,7 @@ test('coupon/discount lines reduce the trip total but do not appear as shopping 
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
+        purchaseDate: null,
         items: [
           { name: 'Milk', price: 3.49, category: 'dairy', isDiscount: false },
           { name: 'Coupon Herzstuecke', price: -0.38, category: 'other', isDiscount: true },
@@ -115,7 +117,7 @@ test('a server error marks the receipt failed, shows the message, and allows ret
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Eggs', price: 4.2, category: 'dairy' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Eggs', price: 4.2, category: 'dairy' }] }),
     })
   })
 

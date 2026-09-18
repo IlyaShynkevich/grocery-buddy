@@ -15,6 +15,12 @@ export interface Trip {
   createdAt: number
   /** set when status becomes 'complete' — history is sorted by this, not date (same-day trips tie on date) */
   completedAt?: number
+  /**
+   * Set once a scanned receipt's purchase date has been confirmed onto this
+   * trip (see confirmReview) — from then on `date` is the real purchase
+   * date, not "today", so refreshDraftDate must leave it alone.
+   */
+  dateFromReceipt?: boolean
 }
 
 export interface Item {
@@ -85,6 +91,15 @@ export interface PendingReceipt {
   stagedItems?: StagedReceiptItem[]
   /** Best-effort typed/extracted item pairs the review panel offers to merge. */
   suggestedMatches?: SuggestedItemMatch[]
+  /**
+   * The receipt's purchase date (ISO 'YYYY-MM-DD'), staged exactly like
+   * `stagedItems`: only written to the trip's `date` on Confirm, discarded
+   * on Dismiss. Null when the AI found no date — the trip's date is then
+   * left as-is unless the user picks one in the review panel.
+   */
+  stagedDate?: string | null
+  /** Why the AI's date couldn't be used (it returned something unparseable) — shown in the review panel until the user picks a date. */
+  stagedDateError?: string | null
   /** Whether the user has confirmed/dismissed the post-scan review panel. */
   reviewed?: boolean
 }
@@ -236,10 +251,13 @@ let pendingActiveTripCreation: Promise<Trip> | null = null
  * otherwise stay stale until the next trip is created (e.g. via Save
  * trip) — so every read of the active draft refreshes it to today first.
  * A no-op (no DB write) once it's already current. Completed trips are
- * left alone — their date is a historical record, not "today".
+ * left alone — their date is a historical record, not "today". So is a
+ * draft whose date came from a confirmed receipt (dateFromReceipt): that's
+ * the real purchase date, and resetting it to today on the next load would
+ * silently undo the user's confirmation.
  */
 export async function refreshDraftDate(trip: Trip): Promise<Trip> {
-  if (trip.status !== 'draft') return trip
+  if (trip.status !== 'draft' || trip.dateFromReceipt) return trip
   const today = todayDateString()
   if (trip.date === today) return trip
   await db.trips.update(trip.id, { date: today })

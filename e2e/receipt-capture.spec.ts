@@ -66,7 +66,7 @@ test('captures a receipt while offline, and it is still there after reconnecting
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
     }),
   )
 

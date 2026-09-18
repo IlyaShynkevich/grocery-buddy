@@ -22,7 +22,7 @@ test('a receipt queued while offline is processed automatically once back online
     route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
     }),
   )
 
@@ -67,7 +67,7 @@ test('multiple pending receipts sync one at a time on reconnect, not simultaneou
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Item', price: 1, category: 'other' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Item', price: 1, category: 'other' }] }),
     })
   })
 
@@ -104,7 +104,7 @@ test('a failed receipt (no rate-limit wait parsed) is retried automatically on r
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Eggs', price: 4.2, category: 'dairy' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Eggs', price: 4.2, category: 'dairy' }] }),
     })
   })
 
@@ -141,7 +141,7 @@ test('a rate-limited receipt with a pending auto-retry is not retried early by a
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ items: [{ name: 'Eggs', price: 4.2, category: 'dairy' }] }),
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Eggs', price: 4.2, category: 'dairy' }] }),
     })
   })
 

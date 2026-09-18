@@ -8,7 +8,7 @@ const SAMPLE_IMAGE = Buffer.from(
 
 async function captureAndProcess(page: Page, items: Array<Record<string, unknown>>) {
   await page.route('**/api/extract-receipt', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items }) }),
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ purchaseDate: null, items }) }),
   )
   await page.goto('/')
   await page.getByTestId('receipt-capture-input').setInputFiles({
