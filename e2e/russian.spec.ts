@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { expect, test, type Page } from './fixtures'
+import { expect, openCustomize, test, type Page } from './fixtures'
 
 // The rest of the suite runs in English with EUR (the defaults); this
 // spec covers Russian (and BYN) end to end.
@@ -98,23 +98,29 @@ async function englishLeftovers(page: Page): Promise<string[]> {
 
 test('switching to Russian in Customize translates the app and survives a reload', async ({ page }) => {
   await page.goto('/')
-  await page.getByTestId('nav-customize').click()
-  await expect(page.getByRole('heading', { name: 'Customize' })).toBeVisible()
+  await page.getByTestId('nav-settings').click()
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
 
-  await page.getByTestId('region-select').selectOption('ru-BYN')
+  await page.getByTestId('settings-language').selectOption('ru')
 
   await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('lang', 'ru')
   await expect(page.getByTestId('nav-history')).toHaveAttribute('aria-label', 'История')
+  // Language only — the currency setting is independent and stays EUR.
+  await expect(page.getByTestId('settings-currency')).toHaveValue('EUR')
+  await openCustomize(page)
+  await expect(page.getByRole('heading', { name: 'Мои категории' })).toBeVisible()
   await expect(page.getByTestId('category-accordion-toggle').first()).toHaveText('Овощи и фрукты')
-  expect(await page.evaluate(([l, c]) => [localStorage.getItem(l), localStorage.getItem(c)], [LANGUAGE_KEY, CURRENCY_KEY])).toEqual(['ru', 'BYN'])
+  await page.getByTestId('customize-back').click()
+  await expect(page.getByTestId('settings-page')).toBeVisible()
+  expect(await page.evaluate(([l, c]) => [localStorage.getItem(l), localStorage.getItem(c)], [LANGUAGE_KEY, CURRENCY_KEY])).toEqual(['ru', null])
 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible()
-  await expect(page.getByTestId('region-select')).toHaveValue('ru-BYN')
+  await expect(page.getByTestId('settings-language')).toHaveValue('ru')
 
-  await page.getByTestId('region-select').selectOption('en-EUR')
-  await expect(page.getByRole('heading', { name: 'Customize' })).toBeVisible()
+  await page.getByTestId('settings-language').selectOption('en')
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('lang', 'en')
 })
 
@@ -131,7 +137,7 @@ test('every main screen is fully in Russian — no English left over', async ({ 
   for (const [tab, heading] of [
     ['nav-history', 'История'],
     ['nav-stats', 'Статистика'],
-    ['nav-customize', 'Настройки'],
+    ['nav-settings', 'Настройки'],
   ] as const) {
     await page.getByTestId(tab).click()
     await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible()
@@ -143,6 +149,10 @@ test('every main screen is fully in Russian — no English left over', async ({ 
   await page.getByTestId('history-trip').click()
   await expect(page.getByTestId('trip-detail-page')).toBeVisible()
   expect(await englishLeftovers(page), 'trip detail').toEqual([])
+
+  await openCustomize(page)
+  await expect(page.getByRole('heading', { name: 'Мои категории', level: 1 })).toBeVisible()
+  expect(await englishLeftovers(page), 'Customize').toEqual([])
 
   await page.getByTestId('nav-about').click()
   await expect(page.getByTestId('about-page')).toBeVisible()
@@ -248,9 +258,12 @@ async function saveTrip(page: Page) {
   await expect(page.getByTestId('shopping-list')).not.toHaveAttribute('data-trip-id', tripId ?? '')
 }
 
+/** Sets both language and currency on the Settings page (the two old combined regions). */
 async function switchRegion(page: Page, id: 'en-EUR' | 'ru-BYN') {
-  await page.getByTestId('nav-customize').click()
-  await page.getByTestId('region-select').selectOption(id)
+  const [language, currency] = id === 'ru-BYN' ? ['ru', 'BYN'] : ['en', 'EUR']
+  await page.getByTestId('nav-settings').click()
+  await page.getByTestId('settings-language').selectOption(language)
+  await page.getByTestId('settings-currency').selectOption(currency)
   await page.getByTestId('nav-shopping').click()
   await expect(page.getByTestId('shopping-list')).toBeVisible()
 }

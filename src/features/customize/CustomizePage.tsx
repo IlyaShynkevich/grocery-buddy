@@ -1,9 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { CATEGORIES, type Category } from '../../db/categories'
 import { categoryLabel, useT } from '../../i18n'
-import type { Currency } from '../../i18n/currencies'
-import type { Language } from '../../i18n/languages'
-import { LANGUAGES, setCurrency, setLanguage, useSettings } from '../../settings/settingsStore'
 import { cardStyle, iconButtonStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { useCategoryNotes } from './useCategoryNotes'
@@ -96,69 +93,24 @@ function CategoryNotes({ category }: { category: Category }) {
  * all 11 category cards fit on one screen, and a separate row would push
  * the last ones below the fold.
  */
-// Interim: language and currency are independent settings now, but until
-// the Settings page exists this single picker still offers the two
-// combinations that existed before and sets both.
-const COMBINED_OPTIONS: { id: string; label: string; language: Language; currency: Currency }[] = [
-  { id: 'en-EUR', label: `${LANGUAGES.en.label} · EUR`, language: 'en', currency: 'EUR' },
-  { id: 'ru-BYN', label: `${LANGUAGES.ru.label} · BYN`, language: 'ru', currency: 'BYN' },
-]
-
-function RegionPicker() {
-  const messages = useT()
-  const settings = useSettings()
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const selected = COMBINED_OPTIONS.find((o) => o.language === settings.language && o.currency === settings.currency)
-
-  const handleChange = (id: string) => {
-    const option = COMBINED_OPTIONS.find((o) => o.id === id)
-    if (!option) {
-      console.error(`Grocery Buddy: unknown region picked: ${JSON.stringify(id)}`)
-      return
-    }
-    setSaveError(null)
-    try {
-      setLanguage(option.language)
-      setCurrency(option.currency)
-    } catch (err) {
-      console.error('Grocery Buddy: could not save the language setting', err)
-      // Rendered in the (already switched) new language.
-      setSaveError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
-  return (
-    <>
-      <select
-        data-testid="region-select"
-        aria-label={messages.customize.region}
-        title={messages.customize.region}
-        value={selected?.id ?? ''}
-        onChange={(e) => handleChange(e.target.value)}
-        style={{ minHeight: '2.5rem', minWidth: 0, flexShrink: 1 }}
-      >
-        {COMBINED_OPTIONS.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      {saveError && (
-        <p role="alert" data-testid="region-save-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', flexBasis: '100%' }}>
-          {messages.customize.regionSaveFailed(saveError)}
-        </p>
-      )}
-    </>
-  )
-}
-
-export function CustomizePage() {
+export function CustomizePage({ onBack }: { onBack: () => void }) {
   const messages = useT()
   return (
     <section data-testid="customize-page" style={pageStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+      {/* Back button in the title row, not on its own line: the page is
+          tuned so all 11 category cards fit one screen. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <button
+          type="button"
+          data-testid="customize-back"
+          aria-label={messages.customize.back}
+          title={messages.customize.back}
+          onClick={onBack}
+          style={{ minHeight: '2.5rem', minWidth: '2.5rem', padding: '0.35rem 0.6rem', lineHeight: 1 }}
+        >
+          ←
+        </button>
         <h1 style={{ fontSize: '1.5rem', marginRight: 'auto' }}>{messages.customize.title}</h1>
-        <RegionPicker />
         <Mascot pose="excited" size={32} />
       </div>
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>

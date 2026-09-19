@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures'
+import { expect, openCustomize, test, type Page } from './fixtures'
 
 // These pages are tuned to fit one phone screen without scrolling — the
 // usable viewport of the target phone (Xiaomi 14T Pro, browser chrome
@@ -56,7 +56,7 @@ for (const region of ['en-EUR', 'ru-BYN'] as const) {
       ['nav-about', 'about-page'],
       ['nav-stats', 'stats-category-chart'],
       ['nav-history', 'history-month-select'],
-      ['nav-customize', 'region-select'],
+      ['nav-settings', 'settings-language'],
     ] as const) {
       await page.getByTestId(tab).click()
       await expect(page.getByTestId(ready)).toBeVisible()
@@ -71,6 +71,11 @@ for (const region of ['en-EUR', 'ru-BYN'] as const) {
         ).toEqual([])
       }
     }
+
+    // Customize now opens from Settings; it must still fit all 11 cards.
+    await openCustomize(page)
+    await expect(page.getByTestId('category-accordion')).toHaveCount(11)
+    expect(await pageOverflow(page), 'Customize overflows the screen').toBeLessThanOrEqual(0)
   })
 }
 

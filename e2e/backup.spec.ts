@@ -1,5 +1,5 @@
 import * as fs from 'node:fs/promises'
-import { expect, test, type Page } from './fixtures'
+import { expect, openCustomize, test, type Page } from './fixtures'
 // Drives the Debug tools panel, which is hidden unless enabled for the session.
 test.use({ debugTools: true })
 
@@ -17,8 +17,7 @@ async function itemNames(page: Page): Promise<string[]> {
 }
 
 async function goToCustomize(page: Page) {
-  await page.getByTestId('nav-customize').click()
-  await expect(page.getByTestId('customize-page')).toBeVisible()
+  await openCustomize(page)
 }
 
 async function goToHistory(page: Page) {

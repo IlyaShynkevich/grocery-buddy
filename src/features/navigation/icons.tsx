@@ -92,6 +92,16 @@ export function BarChartIcon({ size = 20 }: IconProps) {
 const GEAR_PATH =
   'M 10.21 5.96 L 9.5 3.56 L 14.5 3.56 L 13.79 5.96 A 6.3 6.3 0 0 1 16.34 7.43 L 18.06 5.62 L 20.56 9.95 L 18.13 10.53 A 6.3 6.3 0 0 1 18.13 13.47 L 20.56 14.05 L 18.06 18.38 L 16.34 16.57 A 6.3 6.3 0 0 1 13.79 18.04 L 14.5 20.44 L 9.5 20.44 L 10.21 18.04 A 6.3 6.3 0 0 1 7.66 16.57 L 5.94 18.38 L 3.44 14.05 L 5.87 13.47 A 6.3 6.3 0 0 1 5.87 10.53 L 3.44 9.95 L 5.94 5.62 L 7.66 7.43 A 6.3 6.3 0 0 1 10.21 5.96 Z'
 
+/** A price tag — Customize (per-category notes), reached from Settings. */
+export function TagIcon({ size = 20 }: IconProps) {
+  return (
+    <svg {...svgProps(size)}>
+      <path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7a1 1 0 0 1 .7.3l7.6 7.6a1 1 0 0 1 0 1.4l-7.7 7.7a1 1 0 0 1-1.4 0l-7.6-7.6a1 1 0 0 1-.3-.7Z" />
+      <circle cx="8" cy="8" r="1.4" />
+    </svg>
+  )
+}
+
 export function GearIcon({ size = 20 }: IconProps) {
   return (
     <svg {...svgProps(size)}>
