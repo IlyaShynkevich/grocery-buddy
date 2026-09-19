@@ -1,5 +1,7 @@
 import * as fs from 'node:fs/promises'
 import { expect, openDebugPanel, test, type Page } from './fixtures'
+// Drives the Debug tools panel, which is hidden unless enabled for the session.
+test.use({ debugTools: true })
 
 // Same 1x1 PNG fixture used in the other receipt specs.
 const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='

@@ -69,3 +69,49 @@ for (const region of ['en-EUR', 'ru-BYN'] as const) {
     }
   })
 }
+
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+
+for (const [region, saveLabel] of [
+  ['en-EUR', 'Save trip'],
+  ['ru-BYN', 'Сохранить покупку'],
+] as const) {
+  test(`${region}: the Shopping List (3 items + a pending receipt) fits, with "${saveLabel}" and the title each on one line`, async ({ page }) => {
+    await page.addInitScript((id) => localStorage.setItem('grocery-buddy:region', id), region)
+    await page.goto('/')
+    // Measured capacity at 393x777, identical in both languages: 4 items fit
+    // with no receipt, 3 with a pending receipt (its hint under Save trip).
+    // Beyond that the list scrolls by design — it's unbounded. This is the
+    // tightest fitting case, and it must hold in both languages.
+    for (const name of ['Milk', 'Bread', 'Eggs']) {
+      const before = await page.getByTestId('shopping-list-item').count()
+      await page.getByTestId('add-item-input').fill(name)
+      await page.getByTestId('add-item-submit').click()
+      await expect(page.getByTestId('shopping-list-item')).toHaveCount(before + 1)
+    }
+    // A pending receipt adds the "process it first" hint under Save trip —
+    // the case that used to squeeze the Russian title onto two lines.
+    await page.getByTestId('receipt-capture-input').setInputFiles({ name: 'r.png', mimeType: 'image/png', buffer: PNG })
+    await expect(page.getByTestId('save-trip-unprocessed-hint')).toBeVisible()
+
+    const saveTrip = page.getByTestId('save-trip-button')
+    await expect(saveTrip).toHaveText(saveLabel)
+    await expect(page.getByTestId('debug-panel')).toHaveCount(0)
+
+    const layout = await page.evaluate(() => {
+      const oneLine = (el: Element) => {
+        const style = getComputedStyle(el)
+        return el.getBoundingClientRect().height < parseFloat(style.fontSize) * 1.9 + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) + 2
+      }
+      const title = document.querySelector('[data-testid="shopping-list"] h1')!
+      const button = document.querySelector('[data-testid="save-trip-button"]')!
+      return {
+        titleOneLine: oneLine(title),
+        buttonOneLine: oneLine(button) && button.scrollWidth <= button.clientWidth + 1,
+        pageOverflow: document.documentElement.scrollHeight - innerHeight,
+        horizontalOverflow: document.documentElement.scrollWidth - innerWidth,
+      }
+    })
+    expect(layout).toEqual({ titleOneLine: true, buttonOneLine: true, pageOverflow: 0, horizontalOverflow: 0 })
+  })
+}

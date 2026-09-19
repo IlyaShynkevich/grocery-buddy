@@ -3,6 +3,7 @@ import { AboutPage } from './features/about/AboutPage'
 import { ReceiptCleanupNotice } from './features/cleanup/ReceiptCleanupNotice'
 import { CustomizePage } from './features/customize/CustomizePage'
 import { DbDebugPanel } from './features/debug/DbDebugPanel'
+import { useDebugToolsEnabled } from './features/debug/debugTools'
 import { Footer } from './features/footer/Footer'
 import { HistoryPage } from './features/history/HistoryPage'
 import { TripDetailPage } from './features/history/TripDetailPage'
@@ -15,6 +16,7 @@ import { ReceiptCapture } from './features/receipt-capture/ReceiptCapture'
 import { ReceiptReviewPanel } from './features/receipt-review/ReceiptReviewPanel'
 import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
 import { StatsPage } from './features/stats/StatsPage'
+import { Toast } from './features/toast/Toast'
 import { useDraftCurrencyFollowsRegion } from './features/trip/useDraftCurrencyFollowsRegion'
 import { useT } from './i18n'
 import { useRegion } from './i18n/regionStore'
@@ -121,6 +123,7 @@ function App() {
   const messages = useT()
   const region = useRegion()
   const draftCurrencyError = useDraftCurrencyFollowsRegion()
+  const debugToolsEnabled = useDebugToolsEnabled()
   const [view, setView] = useState<View>(readInitialView)
   // trip-detail isn't its own tab — it's reached via History, so it keeps
   // the History tab highlighted rather than showing no active tab at all.
@@ -386,10 +389,13 @@ function App() {
           show up as a jump (there's nothing else to jump against, since it
           never appears on History or Stats to begin with). Plain, instant
           conditional on `activeTab`, same as the tab bar's own highlight.
+          Hidden entirely unless switched on for the session by the secret
+          gesture on the Home mascot (see features/debug/debugTools.ts).
         */}
-        {activeTab === 'shopping' && <DbDebugPanel />}
+        {activeTab === 'shopping' && debugToolsEnabled && <DbDebugPanel />}
         <Footer />
       </div>
+      <Toast />
       {/* TEMPORARY — ?perf=1 only, see features/perf/perfLog.ts */}
       {PERF_ENABLED && <PerfOverlay />}
     </main>

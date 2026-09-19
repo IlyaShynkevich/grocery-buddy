@@ -1,4 +1,6 @@
 import { expect, openDebugPanel, test } from './fixtures'
+// Drives the Debug tools panel, which is hidden unless enabled for the session.
+test.use({ debugTools: true })
 
 async function addItem(page: import('@playwright/test').Page, name: string) {
   await page.getByTestId('add-item-input').fill(name)

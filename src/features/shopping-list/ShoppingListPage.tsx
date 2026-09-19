@@ -136,47 +136,53 @@ export function ShoppingListPage() {
 
   return (
     <section data-testid="shopping-list" data-trip-id={trip?.id ?? ''} style={pageStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
-        <h1 style={{ fontSize: '1.5rem' }}>{messages.shopping.title}</h1>
+      {/*
+        Title on its own row; the trip's date and Save trip share the row
+        below. Side by side with the title, a long Save trip label
+        ("Сохранить покупку") plus its hints squeezed the title onto two
+        lines — and whether the two fit on one row at all would depend on the
+        phone's font. This layout doesn't: neither element ever competes
+        with the title for width, in any language.
+      */}
+      <h1 style={{ fontSize: '1.5rem' }}>{messages.shopping.title}</h1>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginTop: '0.25rem' }}
+      >
+        <p data-testid="shopping-trip-date" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
+          {trip ? formatDate(trip.date) : messages.shopping.loadingTrip}
+        </p>
         {trip && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
-            <button
-              type="button"
-              data-testid="save-trip-button"
-              onClick={handleSaveTrip}
-              disabled={hasPendingReview || hasUnprocessedReceipts}
-              title={saveBlockedReason}
-              style={{ background: 'transparent', color: 'var(--accent)', borderColor: 'var(--accent)' }}
-            >
-              {messages.shopping.saveTrip}
-            </button>
-            {hasUnprocessedReceipts && (
-              <span
-                data-testid="save-trip-unprocessed-hint"
-                style={{ ...mutedTextStyle, fontSize: '0.7rem', textAlign: 'right' }}
-              >
-                {unprocessedHint}
-              </span>
-            )}
-            {hasPendingReview && (
-              <span
-                data-testid="save-trip-disabled-hint"
-                style={{ ...mutedTextStyle, fontSize: '0.7rem', textAlign: 'right' }}
-              >
-                {messages.shopping.reviewHint}
-              </span>
-            )}
-          </div>
+          <button
+            type="button"
+            data-testid="save-trip-button"
+            onClick={handleSaveTrip}
+            disabled={hasPendingReview || hasUnprocessedReceipts}
+            title={saveBlockedReason}
+            style={{ background: 'transparent', color: 'var(--accent)', borderColor: 'var(--accent)', flexShrink: 0, whiteSpace: 'nowrap' }}
+          >
+            {messages.shopping.saveTrip}
+          </button>
         )}
       </div>
+      {trip && (hasUnprocessedReceipts || hasPendingReview) && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem', marginTop: '0.3rem' }}>
+          {hasUnprocessedReceipts && (
+            <span data-testid="save-trip-unprocessed-hint" style={{ ...mutedTextStyle, fontSize: '0.75rem', textAlign: 'right' }}>
+              {unprocessedHint}
+            </span>
+          )}
+          {hasPendingReview && (
+            <span data-testid="save-trip-disabled-hint" style={{ ...mutedTextStyle, fontSize: '0.75rem', textAlign: 'right' }}>
+              {messages.shopping.reviewHint}
+            </span>
+          )}
+        </div>
+      )}
       {saveError && (
         <p role="alert" data-testid="save-trip-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>
           {messages.shopping.saveFailed(saveError)}
         </p>
       )}
-      <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>
-        {trip ? formatDate(trip.date) : messages.shopping.loadingTrip}
-      </p>
 
       <details
         data-testid="shopping-list-collapsible"

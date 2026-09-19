@@ -1,4 +1,6 @@
 import { expect, test, type Page } from './fixtures'
+// Drives the Debug tools panel, which is hidden unless enabled for the session.
+test.use({ debugTools: true })
 
 // Touch emulation must be on for TouchEvent/Touch to behave like a real
 // device in Chromium — this is what lets these tests exercise the actual

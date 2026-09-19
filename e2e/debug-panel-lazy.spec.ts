@@ -1,4 +1,6 @@
 import { expect, test, type Page } from './fixtures'
+// Drives the Debug tools panel, which is hidden unless enabled for the session.
+test.use({ debugTools: true })
 
 // Counts whole-table reads of the `items` object store at the IndexedDB
 // layer. Only Debug tools reads every item (db.items.toArray()); every real

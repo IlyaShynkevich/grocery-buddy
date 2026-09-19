@@ -1,4 +1,6 @@
 import { expect, test, type Page } from './fixtures'
+// Drives the Debug tools panel, which is hidden unless enabled for the session.
+test.use({ debugTools: true })
 
 // Same 1x1 PNG fixture used in the other receipt specs.
 const SAMPLE_IMAGE = Buffer.from(

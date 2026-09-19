@@ -48,6 +48,12 @@ export const en = {
     cta: "I'm ready to shop",
   },
 
+  debugTools: {
+    enabled: 'Debug tools enabled',
+    hidden: 'Debug tools hidden',
+    notRemembered: (message: string) => `Debug tools switched, but only until reload: ${message}`,
+  },
+
   footer: {
     mascotAlt: 'Grocery Buddy mascot',
   },
