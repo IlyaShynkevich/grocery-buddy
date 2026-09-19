@@ -8,6 +8,17 @@ export function ShoppingListPage() {
   const { trip, items, unprocessedReceiptCount, addItem, renameItem, removeItem, toggleItemChecked, saveTrip } =
     useShoppingList()
   const [draftName, setDraftName] = useState('')
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const handleSaveTrip = async () => {
+    setSaveError(null)
+    try {
+      await saveTrip()
+    } catch (err) {
+      console.error('Grocery Buddy: saving the trip failed', err)
+      setSaveError(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   // The list is always collapsible via the toggle, in either direction, at
   // any time — tapping it expands when collapsed and collapses when
@@ -133,7 +144,7 @@ export function ShoppingListPage() {
             <button
               type="button"
               data-testid="save-trip-button"
-              onClick={saveTrip}
+              onClick={handleSaveTrip}
               disabled={hasPendingReview || hasUnprocessedReceipts}
               title={saveBlockedReason}
               style={{ background: 'transparent', color: 'var(--accent)', borderColor: 'var(--accent)' }}
@@ -159,6 +170,11 @@ export function ShoppingListPage() {
           </div>
         )}
       </div>
+      {saveError && (
+        <p role="alert" data-testid="save-trip-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>
+          Trip not saved: {saveError}
+        </p>
+      )}
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>
         {trip ? formatDate(trip.date) : 'Loading trip…'}
       </p>

@@ -295,20 +295,53 @@ export async function getOrCreateActiveTrip(): Promise<Trip> {
 }
 
 /**
+ * A receipt whose photo has done its job: extraction finished ('done') and
+ * the review was resolved — confirmed or dismissed. `reviewed` is only
+ * `false` while a review is still open; it's absent on receipts from before
+ * the review step existed, whose items were written straight to the trip.
+ * Anything else (pending, processing, failed, or an open review) still
+ * needs its row — the photo to process, or the staged items to review.
+ */
+export function isReceiptFinished(receipt: PendingReceipt): boolean {
+  return receipt.status === 'done' && receipt.reviewed !== false
+}
+
+/**
  * Marks a trip complete and immediately starts a fresh empty draft as the
  * new active trip, so the user never has to manually set one up before
  * their next shopping run. The completed trip's items/total are untouched
  * — nothing here mutates them, "saving" only changes the trip's own status.
+ *
+ * Its receipts (rows and photos) are deleted in the same transaction: a
+ * saved trip's receipts are never shown again, and keeping every photo
+ * forever is what grew one device's IndexedDB by ~76MB and a backup to
+ * ~100MB. Refuses — throwing, with nothing written — if any receipt isn't
+ * finished (see isReceiptFinished): deleting it would silently lose a photo
+ * never scanned or a scan never reviewed. The Save trip button is already
+ * disabled in that state; this is the same rule enforced where the delete
+ * actually happens.
  */
 export async function completeTrip(tripId: number): Promise<Trip> {
-  await db.trips.update(tripId, { status: 'complete', completedAt: Date.now() })
+  return db.transaction('rw', db.trips, db.pendingReceipts, db.appState, async () => {
+    const receipts = await db.pendingReceipts.where('tripId').equals(tripId).toArray()
+    const unfinished = receipts.filter((receipt) => !isReceiptFinished(receipt))
+    if (unfinished.length > 0) {
+      const detail = unfinished
+        .map((r) => `#${r.id} (${r.status}${r.status === 'done' ? ', review open' : ''})`)
+        .join(', ')
+      throw new Error(`Can't save this trip yet — ${unfinished.length} receipt(s) still need processing or review: ${detail}`)
+    }
 
-  const newId = await db.trips.add(newTrip())
-  await db.appState.put({ key: ACTIVE_TRIP_KEY, value: newId })
+    await db.pendingReceipts.bulkDelete(receipts.map((receipt) => receipt.id))
+    await db.trips.update(tripId, { status: 'complete', completedAt: Date.now() })
 
-  const created = await db.trips.get(newId)
-  if (!created) throw new Error('Failed to create new trip')
-  return created
+    const newId = await db.trips.add(newTrip())
+    await db.appState.put({ key: ACTIVE_TRIP_KEY, value: newId })
+
+    const created = await db.trips.get(newId)
+    if (!created) throw new Error('Failed to create new trip')
+    return created
+  })
 }
 
 /**
