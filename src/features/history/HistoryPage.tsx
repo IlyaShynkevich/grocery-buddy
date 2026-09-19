@@ -4,7 +4,6 @@ import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
 import { cardStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
-import { BackupSection } from './BackupSection'
 import { groupTripsByMonth, useHistory } from './useHistory'
 
 export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) => void }) {
@@ -116,14 +115,6 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
           </div>
         ))}
       </div>
-
-      {/*
-        Below the (possibly scrolling) trip list, not inside it — backup/
-        restore isn't part of the trip list itself, and living outside the
-        maxHeight container means it's never clipped or scrolled out of
-        reach regardless of how many trips there are.
-      */}
-      <BackupSection />
     </section>
   )
 }

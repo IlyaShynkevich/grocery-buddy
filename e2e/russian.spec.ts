@@ -403,7 +403,7 @@ test('backups keep each trip’s currency; older backups import as EUR; an unkno
       },
     })
   const importFile = async (content: string) => {
-    await page.getByTestId('nav-history').click()
+    await page.getByTestId('nav-settings').click()
     await page.getByTestId('backup-import-input').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(content) })
   }
 
@@ -417,9 +417,11 @@ test('backups keep each trip’s currency; older backups import as EUR; an unkno
   await page.getByTestId('backup-import-confirm-yes').click()
   await expect(page.getByTestId('backup-import-success')).toBeVisible()
   expect((await tripCurrencies(page))['50']).toBe('EUR')
+  await page.getByTestId('nav-history').click()
   await expect(page.getByTestId('history-trip')).toContainText('2,00 €')
 
   // Export carries the currency.
+  await page.getByTestId('nav-settings').click()
   const downloadPromise = page.waitForEvent('download')
   await page.getByTestId('backup-export-button').click()
   const path = await (await downloadPromise).path()

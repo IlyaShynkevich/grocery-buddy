@@ -255,6 +255,19 @@ export const en = {
     openCustomize: 'Customize categories',
   },
 
+  storage: {
+    title: 'Storage',
+    loading: 'Measuring…',
+    total: 'Total used',
+    photos: (count: number) => `Receipt photos (${count})`,
+    tripData: 'Trips & lists',
+    appFiles: 'App files',
+    rest: 'Everything else',
+    estimateNote: "The browser's own estimate, rounded.",
+    unsupported: "This browser doesn't report how much space the app uses.",
+    failed: (message: string) => `Couldn't measure storage: ${message}`,
+  },
+
   customize: {
     title: 'Customize',
     back: 'Back to Settings',

@@ -137,7 +137,7 @@ test('Settings has no English left over in Russian, and Customize is titled "М�
   await page.goto('/')
   await goToSettings(page)
   await expect(page.getByRole('heading', { name: 'Настройки', level: 1 })).toBeVisible()
-  await expect(page.getByTestId('settings-currency-hint')).toHaveText('Для новых покупок — у сохранённых остаётся своя валюта.')
+  await expect(page.getByTestId('settings-currency-hint')).toHaveText('Только для новых покупок — старые не меняются.')
   await expect(page.getByTestId('settings-open-customize')).toContainText('Мои категории')
   await openCustomize(page)
   await expect(page.getByRole('heading', { name: 'Мои категории', level: 1 })).toBeVisible()

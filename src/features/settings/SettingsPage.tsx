@@ -7,6 +7,8 @@ import { setCurrency, setLanguage, setTheme, useSettings } from '../../settings/
 import { isTheme, THEMES } from '../../settings/theme'
 import { Mascot } from '../mascot/Mascot'
 import { TagIcon } from '../navigation/icons'
+import { BackupSection } from './BackupSection'
+import { StorageSection } from './StorageSection'
 
 /** Label on the left, control on the right — one compact row per setting. */
 function SettingRow({ label, children }: { label: string; children: ReactNode }) {
@@ -22,8 +24,8 @@ const selectStyle = { minHeight: '2.5rem', minWidth: '9rem' }
 
 /**
  * The app's configuration: language and currency (independent — the
- * currency only decides what new trips use), theme, and the way into
- * Customize.
+ * currency only decides what new trips use), theme, the way into
+ * Customize, backup & restore, and how much space the app takes.
  */
 export function SettingsPage({ onOpenCustomize }: { onOpenCustomize: () => void }) {
   const messages = useT()
@@ -128,6 +130,9 @@ export function SettingsPage({ onOpenCustomize }: { onOpenCustomize: () => void 
         <span style={{ flex: 1, textAlign: 'left' }}>{messages.settings.openCustomize}</span>
         <span aria-hidden="true">›</span>
       </button>
+
+      <BackupSection />
+      <StorageSection />
     </section>
   )
 }

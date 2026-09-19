@@ -245,11 +245,24 @@ export const ru: Messages = {
     language: 'Язык',
     currency: 'Валюта',
     currencyOption: (code) => (code === 'EUR' ? 'EUR — €' : code === 'BYN' ? 'BYN — Br' : code),
-    currencyHint: 'Для новых покупок — у сохранённых остаётся своя валюта.',
+    currencyHint: 'Только для новых покупок — старые не меняются.',
     theme: 'Тема',
     themeOptions: { system: 'Как на устройстве', light: 'Светлая', dark: 'Тёмная' },
     saveFailed: (message) => `Изменено, но не сохранится до следующего запуска: ${message}`,
     openCustomize: 'Мои категории',
+  },
+
+  storage: {
+    title: 'Память',
+    loading: 'Считаем…',
+    total: 'Всего занято',
+    photos: (count) => `Фото чеков (${count})`,
+    tripData: 'Покупки и списки',
+    appFiles: 'Файлы приложения',
+    rest: 'Всё остальное',
+    estimateNote: 'Оценка браузера, округлённая.',
+    unsupported: 'Этот браузер не сообщает, сколько места занимает приложение.',
+    failed: (message) => `Не удалось измерить занятое место: ${message}`,
   },
 
   customize: {
