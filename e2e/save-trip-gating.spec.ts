@@ -67,3 +67,80 @@ test('Save trip re-enables once the review is dismissed (discarding the scan)', 
   await expect(page.getByTestId('save-trip-button')).toBeEnabled()
   await expect(page.getByTestId('save-trip-disabled-hint')).toHaveCount(0)
 })
+
+async function captureOnly(page: Page) {
+  const before = await page.getByTestId('receipt-item').count()
+  await page.getByTestId('receipt-capture-input').setInputFiles({
+    name: 'receipt.png',
+    mimeType: 'image/png',
+    buffer: SAMPLE_IMAGE,
+  })
+  await expect(page.getByTestId('receipt-item')).toHaveCount(before + 1)
+}
+
+test('Save trip is blocked with a visible reason while a receipt photo has not been processed', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByTestId('shopping-list')).not.toHaveAttribute('data-trip-id', '')
+  const tripId = await page.getByTestId('shopping-list').getAttribute('data-trip-id')
+
+  await captureOnly(page)
+
+  await expect(page.getByTestId('save-trip-button')).toBeDisabled()
+  const hint = page.getByTestId('save-trip-unprocessed-hint')
+  await expect(hint).toBeVisible()
+  await expect(hint).toHaveText('Process or remove the receipt photo first')
+
+  await page.getByTestId('save-trip-button').click({ force: true })
+  await page.waitForTimeout(200)
+  expect(await page.getByTestId('shopping-list').getAttribute('data-trip-id')).toBe(tripId)
+})
+
+test('removing the unprocessed receipt photo unblocks Save trip', async ({ page }) => {
+  await page.goto('/')
+  await captureOnly(page)
+  await expect(page.getByTestId('save-trip-button')).toBeDisabled()
+
+  await page.getByTestId('receipt-item').getByRole('button', { name: 'Remove receipt' }).click()
+
+  await expect(page.getByTestId('save-trip-button')).toBeEnabled()
+  await expect(page.getByTestId('save-trip-unprocessed-hint')).toHaveCount(0)
+})
+
+test('a failed receipt keeps Save trip blocked until a retry succeeds and the review is resolved', async ({ page }) => {
+  let fail = true
+  await page.route('**/api/extract-receipt', (route) =>
+    fail
+      ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'boom' }) })
+      : route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Milk', price: 3.49, category: 'dairy' }] }),
+        }),
+  )
+  await page.goto('/')
+  await captureOnly(page)
+  await page.getByTestId('receipt-process-button').click()
+  await expect(page.getByTestId('receipt-item')).toHaveAttribute('data-status', 'failed')
+
+  await expect(page.getByTestId('save-trip-button')).toBeDisabled()
+  await expect(page.getByTestId('save-trip-unprocessed-hint')).toBeVisible()
+
+  fail = false
+  await page.getByTestId('receipt-process-button').click()
+  await expect(page.getByTestId('receipt-status')).toHaveText('Processed')
+  // Processed now, but its review is still open — that gate takes over.
+  await expect(page.getByTestId('save-trip-unprocessed-hint')).toHaveCount(0)
+  await expect(page.getByTestId('save-trip-disabled-hint')).toBeVisible()
+  await expect(page.getByTestId('save-trip-button')).toBeDisabled()
+
+  await page.getByTestId('receipt-review-confirm').click()
+  await expect(page.getByTestId('save-trip-button')).toBeEnabled()
+})
+
+test('the hint counts several unprocessed receipt photos', async ({ page }) => {
+  await page.goto('/')
+  await captureOnly(page)
+  await captureOnly(page)
+
+  await expect(page.getByTestId('save-trip-unprocessed-hint')).toHaveText('Process or remove the 2 receipt photos first')
+})

@@ -72,7 +72,14 @@ export interface PendingReceipt {
   id: number
   /** null if captured before being attached to a trip */
   tripId: number | null
-  imageBlob: Blob
+  /**
+   * The receipt photo, shrunk to at most 1600px at capture (see
+   * prepareReceiptPhoto). Only absent on a receipt that was already
+   * processed ('done') when it was exported to a v2+ backup and later
+   * restored — backups drop photos once they've served their purpose (see
+   * buildBackup). A receipt that still needs processing always has one.
+   */
+  imageBlob?: Blob
   capturedAt: number
   status: ReceiptStatus
   /** message from the most recent failed extraction attempt, if any */

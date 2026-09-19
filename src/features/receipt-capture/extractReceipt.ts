@@ -1,4 +1,6 @@
+import { blobToDataUrl } from '../../lib/dataUrl'
 import { perfMark } from '../perf/perfLog'
+import { prepareReceiptPhoto } from './prepareReceiptPhoto'
 
 export interface ExtractedItem {
   name: string
@@ -37,19 +39,18 @@ export class ExtractionRequestError extends Error {
   }
 }
 
-const MAX_DIMENSION = 1600
-const JPEG_QUALITY = 0.8
-
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 /**
  * Sends a receipt photo to /api/extract-receipt and returns the extracted
- * items and purchase date. Resizes/re-encodes the image first: phone camera
- * photos (several MB) plus base64's ~37% overhead can exceed Vercel's 4.5MB
- * function request-body limit, so this keeps requests reliably small.
+ * items and purchase date. Photos are already shrunk to at most 1600px at
+ * capture (see prepareReceiptPhoto) and pass through untouched here; running
+ * it again only matters for a receipt captured before that existed, whose
+ * stored original (several MB, plus base64's ~33% overhead) could otherwise
+ * exceed Vercel's 4.5MB function request-body limit.
  */
 export async function extractReceipt(imageBlob: Blob, categoryNotes: CategoryNoteHint[] = []): Promise<ExtractionResult> {
-  const dataUrl = await toUploadDataUrl(imageBlob)
+  const dataUrl = await blobToDataUrl(await prepareReceiptPhoto(imageBlob))
 
   perfMark(`request sent (${Math.round(dataUrl.length / 1024)} KB)`)
   const response = await fetch('/api/extract-receipt', {
@@ -95,34 +96,4 @@ export async function extractReceipt(imageBlob: Blob, categoryNotes: CategoryNot
   }
 
   return { items: items as ExtractedItem[], purchaseDate, purchaseDateError }
-}
-
-async function toUploadDataUrl(blob: Blob): Promise<string> {
-  const bitmap = await createImageBitmap(blob)
-  const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
-  const width = Math.round(bitmap.width * scale)
-  const height = Math.round(bitmap.height * scale)
-
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas is not supported in this browser')
-  ctx.drawImage(bitmap, 0, 0, width, height)
-  bitmap.close()
-
-  const resizedBlob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (result) => (result ? resolve(result) : reject(new Error('Failed to encode image'))),
-      'image/jpeg',
-      JPEG_QUALITY,
-    )
-  })
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read image'))
-    reader.readAsDataURL(resizedBlob)
-  })
 }
