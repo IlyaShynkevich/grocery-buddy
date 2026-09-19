@@ -388,9 +388,9 @@ test('backups keep each trip’s currency; older backups import as EUR; an unkno
   }
 
   await importFile(backup(3, { currency: 'USD' }))
-  await expect(page.getByTestId('backup-import-error')).toContainText('У похода №50 неизвестная валюта ("USD")')
+  await expect(page.getByTestId('backup-import-error')).toContainText('У покупки №50 неизвестная валюта ("USD")')
   await importFile(backup(3, {}))
-  await expect(page.getByTestId('backup-import-error')).toContainText('У похода №50 не указана валюта')
+  await expect(page.getByTestId('backup-import-error')).toContainText('У покупки №50 не указана валюта')
   expect((await tripCurrencies(page))['50']).toBeUndefined()
 
   await importFile(backup(2, {})) // pre-currency backup
@@ -423,6 +423,6 @@ test('an unreadable receipt date is reported in Russian, quoting what the AI rea
   await page.getByTestId('receipt-process-button').click()
 
   await expect(page.getByTestId('receipt-review-date-error')).toHaveText(
-    'Не удалось прочитать дату чека («32.13.26») — у похода останется текущая дата, если не выбрать другую в «Показать товары».',
+    'Не удалось прочитать дату чека («32.13.26») — у покупки останется текущая дата, если не выбрать другую в «Показать товары».',
   )
 })

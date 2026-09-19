@@ -10,11 +10,20 @@ import { test as base, expect as baseExpect, type Locator, type Page } from '@pl
  * (see home.spec.ts) need the real fresh-launch path, and they clear this
  * flag themselves.
  */
-export const test = base.extend<{ page: Page }>({
-  page: async ({ page }, use) => {
-    await page.addInitScript(() => {
+export const test = base.extend<{ page: Page; debugTools: boolean }>({
+  /**
+   * Debug tools is hidden unless switched on for the session (the secret
+   * Home-mascot gesture, see src/features/debug/debugTools.ts) — off by
+   * default here too, like the real app. Specs that drive the panel opt in
+   * with `test.use({ debugTools: true })`, which pre-sets the same session
+   * flag the gesture writes.
+   */
+  debugTools: [false, { option: true }],
+  page: async ({ page, debugTools }, use) => {
+    await page.addInitScript((debug) => {
       window.sessionStorage.setItem('grocery-buddy:homeSeenThisSession', '1')
-    })
+      if (debug) window.sessionStorage.setItem('grocery-buddy:debugTools', '1')
+    }, debugTools)
     await use(page)
   },
 })

@@ -171,9 +171,24 @@ summary {
   50% { opacity: 0.4; }
 }
 
+/* Toast (features/toast): fades in, holds, fades out over its duration,
+   which Toast.tsx sets inline to match the timer that removes it. */
+.gb-toast {
+  animation-name: gb-toast;
+  animation-timing-function: ease;
+  animation-fill-mode: both;
+}
+
+@keyframes gb-toast {
+  0% { opacity: 0; }
+  8%, 80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gb-tab-slide,
-  .gb-pulse {
+  .gb-pulse,
+  .gb-toast {
     animation: none !important;
   }
 }
