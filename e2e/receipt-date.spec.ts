@@ -44,7 +44,7 @@ test.beforeEach(async ({ page }) => {
 test('an extracted date shows in the collapsed review summary and is applied to the trip on Confirm', async ({
   page,
 }) => {
-  await mockExtraction(page, { purchaseDate: '2026-09-15', purchaseDateError: null })
+  await mockExtraction(page, { purchaseDate: '2026-09-15', purchaseDateRaw: null })
 
   await page.goto('/')
   await captureAndProcess(page)
@@ -67,7 +67,7 @@ test('an extracted date shows in the collapsed review summary and is applied to 
 })
 
 test('dismissing the review discards the extracted date along with the items', async ({ page }) => {
-  await mockExtraction(page, { purchaseDate: '2026-09-15', purchaseDateError: null })
+  await mockExtraction(page, { purchaseDate: '2026-09-15', purchaseDateRaw: null })
 
   await page.goto('/')
   await captureAndProcess(page)
@@ -82,7 +82,7 @@ test('dismissing the review discards the extracted date along with the items', a
 })
 
 test("a null date shows the trip's current date as-is and leaves it unchanged on Confirm", async ({ page }) => {
-  await mockExtraction(page, { purchaseDate: null, purchaseDateError: null })
+  await mockExtraction(page, { purchaseDate: null, purchaseDateRaw: null })
 
   await page.goto('/')
   await captureAndProcess(page)
@@ -98,7 +98,7 @@ test("a null date shows the trip's current date as-is and leaves it unchanged on
 })
 
 test('the user can correct the date in the review panel before confirming', async ({ page }) => {
-  await mockExtraction(page, { purchaseDate: '2026-09-15', purchaseDateError: null })
+  await mockExtraction(page, { purchaseDate: '2026-09-15', purchaseDateRaw: null })
 
   await page.goto('/')
   await captureAndProcess(page)
@@ -121,12 +121,15 @@ test('the user can correct the date in the review panel before confirming', asyn
 test('an unreadable date is surfaced as an error, not silently dropped, and leaves the trip date unchanged', async ({
   page,
 }) => {
-  await mockExtraction(page, { purchaseDate: null, purchaseDateError: 'Unrecognized receipt date "32.13.26"' })
+  await mockExtraction(page, { purchaseDate: null, purchaseDateRaw: '32.13.26' })
 
   await page.goto('/')
   await captureAndProcess(page)
 
   await expect(page.getByTestId('receipt-review-date-error')).toBeVisible()
+  await expect(page.getByTestId('receipt-review-date-error')).toHaveText(
+    'Couldn\'t read the receipt\'s date ("32.13.26") — the trip keeps its current date unless you pick one under Show items.',
+  )
   await expect(page.getByTestId('receipt-review-date-error')).toContainText('32.13.26')
   await expect(page.getByTestId('receipt-review-date')).toHaveText(`Date: ${TODAY_DISPLAY}`)
 
@@ -138,7 +141,7 @@ test('an unreadable date is surfaced as an error, not silently dropped, and leav
 })
 
 test('picking a date resolves an unreadable-date error, and Confirm applies the picked date', async ({ page }) => {
-  await mockExtraction(page, { purchaseDate: null, purchaseDateError: 'Unrecognized receipt date "32.13.26"' })
+  await mockExtraction(page, { purchaseDate: null, purchaseDateRaw: '32.13.26' })
 
   await page.goto('/')
   await captureAndProcess(page)

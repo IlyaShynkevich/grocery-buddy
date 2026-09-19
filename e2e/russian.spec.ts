@@ -407,3 +407,22 @@ test('backups keep each trip’s currency; older backups import as EUR; an unkno
   expect(exported.schemaVersion).toBe(3)
   expect(exported.tables.trips.find((trip: { id: number }) => trip.id === 50).currency).toBe('EUR')
 })
+
+test('an unreadable receipt date is reported in Russian, quoting what the AI read', async ({ page }) => {
+  await useRussian(page)
+  await page.route('**/api/extract-receipt', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      // The server sends only the raw text; the sentence around it is the app's.
+      body: JSON.stringify({ purchaseDate: null, purchaseDateRaw: '32.13.26', items: [{ name: 'Молоко', price: 1.19, category: 'dairy' }] }),
+    }),
+  )
+  await page.goto('/')
+  await page.getByTestId('receipt-capture-input').setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: SAMPLE_IMAGE })
+  await page.getByTestId('receipt-process-button').click()
+
+  await expect(page.getByTestId('receipt-review-date-error')).toHaveText(
+    'Не удалось прочитать дату чека («32.13.26») — у похода останется текущая дата, если не выбрать другую в «Показать товары».',
+  )
+})

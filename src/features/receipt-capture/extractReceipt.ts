@@ -18,7 +18,7 @@ export interface ExtractionResult {
   /** ISO 'YYYY-MM-DD' read off the receipt, or null if it has no legible date */
   purchaseDate: string | null
   /** Set when the AI returned a date that couldn't be parsed — shown in the review panel, never dropped silently */
-  purchaseDateError: string | null
+  purchaseDateRaw: string | null
 }
 
 /** A category's personal notes (see useCategoryNotes/CustomizePage), grouped for the extraction request. */
@@ -80,7 +80,7 @@ export async function extractReceipt(imageBlob: Blob, categoryNotes: CategoryNot
     throw new Error('Receipt scanning is disabled (demo mode): this deployment has no OPENAI_API_KEY configured')
   }
 
-  const record = body as { items?: unknown; purchaseDate?: unknown; purchaseDateError?: unknown } | null
+  const record = body as { items?: unknown; purchaseDate?: unknown; purchaseDateRaw?: unknown } | null
   const items = record?.items
   if (!Array.isArray(items)) {
     throw new Error('Extraction response was malformed')
@@ -90,10 +90,10 @@ export async function extractReceipt(imageBlob: Blob, categoryNotes: CategoryNot
   if (purchaseDate !== null && !(typeof purchaseDate === 'string' && ISO_DATE.test(purchaseDate))) {
     throw new Error(`Extraction response had a malformed purchaseDate: ${JSON.stringify(purchaseDate)}`)
   }
-  const purchaseDateError = record?.purchaseDateError ?? null
-  if (purchaseDateError !== null && typeof purchaseDateError !== 'string') {
-    throw new Error(`Extraction response had a malformed purchaseDateError: ${JSON.stringify(purchaseDateError)}`)
+  const purchaseDateRaw = record?.purchaseDateRaw ?? null
+  if (purchaseDateRaw !== null && typeof purchaseDateRaw !== 'string') {
+    throw new Error(`Extraction response had a malformed purchaseDateRaw: ${JSON.stringify(purchaseDateRaw)}`)
   }
 
-  return { items: items as ExtractedItem[], purchaseDate, purchaseDateError }
+  return { items: items as ExtractedItem[], purchaseDate, purchaseDateRaw }
 }

@@ -115,7 +115,13 @@ export interface PendingReceipt {
    * left as-is unless the user picks one in the review panel.
    */
   stagedDate?: string | null
-  /** Why the AI's date couldn't be used (it returned something unparseable) — shown in the review panel until the user picks a date. */
+  /** What the AI read as the date when it couldn't be parsed, as raw text — the review panel shows it (in the user's language) until they pick a date. */
+  stagedDateRaw?: string | null
+  /**
+   * Legacy (before purchaseDateRaw): a whole English error sentence instead
+   * of the raw date text. Only on reviews that were already open when the
+   * app updated — still shown, so the warning isn't silently dropped.
+   */
   stagedDateError?: string | null
   /** Whether the user has confirmed/dismissed the post-scan review panel. */
   reviewed?: boolean

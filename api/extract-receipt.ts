@@ -36,8 +36,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-      const { items, purchaseDate, purchaseDateError } = await extractReceipt(image, apiKey, notes)
-      res.status(200).json({ items, purchaseDate, purchaseDateError })
+      const { items, purchaseDate, purchaseDateRaw } = await extractReceipt(image, apiKey, notes)
+      res.status(200).json({ items, purchaseDate, purchaseDateRaw })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown extraction error'
       // Forward OpenAI's own 4xx as-is (429, 400, 413, ...) — those describe

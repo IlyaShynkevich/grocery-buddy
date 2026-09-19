@@ -117,6 +117,9 @@ export function ReceiptReviewPanel() {
   // The AI's (or user's) staged date when there is one; otherwise the trip's
   // own date, shown as-is — that's also exactly what Confirm leaves in place.
   const shownDate = receipt.stagedDate ?? tripDate
+  // What the AI read as the date but couldn't be parsed (legacy rows carry a
+  // full English sentence instead — see PendingReceipt.stagedDateError).
+  const unreadableDate = receipt.stagedDateRaw ?? receipt.stagedDateError
 
   const handleDateChange = (date: string) => {
     // Mid-edit (a date input reports '' until every part is filled in) —
@@ -218,9 +221,9 @@ export function ReceiptReviewPanel() {
         {!isOpen && confirmButton}
       </div>
 
-      {receipt.stagedDateError && (
+      {unreadableDate && (
         <p role="alert" data-testid="receipt-review-date-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
-          {messages.review.dateUnreadable(receipt.stagedDateError)}
+          {messages.review.dateUnreadable(unreadableDate)}
         </p>
       )}
       {dateSaveError && (

@@ -126,8 +126,8 @@ export const en = {
     yesSame: 'Yes, same item',
     noKeepBoth: 'No, keep both',
     date: (date: string) => `Date: ${date}`,
-    dateUnreadable: (detail: string) =>
-      `Couldn't read the receipt's date (${detail}) — the trip keeps its current date unless you pick one under Show items.`,
+    dateUnreadable: (raw: string) =>
+      `Couldn't read the receipt's date ("${raw}") — the trip keeps its current date unless you pick one under Show items.`,
     dateSaveFailed: (message: string) => `Failed to save the date: ${message}`,
     hideItems: 'Hide items ▾',
     showItems: 'Show items ▸',
