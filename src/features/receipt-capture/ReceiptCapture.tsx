@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
-import type { PendingReceipt, ReceiptStatus } from '../../db/db'
+import type { PendingReceipt } from '../../db/db'
+import { useT } from '../../i18n'
+import { formatDateTime } from '../../lib/formatDate'
 import { IconChip } from '../../lib/IconChip'
 import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
@@ -9,14 +11,8 @@ import { getUserFacingErrorMessage, isDemoModeError } from './errorMessage'
 import { ReceiptThumbnail } from './ReceiptThumbnail'
 import { useReceiptCapture } from './useReceiptCapture'
 
-const STATUS_LABEL: Record<ReceiptStatus, string> = {
-  pending: 'Waiting to process',
-  processing: 'Processing…',
-  failed: 'Failed — will retry',
-  done: 'Processed',
-}
-
 export function ReceiptCapture() {
+  const messages = useT()
   const { pendingReceipts, captureReceipt, removeReceipt, processReceipt } = useReceiptCapture()
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
@@ -51,7 +47,7 @@ export function ReceiptCapture() {
     setMenuOpen(false)
     if (!input) {
       console.error('Receipt capture: photo input is not mounted')
-      setCaptureError('The photo picker is not available — reload the app and try again.')
+      setCaptureError(messages.capture.pickerUnavailable)
       return
     }
     perfMark(perfLabel)
@@ -76,7 +72,7 @@ export function ReceiptCapture() {
       perfMark('photo saved')
     } catch (err) {
       console.error('RECEIPT_CAPTURE_ERROR:', err)
-      setCaptureError(`Photo not saved: ${err instanceof Error ? err.message : String(err)}`)
+      setCaptureError(messages.capture.photoNotSaved(err instanceof Error ? err.message : String(err)))
     } finally {
       setPhotoPhase(null)
       // Reset so picking the same file again still fires a change event.
@@ -88,7 +84,7 @@ export function ReceiptCapture() {
     <section data-testid="receipt-capture" style={pageStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.1rem' }}>Receipt</h2>
+          <h2 style={{ fontSize: '1.1rem' }}>{messages.capture.title}</h2>
 
           <div style={{ position: 'relative', display: 'inline-block', marginTop: '0.6rem' }}>
             <button
@@ -104,7 +100,7 @@ export function ReceiptCapture() {
                 borderRadius: 'var(--radius-sm)',
               }}
             >
-              Add receipt photo
+              {messages.capture.addPhoto}
             </button>
 
             {menuOpen && (
@@ -139,7 +135,7 @@ export function ReceiptCapture() {
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left', width: '100%' }}
                   >
                     <IconChip src="/icons/icon-camera.png" />
-                    Camera
+                    {messages.capture.camera}
                   </button>
                   <button
                     type="button"
@@ -148,7 +144,7 @@ export function ReceiptCapture() {
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left', width: '100%' }}
                   >
                     <IconChip src="/icons/icon-gallery.png" />
-                    Choose from Photos
+                    {messages.capture.gallery}
                   </button>
                 </div>
               </>
@@ -199,7 +195,7 @@ export function ReceiptCapture() {
           style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem' }}
         >
           <span className="gb-pulse" style={{ flex: 1 }}>
-            {photoPhase === 'waiting' ? 'Waiting for photo…' : 'Preparing photo…'}
+            {photoPhase === 'waiting' ? messages.capture.waiting : messages.capture.preparing}
           </span>
           {/* Safety valve for browsers that never fire `cancel`: only hides
               this indicator — a photo that still arrives is saved as usual.
@@ -209,7 +205,7 @@ export function ReceiptCapture() {
             <button
               type="button"
               data-testid="receipt-waiting-dismiss"
-              aria-label="Stop waiting for photo"
+              aria-label={messages.capture.stopWaiting}
               onClick={() => setPhotoPhase(null)}
               style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
             >
@@ -220,7 +216,7 @@ export function ReceiptCapture() {
       )}
 
       {pendingReceipts.length === 0 && !photoPhase && (
-        <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>No receipts captured yet.</p>
+        <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>{messages.capture.empty}</p>
       )}
 
       <ul
@@ -249,6 +245,7 @@ function ReceiptRow({
   onProcess: (receipt: PendingReceipt) => void
   onRemove: (id: number) => void
 }) {
+  const messages = useT()
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -285,10 +282,10 @@ function ReceiptRow({
   const demoMode = receipt.status === 'failed' && receipt.lastError !== undefined && isDemoModeError(receipt.lastError)
 
   const statusText = isWaitingToRetry
-    ? `Retrying in ${Math.max(0, Math.ceil((receipt.retryAt! - now) / 1000))}s`
+    ? messages.capture.retryingIn(Math.max(0, Math.ceil((receipt.retryAt! - now) / 1000)))
     : demoMode
-      ? 'Demo mode'
-      : STATUS_LABEL[receipt.status]
+      ? messages.capture.demoMode
+      : messages.capture.status[receipt.status]
 
   return (
     <li
@@ -303,7 +300,7 @@ function ReceiptRow({
       <div style={{ flex: 1 }}>
         <div data-testid="receipt-status">{statusText}</div>
         <div data-testid="receipt-timestamp" style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
-          {new Date(receipt.capturedAt).toLocaleString()}
+          {formatDateTime(receipt.capturedAt)}
         </div>
         {receipt.status === 'failed' && receipt.lastError && (
           <div data-testid="receipt-error" style={{ fontSize: '0.75rem', color: demoMode ? 'var(--text-muted)' : 'var(--danger)' }}>
@@ -321,10 +318,10 @@ function ReceiptRow({
           }}
           style={primaryButtonStyle}
         >
-          {receipt.status === 'failed' ? 'Retry' : 'Process'}
+          {receipt.status === 'failed' ? messages.capture.retry : messages.capture.process}
         </button>
       )}
-      <button type="button" onClick={() => onRemove(receipt.id)} aria-label="Remove receipt" style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}>
+      <button type="button" onClick={() => onRemove(receipt.id)} aria-label={messages.capture.removeReceipt} style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}>
         ✕
       </button>
     </li>

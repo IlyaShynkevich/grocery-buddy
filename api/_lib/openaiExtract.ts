@@ -23,7 +23,7 @@ export interface ExtractedItem {
 /** The whole extraction response: line items plus the receipt-level purchase date. */
 export interface ExtractionResult {
   items: ExtractedItem[]
-  /** ISO 'YYYY-MM-DD', or null when the receipt has no legible date (or it failed to parse — see purchaseDateError) */
+  /** ISO 'YYYY-MM-DD', or null when the receipt has no legible date (or it failed to parse — see purchaseDateRaw) */
   purchaseDate: string | null
   /**
    * Set only when the model returned *something* for the date that couldn't
@@ -31,7 +31,7 @@ export interface ExtractionResult {
    * silently dropped. Null when purchaseDate parsed fine or the model itself
    * reported no date.
    */
-  purchaseDateError: string | null
+  purchaseDateRaw: string | null
 }
 
 /** A category's personal notes (Customize page), grouped for the extraction prompt. */
@@ -129,12 +129,14 @@ const CATEGORY_KEYS = CATEGORIES.map((category) => category.key)
 // in order, so a response truncated mid-items (see the salvage pass below)
 // still carries the date.
 const SYSTEM_PROMPT = `You extract line items and the purchase date from a photo of a grocery store receipt.
+Receipts are usually German, Russian or Belarusian (Latin or Cyrillic script); prices may use a comma as the decimal separator.
 Respond with ONLY a JSON object of the shape {"purchaseDate": string|null, "items": [{"name": string, "price": number, "category": string, "isDiscount": boolean, "essentialOverride": boolean|null}]}.
-- "purchaseDate" is the date the purchase was made, copied exactly as printed on the receipt — date part only, no time. Receipts are usually German, so it is typically day-first: DD.MM.YYYY (e.g. "18.09.2026") or DD.MM.YY (e.g. "18.09.26"). Do not reorder, reformat, or convert it. Use null if no date is printed or it cannot be read confidently — never guess.
-- "price" is the item's paid price in the receipt's currency, as a plain number (no currency symbol, no thousands separators).
+- "purchaseDate" is the date the purchase was made, copied exactly as printed on the receipt — date part only, no time. German, Russian and Belarusian receipts all write dates day-first: DD.MM.YYYY (e.g. "18.09.2026") or DD.MM.YY (e.g. "18.09.26"). Do not reorder, reformat, or convert it. Use null if no date is printed or it cannot be read confidently — never guess.
+- "name" is the item's name as printed, in its original language and script — do not translate or transliterate it.
+- "price" is the item's paid price in the receipt's currency, as a plain number (no currency symbol, no thousands separators). When a line shows quantity × unit price, use the line's total.
 - "category" must be exactly one of: ${CATEGORY_KEYS.join(', ')}. Pick the closest match; use "other" if unsure.
-- Skip subtotal, tax, total, and payment-method lines — only include purchased items and discounts.
-- Coupon/discount lines (e.g. "Coupon Herzstuecke -0,38") are not purchasable products: include them with "isDiscount": true, "price" as a negative number equal to the discount amount, and "category" set to "other".
+- Skip subtotal, tax, total, change and payment-method lines — only include purchased items and discounts. For example: "Summe", "MwSt", "Karte", "Bar" (German); "ИТОГО", "К ОПЛАТЕ", "НДС", "Наличные", "Карта", "Сдача" (Russian/Belarusian).
+- Coupon/discount lines (e.g. "Coupon Herzstuecke -0,38", "Скидка -0,50") are not purchasable products: include them with "isDiscount": true, "price" as a negative number equal to the discount amount, and "category" set to "other".
 - For regular purchased items, set "isDiscount": false.
 - "essentialOverride" is null by default. Only set it to false when the user's own personal category notes (given separately in the user message, if any) name this specific item — see those instructions if present. Never set it to true.
 - If the photo is not a legible receipt, respond with {"purchaseDate": null, "items": []}.
@@ -317,18 +319,15 @@ function salvagePurchaseDate(content: string): unknown {
 /**
  * Validates the model's raw "purchaseDate" (a date copied as printed — see
  * SYSTEM_PROMPT) into an ISO date. Anything non-null that doesn't parse is
- * reported via purchaseDateError rather than silently becoming "no date".
+ * returned as purchaseDateRaw rather than silently becoming "no date" — the
+ * raw text only, so the app can word the message in the user's language.
  */
-function purchaseDateFromRaw(raw: unknown): Pick<ExtractionResult, 'purchaseDate' | 'purchaseDateError'> {
-  if (raw === null || raw === undefined) return { purchaseDate: null, purchaseDateError: null }
-  if (typeof raw !== 'string') {
-    return { purchaseDate: null, purchaseDateError: `Receipt date was not text: ${JSON.stringify(raw)}` }
-  }
+function purchaseDateFromRaw(raw: unknown): Pick<ExtractionResult, 'purchaseDate' | 'purchaseDateRaw'> {
+  if (raw === null || raw === undefined) return { purchaseDate: null, purchaseDateRaw: null }
+  if (typeof raw !== 'string') return { purchaseDate: null, purchaseDateRaw: JSON.stringify(raw) }
   const purchaseDate = parseReceiptDate(raw)
-  if (purchaseDate === null) {
-    return { purchaseDate: null, purchaseDateError: `Unrecognized receipt date "${raw}"` }
-  }
-  return { purchaseDate, purchaseDateError: null }
+  if (purchaseDate === null) return { purchaseDate: null, purchaseDateRaw: raw }
+  return { purchaseDate, purchaseDateRaw: null }
 }
 
 /**
@@ -340,7 +339,11 @@ function purchaseDateFromRaw(raw: unknown): Pick<ExtractionResult, 'purchaseDate
  * it despite the prompt saying date only.
  */
 export function parseReceiptDate(raw: string): string | null {
-  const text = raw.trim().replace(/\s+\d{1,2}:\d{2}(:\d{2})?$/, '')
+  // Russian/Belarusian receipts sometimes print "г." (year) after the date.
+  const text = raw
+    .trim()
+    .replace(/\s+\d{1,2}:\d{2}(:\d{2})?$/, '')
+    .replace(/\s*г\.?$/, '')
   let year: number
   let month: number
   let day: number

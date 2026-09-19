@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { CATEGORIES, type Category } from '../../db/categories'
+import { categoryLabel, useT } from '../../i18n'
+import { setRegion, useRegion } from '../../i18n/regionStore'
+import { isRegionId, REGIONS } from '../../i18n/regions'
 import { cardStyle, iconButtonStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { useCategoryNotes } from './useCategoryNotes'
@@ -14,6 +17,7 @@ import { useCategoryNotes } from './useCategoryNotes'
  * just not painted.
  */
 function CategoryNotes({ category }: { category: Category }) {
+  const messages = useT()
   const { notes, addNote, removeNote } = useCategoryNotes(category.key)
   const [draftText, setDraftText] = useState('')
 
@@ -27,7 +31,7 @@ function CategoryNotes({ category }: { category: Category }) {
     <div style={{ padding: '0.75rem 0.1rem 0.1rem' }}>
       {notes.length === 0 ? (
         <p data-testid="category-notes-empty" style={mutedTextStyle}>
-          Nothing set up yet — add what's not essential for you.
+          {messages.customize.notesEmpty}
         </p>
       ) : (
         <ul
@@ -45,7 +49,7 @@ function CategoryNotes({ category }: { category: Category }) {
                 type="button"
                 data-testid="category-note-remove"
                 onClick={() => removeNote(note.id)}
-                aria-label={`Remove note: ${note.text}`}
+                aria-label={messages.customize.removeNote(note.text)}
                 style={iconButtonStyle}
               >
                 ✕
@@ -60,13 +64,13 @@ function CategoryNotes({ category }: { category: Category }) {
           type="text"
           value={draftText}
           onChange={(e) => setDraftText(e.target.value)}
-          placeholder="e.g. nuggets, frozen pizza"
-          aria-label={`Add a note for ${category.label}`}
+          placeholder={messages.customize.notePlaceholder}
+          aria-label={messages.customize.addNoteFor(categoryLabel(messages, category.key))}
           data-testid="category-note-input"
           style={{ flex: 1 }}
         />
         <button type="submit" data-testid="category-note-submit" style={primaryButtonStyle}>
-          Add
+          {messages.common.add}
         </button>
       </form>
     </div>
@@ -86,15 +90,67 @@ function CategoryNotes({ category }: { category: Category }) {
  * collapsible section — rather than hand-rolled open/close state, so
  * tapping a header toggling it open/closed comes for free.
  */
+/**
+ * Sits in the title row rather than on its own line: the page is tuned so
+ * all 11 category cards fit on one screen, and a separate row would push
+ * the last ones below the fold.
+ */
+function RegionPicker() {
+  const messages = useT()
+  const region = useRegion()
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const handleChange = (id: string) => {
+    if (!isRegionId(id)) {
+      console.error(`Grocery Buddy: unknown region picked: ${JSON.stringify(id)}`)
+      return
+    }
+    setSaveError(null)
+    try {
+      setRegion(id)
+    } catch (err) {
+      console.error('Grocery Buddy: could not save the language setting', err)
+      // Rendered in the (already switched) new language.
+      setSaveError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  return (
+    <>
+      <select
+        data-testid="region-select"
+        aria-label={messages.customize.region}
+        title={messages.customize.region}
+        value={region.id}
+        onChange={(e) => handleChange(e.target.value)}
+        style={{ minHeight: '2.5rem', minWidth: 0, flexShrink: 1 }}
+      >
+        {Object.values(REGIONS).map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {saveError && (
+        <p role="alert" data-testid="region-save-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', flexBasis: '100%' }}>
+          {messages.customize.regionSaveFailed(saveError)}
+        </p>
+      )}
+    </>
+  )
+}
+
 export function CustomizePage() {
+  const messages = useT()
   return (
     <section data-testid="customize-page" style={pageStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '1.5rem' }}>Customize</h1>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <h1 style={{ fontSize: '1.5rem', marginRight: 'auto' }}>{messages.customize.title}</h1>
+        <RegionPicker />
         <Mascot pose="excited" size={32} />
       </div>
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>
-        Add personal notes on items that are NOT essential for you, within each category.
+        {messages.customize.intro}
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.6rem' }}>
@@ -106,7 +162,7 @@ export function CustomizePage() {
             style={{ ...cardStyle, padding: '0.55rem 0.75rem' }}
           >
             <summary data-testid="category-accordion-toggle" style={{ fontWeight: 600, cursor: 'pointer' }}>
-              {category.label}
+              {categoryLabel(messages, category.key)}
             </summary>
             <CategoryNotes category={category} />
           </details>

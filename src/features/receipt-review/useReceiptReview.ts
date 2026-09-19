@@ -15,7 +15,7 @@ export interface ResolvedMatch {
   stagedItem: Omit<Item, 'id'>
 }
 
-const CLEARED_STAGING = { stagedItems: [], suggestedMatches: [], stagedDate: null, stagedDateError: null }
+const CLEARED_STAGING = { stagedItems: [], suggestedMatches: [], stagedDate: null, stagedDateRaw: null, stagedDateError: null }
 
 /**
  * Drives the review panel shown automatically after a receipt finishes
@@ -92,7 +92,7 @@ export function useReceiptReview() {
   /** A user-picked date replaces the AI's (and resolves any error about it) — still only staged until Confirm. */
   const updateDate = async (date: string) => {
     if (!receipt) return
-    await db.pendingReceipts.update(receipt.id, { stagedDate: date, stagedDateError: null })
+    await db.pendingReceipts.update(receipt.id, { stagedDate: date, stagedDateRaw: null, stagedDateError: null })
   }
 
   /** Materializes the surviving staged items into `items`, applies any resolved merges, recomputes the trip total, and applies the staged purchase date — all in one transaction. */
@@ -134,6 +134,8 @@ export function useReceiptReview() {
   return {
     receipt,
     tripDate: trip?.date,
+    /** The active trip's currency — staged prices will be recorded in it on Confirm. */
+    tripCurrency: trip?.currency,
     addedItems,
     matches,
     resolveMatch,

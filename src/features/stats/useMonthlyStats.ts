@@ -1,15 +1,18 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { getCategory, resolveEssential } from '../../db/categories'
+import { resolveEssential } from '../../db/categories'
 import { db, type Item } from '../../db/db'
+import type { Currency } from '../../i18n/regions'
 import { groupTripsByMonth, useHistory, type MonthGroup } from '../history/useHistory'
 
 export interface CategoryStat {
+  /** category key — see categoryLabel() for its display name */
   key: string
-  label: string
   amount: number
 }
 
 export interface MonthlyStats {
+  /** Every amount below is in this currency — see useMonthlyStats. */
+  currency: Currency
   /** Sum of each trip's total (already net of discounts, same as History/trip detail). */
   total: number
   /**
@@ -51,8 +54,14 @@ export function useStatsMonths(): MonthGroup[] {
  * defaults to essential — see CATEGORIES in src/db/categories.ts), i.e.
  * they reduce the essential total by default. This keeps both breakdowns
  * exactly reconciled with `total` without inventing a fake category link.
+ *
+ * One MonthlyStats per currency the month's trips were recorded in — never
+ * one sum across currencies, which would add euros to roubles. A month with
+ * a single currency (the normal case) returns a single entry. Ordered by
+ * the most recently completed trip in each currency. Null when the month
+ * has no trips.
  */
-export function useMonthlyStats(group: MonthGroup | undefined): MonthlyStats | null {
+export function useMonthlyStats(group: MonthGroup | undefined): MonthlyStats[] | null {
   const tripIds = group?.trips.map((trip) => trip.id) ?? []
   const tripIdsKey = tripIds.join(',')
 
@@ -64,8 +73,27 @@ export function useMonthlyStats(group: MonthGroup | undefined): MonthlyStats | n
 
   if (!group || group.trips.length === 0) return null
 
-  const total = group.trips.reduce((sum, trip) => sum + trip.total, 0)
+  // group.trips is most-recently-completed first, so Map insertion order is
+  // the display order.
+  const currencyByTrip = new Map(group.trips.map((trip) => [trip.id, trip.currency]))
+  const byCurrency = new Map<Currency, { total: number; items: Item[] }>()
+  for (const trip of group.trips) {
+    const bucket = byCurrency.get(trip.currency) ?? { total: 0, items: [] }
+    bucket.total += trip.total
+    byCurrency.set(trip.currency, bucket)
+  }
+  for (const item of items) {
+    // Items are queried by these very trip ids, so every item has one.
+    if (!currencyByTrip.has(item.tripId)) {
+      throw new Error(`Stats: item #${item.id} belongs to trip #${item.tripId}, which is not in this month`)
+    }
+    byCurrency.get(currencyByTrip.get(item.tripId)!)!.items.push(item)
+  }
 
+  return Array.from(byCurrency.entries()).map(([currency, bucket]) => summarize(currency, bucket.total, bucket.items))
+}
+
+function summarize(currency: Currency, total: number, items: Item[]): MonthlyStats {
   let essential = 0
   let nonEssential = 0
   const byCategory = new Map<string, number>()
@@ -78,8 +106,8 @@ export function useMonthlyStats(group: MonthGroup | undefined): MonthlyStats | n
   }
 
   const categories: CategoryStat[] = Array.from(byCategory.entries())
-    .map(([key, amount]) => ({ key, label: getCategory(key).label, amount }))
+    .map(([key, amount]) => ({ key, amount }))
     .sort((a, b) => b.amount - a.amount)
 
-  return { total, essential, nonEssential, categories }
+  return { currency, total, essential, nonEssential, categories }
 }

@@ -77,7 +77,7 @@ export function useReceiptCapture() {
       const {
         items: extractedItems,
         purchaseDate,
-        purchaseDateError,
+        purchaseDateRaw,
       } = await extractReceipt(receipt.imageBlob, categoryNotes)
 
       const stagedItems: StagedReceiptItem[] = []
@@ -122,7 +122,7 @@ export function useReceiptCapture() {
         stagedItems,
         suggestedMatches,
         stagedDate: purchaseDate,
-        stagedDateError: purchaseDateError,
+        stagedDateRaw: purchaseDateRaw,
         reviewed: stagedItems.length === 0,
       })
     } catch (err) {

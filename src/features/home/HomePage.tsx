@@ -1,4 +1,5 @@
 import { Mascot } from '../mascot/Mascot'
+import { useT } from '../../i18n'
 import { PAGE_MAX_WIDTH, primaryButtonStyle } from '../../lib/ui'
 
 interface HomePageProps {
@@ -11,6 +12,7 @@ interface HomePageProps {
 // as the visual anchor, minimal text, one clear CTA, all centered in the
 // space between the nav bar and the footer.
 export function HomePage({ onShop }: HomePageProps) {
+  const messages = useT()
   return (
     <section
       data-testid="home-page"
@@ -40,7 +42,7 @@ export function HomePage({ onShop }: HomePageProps) {
         onClick={onShop}
         style={{ ...primaryButtonStyle, padding: '0.75rem 1.75rem', fontSize: '1rem' }}
       >
-        I'm ready to shop
+        {messages.home.cta}
       </button>
     </section>
   )

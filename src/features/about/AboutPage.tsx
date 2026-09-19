@@ -1,4 +1,5 @@
 import packageJson from '../../../package.json'
+import { useT } from '../../i18n'
 import { PAGE_MAX_WIDTH, mutedTextStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 
@@ -7,6 +8,7 @@ import { Mascot } from '../mascot/Mascot'
 // HomePage, just without a CTA: there's nowhere further for this page to
 // send you.
 export function AboutPage() {
+  const messages = useT()
   return (
     <section
       data-testid="about-page"
@@ -16,11 +18,13 @@ export function AboutPage() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '1.25rem',
+        // Tuned (with the mascot size and list line-height below) so the whole
+        // page fits a 393x777 phone viewport in both English and Russian.
+        gap: '0.85rem',
         width: '100%',
         maxWidth: PAGE_MAX_WIDTH,
         margin: '0 auto',
-        padding: '2rem 1rem',
+        padding: '1rem 1rem',
         textAlign: 'center',
       }}
     >
@@ -34,7 +38,7 @@ export function AboutPage() {
       {/* Same negative-margin-under-the-title treatment as HomePage's
           mascot, for a consistent "standing just below it" read. */}
       <div style={{ marginTop: '-0.5rem' }}>
-        <Mascot pose="thankyou" size={150} />
+        <Mascot pose="thankyou" size={96} />
       </div>
 
       {/* Left-aligned within the otherwise-centered page — bullet text reads
@@ -44,7 +48,7 @@ export function AboutPage() {
         style={{
           textAlign: 'left',
           fontSize: '0.9rem',
-          lineHeight: 1.5,
+          lineHeight: 1.4,
           margin: 0,
           paddingLeft: '1.1rem',
           display: 'flex',
@@ -52,23 +56,19 @@ export function AboutPage() {
           gap: '0.4rem',
         }}
       >
-        <li>Build your shopping list before or during a trip, checking items off as you grab them.</li>
-        <li>Scan a receipt (camera or gallery) — AI pulls out items, prices, and categories.</li>
-        <li>Review and confirm each scan — nothing touches your list until you do.</li>
-        <li>Browse your trip history, grouped by month; edit or delete a leftover item, or a whole trip.</li>
-        <li>See monthly stats: essential vs. non-essential spend, and spend by category.</li>
-        <li>Personalize what counts as essential per category on Customize.</li>
-        <li>Back up everything to a file, and restore it on a new device.</li>
+        {messages.about.features.map((feature) => (
+          <li key={feature}>{feature}</li>
+        ))}
       </ul>
 
       <p style={{ fontSize: '0.85rem' }}>Ilya Shynkevich</p>
 
       <p data-testid="about-access" style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
-        Production access is protected behind a shared login.
+        {messages.about.access}
       </p>
 
       <p data-testid="about-planned" style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
-        Planned: trends over time / month-to-month spending comparisons.
+        {messages.about.planned}
       </p>
     </section>
   )

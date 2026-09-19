@@ -1,0 +1,71 @@
+import { expect, test, type Page } from './fixtures'
+
+// These pages are tuned to fit one phone screen without scrolling — the
+// usable viewport of the target phone (Xiaomi 14T Pro, browser chrome
+// excluded) — in both languages, since Russian text runs ~15–25% longer.
+// Worst-case content: all 11 categories in Stats, 12 trips over 2 months in
+// History (enough to hit the list's internal scroll and the month filter).
+test.use({ viewport: { width: 393, height: 777 }, isMobile: true, hasTouch: true })
+
+const CATEGORIES = ['produce', 'dairy', 'meat_seafood', 'bakery', 'frozen', 'pantry', 'household', 'personal_care', 'snacks', 'drinks', 'other']
+
+async function seedWorstCase(page: Page) {
+  await page.evaluate(async (categories) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('grocery-buddy')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(['trips', 'items'], 'readwrite')
+      let itemId = 5000
+      for (let trip = 1; trip <= 12; trip++) {
+        const date = `2026-0${trip % 2 === 0 ? 8 : 7}-${String(10 + trip).padStart(2, '0')}`
+        let total = 0
+        for (const category of categories) {
+          total += 2
+          tx.objectStore('items').put({ id: itemId++, tripId: 100 + trip, name: 'x', price: 2, category, essentialOverride: null, source: 'ai', isDiscount: false, checked: false })
+        }
+        tx.objectStore('trips').put({ id: 100 + trip, date, total, currency: 'EUR', status: 'complete', createdAt: trip, completedAt: trip })
+      }
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+    db.close()
+  }, CATEGORIES)
+  await page.reload()
+}
+
+const pageOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)
+
+/** Labels whose text is wider than the box they're laid out in. */
+const overflowingLabels = (page: Page, selector: string) =>
+  page.locator(selector).evaluateAll((els) => els.filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent))
+
+for (const region of ['en-EUR', 'ru-BYN'] as const) {
+  test(`${region}: About, Stats, History and Customize each fit one screen`, async ({ page }) => {
+    await page.addInitScript((id) => localStorage.setItem('grocery-buddy:region', id), region)
+    await page.goto('/')
+    await seedWorstCase(page)
+
+    for (const [tab, ready] of [
+      ['nav-about', 'about-page'],
+      ['nav-stats', 'stats-category-chart'],
+      ['nav-history', 'history-month-select'],
+      ['nav-customize', 'region-select'],
+    ] as const) {
+      await page.getByTestId(tab).click()
+      await expect(page.getByTestId(ready)).toBeVisible()
+      await page.waitForTimeout(400) // tab slide animation
+      expect(await pageOverflow(page), `${tab} overflows the screen`).toBeLessThanOrEqual(0)
+
+      if (tab === 'nav-stats') {
+        await expect(page.getByTestId('stats-category-bar')).toHaveCount(11)
+        expect(
+          await overflowingLabels(page, '[data-testid="stats-category-label"], [data-testid^="stats-split-"] > span:first-child'),
+          'Stats labels wider than their column',
+        ).toEqual([])
+      }
+    }
+  })
+}

@@ -1,4 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { t } from '../i18n'
+import { getRegion } from '../i18n/regionStore'
+import type { Currency } from '../i18n/regions'
 import { DEFAULT_CATEGORY_KEY } from './categories'
 
 export type TripStatus = 'draft' | 'complete'
@@ -12,6 +15,13 @@ export interface Trip {
   store?: string
   total: number
   status: TripStatus
+  /**
+   * What this trip's prices were paid in. Set when the trip is created, from
+   * the active region; every trip from before currencies existed was EUR
+   * (see the version 5 upgrade). A price is always shown in its own trip's
+   * currency, so switching the app's language never relabels history.
+   */
+  currency: Currency
   createdAt: number
   /** set when status becomes 'complete' — history is sorted by this, not date (same-day trips tie on date) */
   completedAt?: number
@@ -105,7 +115,13 @@ export interface PendingReceipt {
    * left as-is unless the user picks one in the review panel.
    */
   stagedDate?: string | null
-  /** Why the AI's date couldn't be used (it returned something unparseable) — shown in the review panel until the user picks a date. */
+  /** What the AI read as the date when it couldn't be parsed, as raw text — the review panel shows it (in the user's language) until they pick a date. */
+  stagedDateRaw?: string | null
+  /**
+   * Legacy (before purchaseDateRaw): a whole English error sentence instead
+   * of the raw date text. Only on reviews that were already open when the
+   * app updated — still shown, so the warning isn't silently dropped.
+   */
   stagedDateError?: string | null
   /** Whether the user has confirmed/dismissed the post-scan review panel. */
   reviewed?: boolean
@@ -161,6 +177,20 @@ db.version(4)
     await tx.table('items').toCollection().modify({ checked: false })
   })
 
+// Per-trip currency. Everything recorded before this existed was EUR (the
+// app only ever supported EUR), so that's a statement of fact about the
+// existing data, not a guess.
+db.version(5)
+  .stores({})
+  .upgrade(async (tx) => {
+    await tx
+      .table('trips')
+      .toCollection()
+      .modify((trip: { currency?: Currency }) => {
+        if (trip.currency === undefined) trip.currency = 'EUR'
+      })
+  })
+
 function todayDateString(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -168,6 +198,7 @@ function todayDateString(): string {
 export function newTrip(overrides: Partial<Omit<Trip, 'id'>> = {}): Omit<Trip, 'id'> {
   return {
     date: todayDateString(),
+    currency: getRegion().currency,
     store: undefined,
     total: 0,
     status: 'draft',
@@ -295,6 +326,33 @@ export async function getOrCreateActiveTrip(): Promise<Trip> {
 }
 
 /**
+ * Makes the active draft trip's currency follow a region switch — but only
+ * while nothing on it has a price yet (typed items have none; confirmed
+ * receipt items do). Once it holds a priced item the currency is locked:
+ * relabelling amounts already recorded would misstate what was paid.
+ * Returns what it did, for logging. Idempotent — safe to run on every load.
+ */
+export async function syncDraftCurrency(currency: Currency): Promise<'updated' | 'unchanged' | 'locked' | 'no-draft'> {
+  return db.transaction('rw', db.trips, db.items, db.appState, async () => {
+    const pointer = await db.appState.get(ACTIVE_TRIP_KEY)
+    if (typeof pointer?.value !== 'number') return 'no-draft'
+    const trip = await db.trips.get(pointer.value)
+    if (!trip || trip.status !== 'draft') return 'no-draft'
+    if (trip.currency === currency) return 'unchanged'
+
+    const pricedItems = await db.items
+      .where('tripId')
+      .equals(trip.id)
+      .filter((item) => item.price !== null)
+      .count()
+    if (pricedItems > 0) return 'locked'
+
+    await db.trips.update(trip.id, { currency })
+    return 'updated'
+  })
+}
+
+/**
  * A receipt whose photo has done its job: extraction finished ('done') and
  * the review was resolved — confirmed or dismissed. `reviewed` is only
  * `false` while a review is still open; it's absent on receipts from before
@@ -326,10 +384,11 @@ export async function completeTrip(tripId: number): Promise<Trip> {
     const receipts = await db.pendingReceipts.where('tripId').equals(tripId).toArray()
     const unfinished = receipts.filter((receipt) => !isReceiptFinished(receipt))
     if (unfinished.length > 0) {
+      const messages = t().saveTripErrors
       const detail = unfinished
-        .map((r) => `#${r.id} (${r.status}${r.status === 'done' ? ', review open' : ''})`)
+        .map((r) => `#${r.id} (${r.status}${r.status === 'done' ? messages.reviewOpen : ''})`)
         .join(', ')
-      throw new Error(`Can't save this trip yet — ${unfinished.length} receipt(s) still need processing or review: ${detail}`)
+      throw new Error(messages.unfinishedReceipts(unfinished.length, detail))
     }
 
     await db.pendingReceipts.bulkDelete(receipts.map((receipt) => receipt.id))

@@ -1,7 +1,8 @@
 import type { ChangeEvent } from 'react'
 import { useState } from 'react'
-import { getCategory, resolveEssential } from '../../db/categories'
+import { resolveEssential } from '../../db/categories'
 import type { Item } from '../../db/db'
+import { categoryLabel, useT } from '../../i18n'
 import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
 import { mutedTextStyle, PAGE_MAX_WIDTH, primaryButtonStyle } from '../../lib/ui'
@@ -22,6 +23,7 @@ function PriceInput({
   item: Omit<Item, 'id'>
   onChange: (event: ChangeEvent<HTMLInputElement>) => void
 }) {
+  const messages = useT()
   const [value, setValue] = useState(item.price !== null ? String(item.price) : '')
   return (
     <input
@@ -29,7 +31,7 @@ function PriceInput({
       step="0.01"
       value={value}
       data-testid="receipt-review-item-price"
-      aria-label={`Price for ${item.name}`}
+      aria-label={messages.review.priceFor(item.name)}
       onChange={(e) => {
         setValue(e.target.value)
         onChange(e)
@@ -41,13 +43,14 @@ function PriceInput({
 
 /** Same seed-once local state as PriceInput, for the same reason: a partially-typed date reads as '' and must not snap back to the stored value mid-edit. */
 function DateInput({ initialDate, onChange }: { initialDate: string; onChange: (date: string) => void }) {
+  const messages = useT()
   const [value, setValue] = useState(initialDate)
   return (
     <input
       type="date"
       value={value}
       data-testid="receipt-review-date-input"
-      aria-label="Purchase date"
+      aria-label={messages.review.purchaseDate}
       onChange={(e) => {
         setValue(e.target.value)
         onChange(e.target.value)
@@ -62,9 +65,11 @@ function DateInput({ initialDate, onChange }: { initialDate: string; onChange: (
 // shopping list yet either — extracted items are staged on the receipt
 // itself (see useReceiptReview) until Confirm.
 export function ReceiptReviewPanel() {
+  const messages = useT()
   const {
     receipt,
     tripDate,
+    tripCurrency,
     addedItems,
     matches,
     resolveMatch,
@@ -84,7 +89,7 @@ export function ReceiptReviewPanel() {
 
   if (!receipt) return null
 
-  const title = matches.length > 0 ? 'Review your scan' : "Here's what we found"
+  const title = matches.length > 0 ? messages.review.titleMatches : messages.review.titleFound
   // Derived straight from the staged items held on the receipt (see
   // useReceiptReview), so an edited price flows through Dexie ->
   // useLiveQuery -> this sum automatically — no separate "edited total"
@@ -112,6 +117,9 @@ export function ReceiptReviewPanel() {
   // The AI's (or user's) staged date when there is one; otherwise the trip's
   // own date, shown as-is — that's also exactly what Confirm leaves in place.
   const shownDate = receipt.stagedDate ?? tripDate
+  // What the AI read as the date but couldn't be parsed (legacy rows carry a
+  // full English sentence instead — see PendingReceipt.stagedDateError).
+  const unreadableDate = receipt.stagedDateRaw ?? receipt.stagedDateError
 
   const handleDateChange = (date: string) => {
     // Mid-edit (a date input reports '' until every part is filled in) —
@@ -126,7 +134,7 @@ export function ReceiptReviewPanel() {
 
   const confirmButton = (
     <button type="button" data-testid="receipt-review-confirm" onClick={confirmReview} style={primaryButtonStyle}>
-      Confirm
+      {messages.review.confirm}
     </button>
   )
 
@@ -151,7 +159,7 @@ export function ReceiptReviewPanel() {
         <button
           type="button"
           data-testid="receipt-review-dismiss"
-          aria-label="Dismiss review"
+          aria-label={messages.review.dismiss}
           onClick={dismissReview}
           style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
         >
@@ -168,8 +176,11 @@ export function ReceiptReviewPanel() {
               style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}
             >
               <div>
-                Is <strong>{match.typedItem.name}</strong> the same as{' '}
-                <strong>{match.stagedItem.name}</strong> ({formatPrice(match.stagedItem.price)})?
+                {messages.review.matchQuestion(
+                  <strong>{match.typedItem.name}</strong>,
+                  <strong>{match.stagedItem.name}</strong>,
+                  formatPrice(match.stagedItem.price, tripCurrency),
+                )}
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
                 <button
@@ -178,14 +189,14 @@ export function ReceiptReviewPanel() {
                   onClick={() => resolveMatch(match.typedItemId, 'merge')}
                   style={primaryButtonStyle}
                 >
-                  Yes, same item
+                  {messages.review.yesSame}
                 </button>
                 <button
                   type="button"
                   data-testid="receipt-review-match-no"
                   onClick={() => resolveMatch(match.typedItemId, 'separate')}
                 >
-                  No, keep both
+                  {messages.review.noKeepBoth}
                 </button>
               </div>
             </li>
@@ -199,26 +210,25 @@ export function ReceiptReviewPanel() {
       >
         <span style={{ display: 'flex', flexDirection: 'column' }}>
           <span data-testid="receipt-review-total" style={{ fontWeight: 700 }}>
-            Total: {formatPrice(total)}
+            {messages.common.total(formatPrice(total, tripCurrency))}
           </span>
           {shownDate && (
             <span data-testid="receipt-review-date" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
-              Date: {formatDate(shownDate)}
+              {messages.review.date(formatDate(shownDate))}
             </span>
           )}
         </span>
         {!isOpen && confirmButton}
       </div>
 
-      {receipt.stagedDateError && (
+      {unreadableDate && (
         <p role="alert" data-testid="receipt-review-date-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
-          Couldn't read the receipt's date ({receipt.stagedDateError}) — the trip keeps its current date unless you pick
-          one under Show items.
+          {messages.review.dateUnreadable(unreadableDate)}
         </p>
       )}
       {dateSaveError && (
         <p role="alert" data-testid="receipt-review-date-save-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
-          Failed to save the date: {dateSaveError}
+          {messages.review.dateSaveFailed(dateSaveError)}
         </p>
       )}
 
@@ -228,14 +238,14 @@ export function ReceiptReviewPanel() {
         onToggle={(e) => setIsOpen(e.currentTarget.open)}
       >
         <summary data-testid="receipt-review-toggle" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
-          {isOpen ? 'Hide items ▾' : 'Show items ▸'}
+          {isOpen ? messages.review.hideItems : messages.review.showItems}
         </summary>
 
         {shownDate && (
           <label
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.75rem' }}
           >
-            Purchase date
+            {messages.review.purchaseDate}
             {/* keyed by receipt so the next queued receipt's review re-seeds it */}
             <DateInput key={receipt.id} initialDate={shownDate} onChange={handleDateChange} />
           </label>
@@ -253,14 +263,15 @@ export function ReceiptReviewPanel() {
                 <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <span>{item.name}</span>
                   <span style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
-                    {getCategory(item.category).label} · {essential ? 'essential' : 'non-essential'}
+                    {categoryLabel(messages, item.category)} ·{' '}
+                    {essential ? messages.common.essential : messages.common.nonEssential}
                   </span>
                 </span>
                 <PriceInput item={item} onChange={(e) => handlePriceChange(stagedIndex, item.name, e)} />
                 <button
                   type="button"
                   data-testid="receipt-review-item-remove"
-                  aria-label={`Remove ${item.name}`}
+                  aria-label={messages.common.remove(item.name)}
                   onClick={() => removeItem(stagedIndex)}
                   style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
                 >

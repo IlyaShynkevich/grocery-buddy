@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useT } from '../../i18n'
 import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
 import { cardStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
@@ -7,6 +8,7 @@ import { BackupSection } from './BackupSection'
 import { groupTripsByMonth, useHistory } from './useHistory'
 
 export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) => void }) {
+  const messages = useT()
   const trips = useHistory()
   const groups = groupTripsByMonth(trips)
   const [monthFilter, setMonthFilter] = useState('')
@@ -15,26 +17,31 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
 
   return (
     <section data-testid="history-page" style={pageStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '1.5rem' }}>History</h1>
-        <Mascot pose="receiptfound" size={32} />
-      </div>
-
-      {trips.length === 0 && <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>No saved trips yet.</p>}
-
-      {groups.length > 1 && (
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.75rem 0' }}>
-          Filter by month:
-          <select data-testid="history-month-select" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
-            <option value="">All months</option>
+      {/* The month filter shares the title row (its label kept for screen
+          readers): on its own row it pushed the page past one phone screen. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <h1 style={{ fontSize: '1.5rem', marginRight: 'auto' }}>{messages.history.title}</h1>
+        {groups.length > 1 && (
+          <select
+            data-testid="history-month-select"
+            aria-label={messages.history.filterByMonth}
+            title={messages.history.filterByMonth}
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            style={{ minHeight: '2.5rem', minWidth: 0 }}
+          >
+            <option value="">{messages.history.allMonths}</option>
             {groups.map((group) => (
               <option key={group.key} value={group.key}>
                 {group.label}
               </option>
             ))}
           </select>
-        </label>
-      )}
+        )}
+        <Mascot pose="receiptfound" size={32} />
+      </div>
+
+      {trips.length === 0 && <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>{messages.history.empty}</p>}
 
       {/*
         Fixed max-height, not an unbounded page: without this, a long
@@ -100,7 +107,7 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
                       {trip.store ? ` — ${trip.store}` : ''}
                     </span>
                     <span style={mutedTextStyle}>
-                      {trip.itemCount} item{trip.itemCount === 1 ? '' : 's'} — {formatPrice(trip.total)}
+                      {messages.history.tripSummary(trip.itemCount, formatPrice(trip.total, trip.currency))}
                     </span>
                   </button>
                 </li>

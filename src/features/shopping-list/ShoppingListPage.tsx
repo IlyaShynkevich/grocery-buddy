@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useT } from '../../i18n'
 import { usePendingReceipt } from '../receipt-review/usePendingReceipt'
 import { formatDate } from '../../lib/formatDate'
 import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { useShoppingList } from './useShoppingList'
 
 export function ShoppingListPage() {
+  const messages = useT()
   const { trip, items, unprocessedReceiptCount, addItem, renameItem, removeItem, toggleItemChecked, saveTrip } =
     useShoppingList()
   const [draftName, setDraftName] = useState('')
@@ -54,13 +56,10 @@ export function ShoppingListPage() {
   // tooltips). Removing the photo is named as the way out on purpose: it's
   // the only one in demo mode, where processing always fails.
   const hasUnprocessedReceipts = unprocessedReceiptCount > 0
-  const unprocessedHint =
-    unprocessedReceiptCount === 1
-      ? 'Process or remove the receipt photo first'
-      : `Process or remove the ${unprocessedReceiptCount} receipt photos first`
+  const unprocessedHint = messages.shopping.unprocessedHint(unprocessedReceiptCount)
   const saveBlockedReason = [
-    hasUnprocessedReceipts ? `${unprocessedHint} — otherwise it would never be scanned` : null,
-    hasPendingReview ? 'Resolve the receipt review below before saving this trip' : null,
+    hasUnprocessedReceipts ? messages.shopping.unprocessedTitle(unprocessedHint) : null,
+    hasPendingReview ? messages.shopping.reviewTitle : null,
   ]
     .filter(Boolean)
     .join('. ') || undefined
@@ -78,17 +77,17 @@ export function ShoppingListPage() {
           type="text"
           value={draftName}
           onChange={(e) => setDraftName(e.target.value)}
-          placeholder="Add an item…"
-          aria-label="Item name"
+          placeholder={messages.shopping.addPlaceholder}
+          aria-label={messages.shopping.itemNameLabel}
           data-testid="add-item-input"
           style={{ flex: 1 }}
         />
         <button type="submit" data-testid="add-item-submit" style={primaryButtonStyle}>
-          Add
+          {messages.common.add}
         </button>
       </form>
 
-      {items.length === 0 && <p style={mutedTextStyle}>No items yet — add what you're picking up.</p>}
+      {items.length === 0 && <p style={mutedTextStyle}>{messages.shopping.empty}</p>}
 
       <ul
         style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
@@ -104,14 +103,14 @@ export function ShoppingListPage() {
               type="checkbox"
               checked={item.checked}
               onChange={(e) => toggleItemChecked(item.id, e.target.checked)}
-              aria-label={item.checked ? `Mark ${item.name} as not grabbed` : `Mark ${item.name} as grabbed`}
+              aria-label={item.checked ? messages.shopping.markNotGrabbed(item.name) : messages.shopping.markGrabbed(item.name)}
               data-testid="shopping-list-item-checkbox"
             />
             <input
               type="text"
               value={item.name}
               onChange={(e) => renameItem(item.id, e.target.value)}
-              aria-label={`Edit ${item.name}`}
+              aria-label={messages.shopping.editItem(item.name)}
               style={{
                 flex: 1,
                 background: 'transparent',
@@ -124,7 +123,7 @@ export function ShoppingListPage() {
             <button
               type="button"
               onClick={() => removeItem(item.id)}
-              aria-label={`Remove ${item.name}`}
+              aria-label={messages.common.remove(item.name)}
               style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
             >
               ✕
@@ -138,7 +137,7 @@ export function ShoppingListPage() {
   return (
     <section data-testid="shopping-list" data-trip-id={trip?.id ?? ''} style={pageStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
-        <h1 style={{ fontSize: '1.5rem' }}>Shopping List</h1>
+        <h1 style={{ fontSize: '1.5rem' }}>{messages.shopping.title}</h1>
         {trip && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
             <button
@@ -149,7 +148,7 @@ export function ShoppingListPage() {
               title={saveBlockedReason}
               style={{ background: 'transparent', color: 'var(--accent)', borderColor: 'var(--accent)' }}
             >
-              Save trip
+              {messages.shopping.saveTrip}
             </button>
             {hasUnprocessedReceipts && (
               <span
@@ -164,7 +163,7 @@ export function ShoppingListPage() {
                 data-testid="save-trip-disabled-hint"
                 style={{ ...mutedTextStyle, fontSize: '0.7rem', textAlign: 'right' }}
               >
-                Resolve the receipt review first
+                {messages.shopping.reviewHint}
               </span>
             )}
           </div>
@@ -172,11 +171,11 @@ export function ShoppingListPage() {
       </div>
       {saveError && (
         <p role="alert" data-testid="save-trip-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>
-          Trip not saved: {saveError}
+          {messages.shopping.saveFailed(saveError)}
         </p>
       )}
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>
-        {trip ? formatDate(trip.date) : 'Loading trip…'}
+        {trip ? formatDate(trip.date) : messages.shopping.loadingTrip}
       </p>
 
       <details
@@ -186,7 +185,7 @@ export function ShoppingListPage() {
         style={{ marginTop: '0.5rem' }}
       >
         <summary data-testid="shopping-list-toggle" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
-          {isOpen ? 'Hide shopping list' : 'Show shopping list'}
+          {isOpen ? messages.shopping.hideList : messages.shopping.showList}
         </summary>
         {listContent}
       </details>
