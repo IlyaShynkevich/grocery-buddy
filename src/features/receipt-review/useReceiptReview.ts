@@ -134,6 +134,8 @@ export function useReceiptReview() {
   return {
     receipt,
     tripDate: trip?.date,
+    /** The active trip's currency — staged prices will be recorded in it on Confirm. */
+    tripCurrency: trip?.currency,
     addedItems,
     matches,
     resolveMatch,

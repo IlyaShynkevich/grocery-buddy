@@ -3,7 +3,7 @@ import { categoryLabel, useT } from '../../i18n'
 import { formatPrice } from '../../lib/formatPrice'
 import { cardStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
-import { useMonthlyStats, useStatsMonths } from './useMonthlyStats'
+import { useMonthlyStats, useStatsMonths, type MonthlyStats } from './useMonthlyStats'
 
 const barTrackStyle: CSSProperties = {
   flex: 1,
@@ -30,6 +30,77 @@ function barWidth(amount: number, max: number): string {
   return `${Math.min(100, Math.max(0, (amount / max) * 100))}%`
 }
 
+/** Total, essential split and category breakdown for one currency's trips. */
+function CurrencyStats({ stats, showCurrency }: { stats: MonthlyStats; showCurrency: boolean }) {
+  const messages = useT()
+  const price = (amount: number) => formatPrice(amount, stats.currency)
+  const maxCategoryAmount = Math.max(0, ...stats.categories.map((c) => c.amount))
+  const maxSplitAmount = Math.max(0, stats.essential, stats.nonEssential)
+
+  return (
+    <div data-testid="stats-currency-block" data-currency={stats.currency} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      <div style={cardStyle}>
+        <span style={{ ...mutedTextStyle, fontSize: '0.8rem' }}>
+          {messages.stats.totalSpend}
+          {showCurrency && ` · ${stats.currency}`}
+        </span>
+        <p data-testid="stats-total" style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '0.15rem' }}>
+          {price(stats.total)}
+        </p>
+      </div>
+
+      <div style={cardStyle}>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>{messages.stats.essentialVsNon}</h2>
+        <div data-testid="stats-essential-split" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <div data-testid="stats-split-essential" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ width: '6.5rem', flexShrink: 0 }}>{messages.stats.essential}</span>
+            <div style={barTrackStyle}>
+              <div style={{ ...barFillStyle, width: barWidth(stats.essential, maxSplitAmount), background: 'var(--accent)' }} />
+            </div>
+            <span data-testid="stats-split-essential-amount" style={{ width: '5rem', textAlign: 'right' }}>
+              {price(stats.essential)}
+            </span>
+          </div>
+          <div data-testid="stats-split-non-essential" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <span style={{ width: '6.5rem', flexShrink: 0, ...mutedTextStyle }}>{messages.stats.nonEssential}</span>
+            <div style={barTrackStyle}>
+              <div style={{ ...barFillStyle, width: barWidth(stats.nonEssential, maxSplitAmount), background: 'var(--border-strong)' }} />
+            </div>
+            <span data-testid="stats-split-non-essential-amount" style={{ width: '5rem', textAlign: 'right', ...mutedTextStyle }}>
+              {price(stats.nonEssential)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>{messages.stats.byCategory}</h2>
+        {stats.categories.length === 0 ? (
+          <p data-testid="stats-empty" style={mutedTextStyle}>
+            {messages.stats.noItemsThisMonth}
+          </p>
+        ) : (
+          <div data-testid="stats-category-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {stats.categories.map((category) => (
+              <div key={category.key} data-testid="stats-category-bar" data-category-key={category.key} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <span data-testid="stats-category-label" style={{ width: '9rem', flexShrink: 0 }}>
+                  {categoryLabel(messages, category.key)}
+                </span>
+                <div style={barTrackStyle}>
+                  <div style={{ ...barFillStyle, width: barWidth(category.amount, maxCategoryAmount), background: 'var(--accent)' }} />
+                </div>
+                <span data-testid="stats-category-amount" style={{ width: '5rem', textAlign: 'right' }}>
+                  {price(category.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function StatsPage() {
   const messages = useT()
   const groups = useStatsMonths()
@@ -38,9 +109,7 @@ export function StatsPage() {
   const activeKey = selectedKey && groups.some((group) => group.key === selectedKey) ? selectedKey : (groups[0]?.key ?? null)
   const group = groups.find((g) => g.key === activeKey)
   const stats = useMonthlyStats(group)
-
-  const maxCategoryAmount = stats ? Math.max(0, ...stats.categories.map((c) => c.amount)) : 0
-  const maxSplitAmount = stats ? Math.max(0, stats.essential, stats.nonEssential) : 0
+  const mixedCurrencies = stats !== null && stats.length > 1
 
   return (
     <section data-testid="stats-page" style={pageStyle}>
@@ -73,62 +142,15 @@ export function StatsPage() {
               {messages.stats.noTripsThisMonth}
             </p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={cardStyle}>
-                <span style={{ ...mutedTextStyle, fontSize: '0.8rem' }}>{messages.stats.totalSpend}</span>
-                <p data-testid="stats-total" style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '0.15rem' }}>
-                  {formatPrice(stats.total)}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {mixedCurrencies && (
+                <p data-testid="stats-mixed-currencies" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
+                  {messages.stats.mixedCurrencies}
                 </p>
-              </div>
-
-              <div style={cardStyle}>
-                <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>{messages.stats.essentialVsNon}</h2>
-                <div data-testid="stats-essential-split" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div data-testid="stats-split-essential" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <span style={{ width: '6.5rem', flexShrink: 0 }}>{messages.stats.essential}</span>
-                    <div style={barTrackStyle}>
-                      <div style={{ ...barFillStyle, width: barWidth(stats.essential, maxSplitAmount), background: 'var(--accent)' }} />
-                    </div>
-                    <span data-testid="stats-split-essential-amount" style={{ width: '5rem', textAlign: 'right' }}>
-                      {formatPrice(stats.essential)}
-                    </span>
-                  </div>
-                  <div data-testid="stats-split-non-essential" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <span style={{ width: '6.5rem', flexShrink: 0, ...mutedTextStyle }}>{messages.stats.nonEssential}</span>
-                    <div style={barTrackStyle}>
-                      <div style={{ ...barFillStyle, width: barWidth(stats.nonEssential, maxSplitAmount), background: 'var(--border-strong)' }} />
-                    </div>
-                    <span data-testid="stats-split-non-essential-amount" style={{ width: '5rem', textAlign: 'right', ...mutedTextStyle }}>
-                      {formatPrice(stats.nonEssential)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={cardStyle}>
-                <h2 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>{messages.stats.byCategory}</h2>
-                {stats.categories.length === 0 ? (
-                  <p data-testid="stats-empty" style={mutedTextStyle}>
-                    {messages.stats.noItemsThisMonth}
-                  </p>
-                ) : (
-                  <div data-testid="stats-category-chart" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {stats.categories.map((category) => (
-                      <div key={category.key} data-testid="stats-category-bar" data-category-key={category.key} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        <span data-testid="stats-category-label" style={{ width: '9rem', flexShrink: 0 }}>
-                          {categoryLabel(messages, category.key)}
-                        </span>
-                        <div style={barTrackStyle}>
-                          <div style={{ ...barFillStyle, width: barWidth(category.amount, maxCategoryAmount), background: 'var(--accent)' }} />
-                        </div>
-                        <span data-testid="stats-category-amount" style={{ width: '5rem', textAlign: 'right' }}>
-                          {formatPrice(category.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              )}
+              {stats.map((currencyStats) => (
+                <CurrencyStats key={currencyStats.currency} stats={currencyStats} showCurrency={mixedCurrencies} />
+              ))}
             </div>
           )}
         </>

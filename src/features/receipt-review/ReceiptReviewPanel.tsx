@@ -69,6 +69,7 @@ export function ReceiptReviewPanel() {
   const {
     receipt,
     tripDate,
+    tripCurrency,
     addedItems,
     matches,
     resolveMatch,
@@ -175,7 +176,7 @@ export function ReceiptReviewPanel() {
                 {messages.review.matchQuestion(
                   <strong>{match.typedItem.name}</strong>,
                   <strong>{match.stagedItem.name}</strong>,
-                  formatPrice(match.stagedItem.price),
+                  formatPrice(match.stagedItem.price, tripCurrency),
                 )}
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
@@ -206,7 +207,7 @@ export function ReceiptReviewPanel() {
       >
         <span style={{ display: 'flex', flexDirection: 'column' }}>
           <span data-testid="receipt-review-total" style={{ fontWeight: 700 }}>
-            {messages.common.total(formatPrice(total))}
+            {messages.common.total(formatPrice(total, tripCurrency))}
           </span>
           {shownDate && (
             <span data-testid="receipt-review-date" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>

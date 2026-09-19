@@ -182,6 +182,10 @@ export const en = {
         `That backup was made by a newer version of Grocery Buddy (schema v${fileVersion}) than this app supports (v${supported}). Update the app, then try importing again.`,
       noTables: 'That file is missing its "tables" section — it is not a valid Grocery Buddy backup file.',
       badTable: (key: string) => `That file's "${key}" table is missing or malformed — it is not a valid Grocery Buddy backup file.`,
+      tripNotObject: (entry: number) => `Trip entry ${entry} in that file is not an object — the backup is damaged. Nothing was imported.`,
+      tripMissingCurrency: (id: string) => `Trip #${id} has no currency — the backup is damaged. Nothing was imported.`,
+      tripBadCurrency: (id: string, currency: string) =>
+        `Trip #${id} has an unknown currency (${currency}) — the backup is damaged. Nothing was imported.`,
       receiptNotObject: (entry: number) => `Receipt entry ${entry} in that file is not an object — the backup is damaged. Nothing was imported.`,
       receiptLabel: (id: string) => `Receipt #${id}`,
       unknownStatus: (label: string, status: string) => `${label} has an unknown status (${status}) — the backup is damaged. Nothing was imported.`,
@@ -196,6 +200,11 @@ export const en = {
       exportMissingPhoto: (id: number, status: string) =>
         `Receipt #${id} (${status}) has no photo — it can't be processed, so it can't be backed up as-is.`,
     },
+  },
+
+  currencyErrors: {
+    draftNotUpdated: (currency: string, message: string) =>
+      `Couldn't switch the current trip to ${currency}: ${message}. Its prices are still in the previous currency.`,
   },
 
   saveTripErrors: {
@@ -224,6 +233,7 @@ export const en = {
     nonEssential: 'Non-essential',
     byCategory: 'Spend by category',
     noItemsThisMonth: 'No purchased items this month.',
+    mixedCurrencies: 'This month has trips in more than one currency — each is totalled separately.',
   },
 
   customize: {

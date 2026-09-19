@@ -175,7 +175,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
       <h1 style={{ fontSize: '1.5rem', marginTop: '0.75rem' }}>{trip ? formatDate(trip.date) : messages.tripDetail.loading}</h1>
       {trip?.store && <p style={{ ...mutedTextStyle, marginTop: '0.2rem' }}>{trip.store}</p>}
       <p data-testid="trip-detail-total" style={{ fontWeight: 700, marginTop: '0.4rem' }}>
-        {messages.common.total(formatPrice(trip?.total ?? null))}
+        {messages.common.total(trip ? formatPrice(trip.total, trip.currency) : formatPrice(null))}
       </p>
 
       {multiSelectActive && !confirmingBulkDelete && (
@@ -344,7 +344,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                         {essential ? messages.common.essential : messages.common.nonEssential}
                       </button>
                     )}
-                    <span>{formatPrice(item.price)}</span>
+                    <span>{formatPrice(item.price, trip?.currency)}</span>
                   </span>
                 </>
               )}
@@ -373,7 +373,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
               }}
             >
               <span>{item.name}</span>
-              <span>{formatPrice(item.price)}</span>
+              <span>{formatPrice(item.price, trip?.currency)}</span>
             </li>
           ))}
         </ul>

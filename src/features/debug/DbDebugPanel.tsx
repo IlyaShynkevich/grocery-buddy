@@ -203,7 +203,7 @@ function DbDebugPanelContents() {
             />{' '}
             <strong>
               Trip #{trip.id} — {trip.date} — {trip.store ?? '(no store)'} — total:{' '}
-              {formatPrice(trip.items.reduce((sum, item) => sum + (item.price ?? 0), 0))} — {trip.status}
+              {formatPrice(trip.items.reduce((sum, item) => sum + (item.price ?? 0), 0), trip.currency)} — {trip.status}
               {trip.id === activePointer?.value ? ' — ACTIVE' : ''}
             </strong>
           </label>
@@ -229,14 +229,14 @@ function DbDebugPanelContents() {
                 // concept applies, so they get a plain deduction row instead
                 // of the item controls below.
                 <li key={item.id} data-testid="debug-discount-item">
-                  {item.name} — {formatPrice(item.price)} (discount){' '}
+                  {item.name} — {formatPrice(item.price, trip.currency)} (discount){' '}
                   <button type="button" onClick={() => removeItem(item)}>
                     remove
                   </button>
                 </li>
               ) : (
                 <li key={item.id} data-testid="debug-item">
-                  {item.name} — {formatPrice(item.price)} —{' '}
+                  {item.name} — {formatPrice(item.price, trip.currency)} —{' '}
                   <select
                     data-testid="debug-item-category"
                     value={item.category}

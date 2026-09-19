@@ -100,7 +100,7 @@ test('export leaves out photos of processed receipts but keeps photos of unproce
   await captureReceipt(page) // never processed
 
   const backup = JSON.parse(await exportBackup(page))
-  expect(backup.schemaVersion).toBe(2)
+  expect(backup.schemaVersion).toBe(3)
   const receipts: { status: string; imageBlob?: string }[] = backup.tables.pendingReceipts
   expect(receipts).toHaveLength(2)
 

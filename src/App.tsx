@@ -15,7 +15,9 @@ import { ReceiptCapture } from './features/receipt-capture/ReceiptCapture'
 import { ReceiptReviewPanel } from './features/receipt-review/ReceiptReviewPanel'
 import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
 import { StatsPage } from './features/stats/StatsPage'
+import { useDraftCurrencyFollowsRegion } from './features/trip/useDraftCurrencyFollowsRegion'
 import { useT } from './i18n'
+import { useRegion } from './i18n/regionStore'
 import { PAGE_MAX_WIDTH } from './lib/ui'
 
 // The 4 icon-only tabs in the middle of the nav bar — these are the ones
@@ -117,6 +119,8 @@ function App() {
   // every formatter (prices, dates) picks the new region up too — not only
   // components that read messages themselves.
   const messages = useT()
+  const region = useRegion()
+  const draftCurrencyError = useDraftCurrencyFollowsRegion()
   const [view, setView] = useState<View>(readInitialView)
   // trip-detail isn't its own tab — it's reached via History, so it keeps
   // the History tab highlighted rather than showing no active tab at all.
@@ -346,6 +350,15 @@ function App() {
       {/* Runs the one-time receipt cleanup on app load, whatever the
           starting view, and reports the outcome — see db/receiptCleanup.ts. */}
       <ReceiptCleanupNotice />
+      {draftCurrencyError && (
+        <p
+          role="alert"
+          data-testid="draft-currency-error"
+          style={{ color: 'var(--danger)', fontSize: '0.85rem', maxWidth: PAGE_MAX_WIDTH, margin: '0.75rem auto 0', padding: '0 1rem' }}
+        >
+          {messages.currencyErrors.draftNotUpdated(region.currency, draftCurrencyError)}
+        </p>
+      )}
 
       {view.name === 'trip-detail' ? (
         <TripDetailPage tripId={view.tripId} onBack={() => setView({ name: 'history' })} />

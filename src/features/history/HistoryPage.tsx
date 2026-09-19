@@ -102,7 +102,7 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
                       {trip.store ? ` — ${trip.store}` : ''}
                     </span>
                     <span style={mutedTextStyle}>
-                      {messages.history.tripSummary(trip.itemCount, formatPrice(trip.total))}
+                      {messages.history.tripSummary(trip.itemCount, formatPrice(trip.total, trip.currency))}
                     </span>
                   </button>
                 </li>

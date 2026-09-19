@@ -1,5 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import { t } from '../i18n'
+import { getRegion } from '../i18n/regionStore'
+import type { Currency } from '../i18n/regions'
 import { DEFAULT_CATEGORY_KEY } from './categories'
 
 export type TripStatus = 'draft' | 'complete'
@@ -13,6 +15,13 @@ export interface Trip {
   store?: string
   total: number
   status: TripStatus
+  /**
+   * What this trip's prices were paid in. Set when the trip is created, from
+   * the active region; every trip from before currencies existed was EUR
+   * (see the version 5 upgrade). A price is always shown in its own trip's
+   * currency, so switching the app's language never relabels history.
+   */
+  currency: Currency
   createdAt: number
   /** set when status becomes 'complete' — history is sorted by this, not date (same-day trips tie on date) */
   completedAt?: number
@@ -162,6 +171,20 @@ db.version(4)
     await tx.table('items').toCollection().modify({ checked: false })
   })
 
+// Per-trip currency. Everything recorded before this existed was EUR (the
+// app only ever supported EUR), so that's a statement of fact about the
+// existing data, not a guess.
+db.version(5)
+  .stores({})
+  .upgrade(async (tx) => {
+    await tx
+      .table('trips')
+      .toCollection()
+      .modify((trip: { currency?: Currency }) => {
+        if (trip.currency === undefined) trip.currency = 'EUR'
+      })
+  })
+
 function todayDateString(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -169,6 +192,7 @@ function todayDateString(): string {
 export function newTrip(overrides: Partial<Omit<Trip, 'id'>> = {}): Omit<Trip, 'id'> {
   return {
     date: todayDateString(),
+    currency: getRegion().currency,
     store: undefined,
     total: 0,
     status: 'draft',
@@ -293,6 +317,33 @@ export async function getOrCreateActiveTrip(): Promise<Trip> {
   })()
 
   return pendingActiveTripCreation
+}
+
+/**
+ * Makes the active draft trip's currency follow a region switch — but only
+ * while nothing on it has a price yet (typed items have none; confirmed
+ * receipt items do). Once it holds a priced item the currency is locked:
+ * relabelling amounts already recorded would misstate what was paid.
+ * Returns what it did, for logging. Idempotent — safe to run on every load.
+ */
+export async function syncDraftCurrency(currency: Currency): Promise<'updated' | 'unchanged' | 'locked' | 'no-draft'> {
+  return db.transaction('rw', db.trips, db.items, db.appState, async () => {
+    const pointer = await db.appState.get(ACTIVE_TRIP_KEY)
+    if (typeof pointer?.value !== 'number') return 'no-draft'
+    const trip = await db.trips.get(pointer.value)
+    if (!trip || trip.status !== 'draft') return 'no-draft'
+    if (trip.currency === currency) return 'unchanged'
+
+    const pricedItems = await db.items
+      .where('tripId')
+      .equals(trip.id)
+      .filter((item) => item.price !== null)
+      .count()
+    if (pricedItems > 0) return 'locked'
+
+    await db.trips.update(trip.id, { currency })
+    return 'updated'
+  })
 }
 
 /**

@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { expect, test, type Page } from './fixtures'
 
 // The rest of the suite runs in the default English region; this spec
@@ -43,7 +44,7 @@ async function seedTrips(page: Page, trips: SeedTrip[]) {
           status: 'complete',
           createdAt: trip.id,
           completedAt: trip.id,
-          ...(trip.currency ? { currency: trip.currency } : {}),
+          currency: trip.currency ?? 'EUR',
         })
         for (const item of trip.items) {
           tx.objectStore('items').put({
@@ -210,4 +211,199 @@ test('the login page follows the saved language', async ({ page }) => {
   await page.getByTestId('login-password').fill('wrong')
   await page.getByTestId('login-submit').click()
   await expect(page.getByTestId('login-error')).toHaveText('Неверный пароль')
+})
+
+// ---- Currency: each trip keeps the currency it was recorded in ----
+
+async function mockExtraction(page: Page, price = 1.19) {
+  await page.route('**/api/extract-receipt', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ purchaseDate: null, items: [{ name: 'Молоко', price, category: 'dairy' }] }),
+    }),
+  )
+}
+
+/** Capture, process and confirm one receipt on the active trip. */
+async function scanAndConfirm(page: Page) {
+  const before = await page.getByTestId('receipt-item').count()
+  await page.getByTestId('receipt-capture-input').setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: SAMPLE_IMAGE })
+  await expect(page.getByTestId('receipt-item')).toHaveCount(before + 1)
+  await page.getByTestId('receipt-process-button').click()
+  await page.getByTestId('receipt-review-confirm').click()
+  await expect(page.getByTestId('receipt-review-panel')).toHaveCount(0)
+}
+
+async function saveTrip(page: Page) {
+  const tripId = await page.getByTestId('shopping-list').getAttribute('data-trip-id')
+  await page.getByTestId('save-trip-button').click()
+  await expect(page.getByTestId('shopping-list')).not.toHaveAttribute('data-trip-id', tripId ?? '')
+}
+
+async function switchRegion(page: Page, id: 'en-EUR' | 'ru-BYN') {
+  await page.getByTestId('nav-customize').click()
+  await page.getByTestId('region-select').selectOption(id)
+  await page.getByTestId('nav-shopping').click()
+  await expect(page.getByTestId('shopping-list')).toBeVisible()
+}
+
+function tripCurrencies(page: Page): Promise<Record<string, string>> {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('grocery-buddy')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const trips = await new Promise<{ id: number; currency: string }[]>((resolve, reject) => {
+      const request = db.transaction('trips').objectStore('trips').getAll()
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    db.close()
+    return Object.fromEntries(trips.map((trip) => [trip.id, trip.currency]))
+  })
+}
+
+test('switching to Russian never relabels an EUR trip; trips recorded afterwards are in BYN', async ({ page }) => {
+  await mockExtraction(page)
+  await page.goto('/')
+  await scanAndConfirm(page)
+  await saveTrip(page) // an English/EUR trip
+
+  await switchRegion(page, 'ru-BYN')
+  // The fresh, still-empty draft follows the switch.
+  await scanAndConfirm(page)
+  await saveTrip(page)
+
+  await page.getByTestId('nav-history').click()
+  const rows = page.getByTestId('history-trip')
+  await expect(rows).toHaveCount(2)
+  await expect(rows.nth(0)).toContainText('1 товар — 1,19 Br')
+  await expect(rows.nth(1)).toContainText('1 товар — 1,19 €')
+
+  // Back in English, the BYN trip is still BYN and the EUR trip still EUR.
+  await switchRegion(page, 'en-EUR')
+  await page.getByTestId('nav-history').click()
+  await expect(rows.nth(0)).toContainText('1 item — 1,19 BYN')
+  await expect(rows.nth(1)).toContainText('1 item — 1,19 €')
+})
+
+test('the draft follows a switch while it has no prices, but is locked once it holds a priced item', async ({ page }) => {
+  await mockExtraction(page)
+  await page.goto('/')
+  await expect(page.getByTestId('shopping-list')).not.toHaveAttribute('data-trip-id', '')
+  const draftId = await page.getByTestId('shopping-list').getAttribute('data-trip-id')
+
+  // Typed items have no price — the draft still follows.
+  await page.getByTestId('add-item-input').fill('Milk')
+  await page.getByTestId('add-item-submit').click()
+  await switchRegion(page, 'ru-BYN')
+  await expect.poll(async () => (await tripCurrencies(page))[draftId!]).toBe('BYN')
+  await switchRegion(page, 'en-EUR')
+  await expect.poll(async () => (await tripCurrencies(page))[draftId!]).toBe('EUR')
+
+  // A confirmed receipt adds priced items — now the currency is locked.
+  await scanAndConfirm(page)
+  await switchRegion(page, 'ru-BYN')
+  await page.waitForTimeout(300)
+  expect((await tripCurrencies(page))[draftId!]).toBe('EUR')
+
+  await saveTrip(page)
+  await page.getByTestId('nav-history').click()
+  await expect(page.getByTestId('history-trip')).toContainText('1,19 €')
+})
+
+test('a month with trips in both currencies is totalled per currency in Stats, never summed across them', async ({ page }) => {
+  await useRussian(page)
+  await page.goto('/')
+  await seedTrips(page, [
+    { id: 101, date: '2026-08-05', currency: 'EUR', items: [milk(2), { name: 'Сок', price: 3, category: 'drinks' }] },
+    { id: 102, date: '2026-08-20', currency: 'BYN', items: [milk(10)] },
+  ])
+
+  await page.getByTestId('nav-stats').click()
+  await expect(page.getByTestId('stats-mixed-currencies')).toBeVisible()
+  const blocks = page.getByTestId('stats-currency-block')
+  await expect(blocks).toHaveCount(2)
+  await expect(page.locator('[data-currency="BYN"]').getByTestId('stats-total')).toHaveText('10,00 Br')
+  await expect(page.locator('[data-currency="EUR"]').getByTestId('stats-total')).toHaveText('5,00 €')
+  await expect(page.locator('[data-currency="EUR"]').getByTestId('stats-category-label')).toHaveText(['Напитки', 'Молочные продукты'])
+})
+
+test('trips stored before currencies existed are upgraded to EUR', async ({ page }) => {
+  // Build the database exactly as the previous app version left it
+  // (schema version 4, no `currency` on trips), before the app opens it.
+  await page.goto('/favicon.svg')
+  await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('grocery-buddy', 40)
+      request.onupgradeneeded = () => {
+        const d = request.result
+        const trips = d.createObjectStore('trips', { keyPath: 'id', autoIncrement: true })
+        trips.createIndex('date', 'date')
+        trips.createIndex('status', 'status')
+        const items = d.createObjectStore('items', { keyPath: 'id', autoIncrement: true })
+        items.createIndex('tripId', 'tripId')
+        items.createIndex('category', 'category')
+        const receipts = d.createObjectStore('pendingReceipts', { keyPath: 'id', autoIncrement: true })
+        receipts.createIndex('tripId', 'tripId')
+        receipts.createIndex('status', 'status')
+        d.createObjectStore('appState', { keyPath: 'key' })
+        d.createObjectStore('categoryNotes', { keyPath: 'id', autoIncrement: true }).createIndex('categoryKey', 'categoryKey')
+        trips.put({ id: 7, date: '2026-08-05', total: 4.5, status: 'complete', createdAt: 1, completedAt: 1 })
+        items.put({ id: 1, tripId: 7, name: 'Milch', price: 4.5, category: 'dairy', essentialOverride: null, source: 'ai', isDiscount: false, checked: false })
+      }
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    db.close()
+  })
+
+  await useRussian(page)
+  await page.goto('/')
+  await page.getByTestId('nav-history').click()
+  await expect(page.getByTestId('history-trip')).toContainText('1 товар — 4,50 €')
+  expect((await tripCurrencies(page))['7']).toBe('EUR')
+})
+
+test('backups keep each trip’s currency; older backups import as EUR; an unknown currency is rejected', async ({ page }) => {
+  await useRussian(page)
+  await page.goto('/')
+  const backup = (schemaVersion: number, trip: Record<string, unknown>) =>
+    JSON.stringify({
+      schemaVersion,
+      exportedAt: '2026-09-01T10:00:00.000Z',
+      tables: {
+        trips: [{ id: 50, date: '2026-08-05', total: 2, status: 'complete', createdAt: 1, completedAt: 1, ...trip }],
+        items: [{ id: 50, tripId: 50, name: 'Молоко', price: 2, category: 'dairy', essentialOverride: null, source: 'ai', isDiscount: false, checked: false }],
+        categoryNotes: [],
+        pendingReceipts: [],
+        appState: [],
+      },
+    })
+  const importFile = async (content: string) => {
+    await page.getByTestId('nav-history').click()
+    await page.getByTestId('backup-import-input').setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: Buffer.from(content) })
+  }
+
+  await importFile(backup(3, { currency: 'USD' }))
+  await expect(page.getByTestId('backup-import-error')).toContainText('У похода №50 неизвестная валюта ("USD")')
+  await importFile(backup(3, {}))
+  await expect(page.getByTestId('backup-import-error')).toContainText('У похода №50 не указана валюта')
+  expect((await tripCurrencies(page))['50']).toBeUndefined()
+
+  await importFile(backup(2, {})) // pre-currency backup
+  await page.getByTestId('backup-import-confirm-yes').click()
+  await expect(page.getByTestId('backup-import-success')).toBeVisible()
+  expect((await tripCurrencies(page))['50']).toBe('EUR')
+  await expect(page.getByTestId('history-trip')).toContainText('2,00 €')
+
+  // Export carries the currency.
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByTestId('backup-export-button').click()
+  const path = await (await downloadPromise).path()
+  const exported = JSON.parse(await readFile(path, 'utf-8'))
+  expect(exported.schemaVersion).toBe(3)
+  expect(exported.tables.trips.find((trip: { id: number }) => trip.id === 50).currency).toBe('EUR')
 })

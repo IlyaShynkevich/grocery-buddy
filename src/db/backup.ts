@@ -1,4 +1,5 @@
 import { t } from '../i18n'
+import type { Currency } from '../i18n/regions'
 import { blobToDataUrl } from '../lib/dataUrl'
 import { db, type AppStateEntry, type CategoryNote, type Item, type PendingReceipt, type ReceiptStatus, type Trip } from './db'
 
@@ -13,9 +14,13 @@ import { db, type AppStateEntry, type CategoryNote, type Item, type PendingRecei
  * 101.6MB, 99.9% of it photos, the other 0.11MB being all the actual trip
  * history.
  * v2: photos only for receipts that still need processing (see buildBackup).
+ * v3: every trip carries its currency. v1/v2 predate currencies — all their
+ *     trips were EUR, and are restored as such.
  * Import accepts both.
  */
-export const BACKUP_SCHEMA_VERSION = 2
+export const BACKUP_SCHEMA_VERSION = 3
+const FIRST_VERSION_WITH_CURRENCY = 3
+const CURRENCIES: readonly Currency[] = ['EUR', 'BYN']
 
 /**
  * pendingReceipts.imageBlob can't survive JSON.stringify — stored as a data
@@ -30,7 +35,8 @@ export interface BackupData {
   schemaVersion: number
   exportedAt: string
   tables: {
-    trips: Trip[]
+    /** `currency` is absent in v1/v2 files (see BACKUP_SCHEMA_VERSION). */
+    trips: (Omit<Trip, 'currency'> & { currency?: Currency })[]
     items: Item[]
     categoryNotes: CategoryNote[]
     pendingReceipts: PendingReceiptExport[]
@@ -171,9 +177,31 @@ export function parseBackup(json: string): BackupData {
     }
   }
 
+  const requireCurrency = parsed.schemaVersion >= FIRST_VERSION_WITH_CURRENCY
+  ;(parsed.tables.trips as unknown[]).forEach((row, index) => validateTripCurrency(row, index, requireCurrency))
   ;(parsed.tables.pendingReceipts as unknown[]).forEach(validateReceiptRow)
 
   return parsed as unknown as BackupData
+}
+
+/**
+ * A trip's currency decides how every one of its prices is labelled, so an
+ * unknown value — or, in a file new enough to always have one, a missing
+ * one — rejects the whole file rather than guessing.
+ */
+function validateTripCurrency(row: unknown, index: number, required: boolean) {
+  const errors = t().backup.errors
+  if (!isPlainObject(row)) {
+    throw new BackupValidationError(errors.tripNotObject(index + 1))
+  }
+  const label = String(row.id ?? index + 1)
+  if (row.currency === undefined) {
+    if (required) throw new BackupValidationError(errors.tripMissingCurrency(label))
+    return
+  }
+  if (!CURRENCIES.includes(row.currency as Currency)) {
+    throw new BackupValidationError(errors.tripBadCurrency(label, JSON.stringify(row.currency)))
+  }
 }
 
 /**
@@ -224,7 +252,8 @@ export async function restoreBackup(backup: BackupData): Promise<void> {
   )
 
   await db.transaction('rw', db.trips, db.items, db.categoryNotes, db.pendingReceipts, db.appState, async () => {
-    await db.trips.bulkPut(backup.tables.trips)
+    // Trips from v1/v2 backups have no currency: those were all EUR.
+    await db.trips.bulkPut(backup.tables.trips.map((trip) => ({ ...trip, currency: trip.currency ?? 'EUR' })))
     await db.items.bulkPut(backup.tables.items)
     await db.categoryNotes.bulkPut(backup.tables.categoryNotes)
     await db.pendingReceipts.bulkPut(receiptsWithBlobs)

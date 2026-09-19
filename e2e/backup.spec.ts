@@ -64,7 +64,7 @@ test('export produces a JSON backup matching the current data', async ({ page })
   expect(suggestedFilename).toBe(`grocery-buddy-backup-${today}.json`)
 
   const backup = JSON.parse(content)
-  expect(backup.schemaVersion).toBe(2)
+  expect(backup.schemaVersion).toBe(3)
   expect(typeof backup.exportedAt).toBe('string')
 
   expect(backup.tables.trips).toHaveLength(1)

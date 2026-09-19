@@ -184,6 +184,9 @@ export const ru: Messages = {
         `Эта копия сделана более новой версией Grocery Buddy (схема v${fileVersion}), чем поддерживает приложение (v${supported}). Обновите приложение и попробуйте снова.`,
       noTables: 'В файле нет раздела «tables» — это не резервная копия Grocery Buddy.',
       badTable: (key) => `Таблица «${key}» в файле отсутствует или повреждена — это не резервная копия Grocery Buddy.`,
+      tripNotObject: (entry) => `Запись похода ${entry} в файле не является объектом — копия повреждена. Ничего не импортировано.`,
+      tripMissingCurrency: (id) => `У похода №${id} не указана валюта — копия повреждена. Ничего не импортировано.`,
+      tripBadCurrency: (id, currency) => `У похода №${id} неизвестная валюта (${currency}) — копия повреждена. Ничего не импортировано.`,
       receiptNotObject: (entry) => `Запись чека ${entry} в файле не является объектом — копия повреждена. Ничего не импортировано.`,
       receiptLabel: (id) => `Чек №${id}`,
       unknownStatus: (label, status) => `${label}: неизвестный статус (${status}) — копия повреждена. Ничего не импортировано.`,
@@ -196,6 +199,11 @@ export const ru: Messages = {
       photoNotImage: (id, bytes, type) => `Фото чека №${id} — это ${bytes} байт типа ${type}, а не изображение — ничего не импортировано.`,
       exportMissingPhoto: (id, status) => `Чек №${id} (${status}) без фото — его нельзя обработать, поэтому его нельзя сохранить в копию как есть.`,
     },
+  },
+
+  currencyErrors: {
+    draftNotUpdated: (currency, message) =>
+      `Не удалось перевести текущий поход в ${currency}: ${message}. Его цены остаются в прежней валюте.`,
   },
 
   saveTripErrors: {
@@ -222,6 +230,7 @@ export const ru: Messages = {
     nonEssential: 'Необязательное',
     byCategory: 'По категориям',
     noItemsThisMonth: 'В этом месяце покупок нет.',
+    mixedCurrencies: 'В этом месяце есть походы в разных валютах — каждая считается отдельно.',
   },
 
   customize: {
