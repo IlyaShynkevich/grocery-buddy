@@ -177,10 +177,13 @@
           connection: 'Проблема со связью — попробуйте ещё раз.',
         },
       }
+      // Same key as src/settings/settingsStore.ts. Falls back to the old
+      // combined region key, in case this page loads before the app has
+      // migrated it.
       let language = 'en'
       try {
-        const region = localStorage.getItem('grocery-buddy:region')
-        if (region === 'ru-BYN') language = 'ru'
+        const saved = localStorage.getItem('grocery-buddy:language')
+        if (saved === 'ru' || (saved === null && localStorage.getItem('grocery-buddy:region') === 'ru-BYN')) language = 'ru'
       } catch (err) {
         console.error('Grocery Buddy: could not read the language setting — using English', err)
       }

@@ -44,7 +44,11 @@ const overflowingLabels = (page: Page, selector: string) =>
 
 for (const region of ['en-EUR', 'ru-BYN'] as const) {
   test(`${region}: About, Stats, History and Customize each fit one screen`, async ({ page }) => {
-    await page.addInitScript((id) => localStorage.setItem('grocery-buddy:region', id), region)
+    await page.addInitScript((id) => {
+      const [language, currency] = id === 'ru-BYN' ? ['ru', 'BYN'] : ['en', 'EUR']
+      localStorage.setItem('grocery-buddy:language', language)
+      localStorage.setItem('grocery-buddy:currency', currency)
+    }, region)
     await page.goto('/')
     await seedWorstCase(page)
 
@@ -77,7 +81,11 @@ for (const [region, saveLabel] of [
   ['ru-BYN', 'Сохранить покупку'],
 ] as const) {
   test(`${region}: the Shopping List (3 items + a pending receipt) fits, with "${saveLabel}" and the title each on one line`, async ({ page }) => {
-    await page.addInitScript((id) => localStorage.setItem('grocery-buddy:region', id), region)
+    await page.addInitScript((id) => {
+      const [language, currency] = id === 'ru-BYN' ? ['ru', 'BYN'] : ['en', 'EUR']
+      localStorage.setItem('grocery-buddy:language', language)
+      localStorage.setItem('grocery-buddy:currency', currency)
+    }, region)
     await page.goto('/')
     // Measured capacity at 393x777, identical in both languages: 4 items fit
     // with no receipt, 3 with a pending receipt (its hint under Save trip).

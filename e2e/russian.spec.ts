@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Page } from './fixtures'
 
-// The rest of the suite runs in the default English region; this spec
-// covers the Russian/BYN region end to end.
+// The rest of the suite runs in English with EUR (the defaults); this
+// spec covers Russian (and BYN) end to end.
 
-const REGION_KEY = 'grocery-buddy:region'
+const LANGUAGE_KEY = 'grocery-buddy:language'
+const CURRENCY_KEY = 'grocery-buddy:currency'
 
 // 1x1 PNG, same fixture as the other receipt specs.
 const SAMPLE_IMAGE = Buffer.from(
@@ -14,7 +15,13 @@ const SAMPLE_IMAGE = Buffer.from(
 
 /** Starts the page already in Russian — the setting as a returning user would have it saved. */
 async function useRussian(page: Page) {
-  await page.addInitScript((key) => localStorage.setItem(key, 'ru-BYN'), REGION_KEY)
+  await page.addInitScript(
+    ([languageKey, currencyKey]) => {
+      localStorage.setItem(languageKey, 'ru')
+      localStorage.setItem(currencyKey, 'BYN')
+    },
+    [LANGUAGE_KEY, CURRENCY_KEY],
+  )
 }
 
 interface SeedTrip {
@@ -100,7 +107,7 @@ test('switching to Russian in Customize translates the app and survives a reload
   await expect(page.locator('html')).toHaveAttribute('lang', 'ru')
   await expect(page.getByTestId('nav-history')).toHaveAttribute('aria-label', 'История')
   await expect(page.getByTestId('category-accordion-toggle').first()).toHaveText('Овощи и фрукты')
-  expect(await page.evaluate((key) => localStorage.getItem(key), REGION_KEY)).toBe('ru-BYN')
+  expect(await page.evaluate(([l, c]) => [localStorage.getItem(l), localStorage.getItem(c)], [LANGUAGE_KEY, CURRENCY_KEY])).toEqual(['ru', 'BYN'])
 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible()

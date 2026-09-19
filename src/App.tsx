@@ -17,9 +17,9 @@ import { ReceiptReviewPanel } from './features/receipt-review/ReceiptReviewPanel
 import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
 import { StatsPage } from './features/stats/StatsPage'
 import { Toast } from './features/toast/Toast'
-import { useDraftCurrencyFollowsRegion } from './features/trip/useDraftCurrencyFollowsRegion'
+import { useDraftCurrencyFollowsSetting } from './features/trip/useDraftCurrencyFollowsSetting'
 import { useT } from './i18n'
-import { useRegion } from './i18n/regionStore'
+import { useCurrencySetting } from './settings/settingsStore'
 import { PAGE_MAX_WIDTH } from './lib/ui'
 
 // The 4 icon-only tabs in the middle of the nav bar — these are the ones
@@ -118,11 +118,11 @@ function cornerButtonStyle(active: boolean): CSSProperties {
 
 function App() {
   // Subscribing here re-renders the whole tree on a language switch, so
-  // every formatter (prices, dates) picks the new region up too — not only
-  // components that read messages themselves.
+  // every formatter (prices, dates) picks the new language up too — not
+  // only components that read messages themselves.
   const messages = useT()
-  const region = useRegion()
-  const draftCurrencyError = useDraftCurrencyFollowsRegion()
+  const currencySetting = useCurrencySetting()
+  const draftCurrencyError = useDraftCurrencyFollowsSetting()
   const debugToolsEnabled = useDebugToolsEnabled()
   const [view, setView] = useState<View>(readInitialView)
   // trip-detail isn't its own tab — it's reached via History, so it keeps
@@ -359,7 +359,7 @@ function App() {
           data-testid="draft-currency-error"
           style={{ color: 'var(--danger)', fontSize: '0.85rem', maxWidth: PAGE_MAX_WIDTH, margin: '0.75rem auto 0', padding: '0 1rem' }}
         >
-          {messages.currencyErrors.draftNotUpdated(region.currency, draftCurrencyError)}
+          {messages.currencyErrors.draftNotUpdated(currencySetting, draftCurrencyError)}
         </p>
       )}
 

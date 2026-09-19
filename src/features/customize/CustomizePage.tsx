@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { CATEGORIES, type Category } from '../../db/categories'
 import { categoryLabel, useT } from '../../i18n'
-import { setRegion, useRegion } from '../../i18n/regionStore'
-import { isRegionId, REGIONS } from '../../i18n/regions'
+import type { Currency } from '../../i18n/currencies'
+import type { Language } from '../../i18n/languages'
+import { LANGUAGES, setCurrency, setLanguage, useSettings } from '../../settings/settingsStore'
 import { cardStyle, iconButtonStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { useCategoryNotes } from './useCategoryNotes'
@@ -95,19 +96,30 @@ function CategoryNotes({ category }: { category: Category }) {
  * all 11 category cards fit on one screen, and a separate row would push
  * the last ones below the fold.
  */
+// Interim: language and currency are independent settings now, but until
+// the Settings page exists this single picker still offers the two
+// combinations that existed before and sets both.
+const COMBINED_OPTIONS: { id: string; label: string; language: Language; currency: Currency }[] = [
+  { id: 'en-EUR', label: `${LANGUAGES.en.label} · EUR`, language: 'en', currency: 'EUR' },
+  { id: 'ru-BYN', label: `${LANGUAGES.ru.label} · BYN`, language: 'ru', currency: 'BYN' },
+]
+
 function RegionPicker() {
   const messages = useT()
-  const region = useRegion()
+  const settings = useSettings()
   const [saveError, setSaveError] = useState<string | null>(null)
+  const selected = COMBINED_OPTIONS.find((o) => o.language === settings.language && o.currency === settings.currency)
 
   const handleChange = (id: string) => {
-    if (!isRegionId(id)) {
+    const option = COMBINED_OPTIONS.find((o) => o.id === id)
+    if (!option) {
       console.error(`Grocery Buddy: unknown region picked: ${JSON.stringify(id)}`)
       return
     }
     setSaveError(null)
     try {
-      setRegion(id)
+      setLanguage(option.language)
+      setCurrency(option.currency)
     } catch (err) {
       console.error('Grocery Buddy: could not save the language setting', err)
       // Rendered in the (already switched) new language.
@@ -121,11 +133,11 @@ function RegionPicker() {
         data-testid="region-select"
         aria-label={messages.customize.region}
         title={messages.customize.region}
-        value={region.id}
+        value={selected?.id ?? ''}
         onChange={(e) => handleChange(e.target.value)}
         style={{ minHeight: '2.5rem', minWidth: 0, flexShrink: 1 }}
       >
-        {Object.values(REGIONS).map((option) => (
+        {COMBINED_OPTIONS.map((option) => (
           <option key={option.id} value={option.id}>
             {option.label}
           </option>

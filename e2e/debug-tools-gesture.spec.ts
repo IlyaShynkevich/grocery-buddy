@@ -85,7 +85,7 @@ test('two taps, or three taps too far apart, do nothing', async ({ page }) => {
 })
 
 test('the toast is translated in Russian', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('grocery-buddy:region', 'ru-BYN'))
+  await page.addInitScript(() => localStorage.setItem('grocery-buddy:language', 'ru'))
   await page.goto('/')
   await goHome(page)
 

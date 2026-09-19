@@ -1,5 +1,5 @@
 import { t } from '../i18n'
-import type { Currency } from '../i18n/regions'
+import { CURRENCIES, type Currency } from '../i18n/currencies'
 import { blobToDataUrl } from '../lib/dataUrl'
 import { db, type AppStateEntry, type CategoryNote, type Item, type PendingReceipt, type ReceiptStatus, type Trip } from './db'
 
@@ -20,7 +20,6 @@ import { db, type AppStateEntry, type CategoryNote, type Item, type PendingRecei
  */
 export const BACKUP_SCHEMA_VERSION = 3
 const FIRST_VERSION_WITH_CURRENCY = 3
-const CURRENCIES: readonly Currency[] = ['EUR', 'BYN']
 
 /**
  * pendingReceipts.imageBlob can't survive JSON.stringify — stored as a data

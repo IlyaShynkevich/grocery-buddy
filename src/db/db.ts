@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import { t } from '../i18n'
-import { getRegion } from '../i18n/regionStore'
-import type { Currency } from '../i18n/regions'
+import type { Currency } from '../i18n/currencies'
+import { getCurrency } from '../settings/settingsStore'
 import { DEFAULT_CATEGORY_KEY } from './categories'
 
 export type TripStatus = 'draft' | 'complete'
@@ -17,9 +17,9 @@ export interface Trip {
   status: TripStatus
   /**
    * What this trip's prices were paid in. Set when the trip is created, from
-   * the active region; every trip from before currencies existed was EUR
+   * the currency setting; every trip from before currencies existed was EUR
    * (see the version 5 upgrade). A price is always shown in its own trip's
-   * currency, so switching the app's language never relabels history.
+   * currency, so changing the currency setting never relabels history.
    */
   currency: Currency
   createdAt: number
@@ -198,7 +198,7 @@ function todayDateString(): string {
 export function newTrip(overrides: Partial<Omit<Trip, 'id'>> = {}): Omit<Trip, 'id'> {
   return {
     date: todayDateString(),
-    currency: getRegion().currency,
+    currency: getCurrency(),
     store: undefined,
     total: 0,
     status: 'draft',
@@ -326,7 +326,7 @@ export async function getOrCreateActiveTrip(): Promise<Trip> {
 }
 
 /**
- * Makes the active draft trip's currency follow a region switch — but only
+ * Makes the active draft trip's currency follow the currency setting — but only
  * while nothing on it has a price yet (typed items have none; confirmed
  * receipt items do). Once it holds a priced item the currency is locked:
  * relabelling amounts already recorded would misstate what was paid.

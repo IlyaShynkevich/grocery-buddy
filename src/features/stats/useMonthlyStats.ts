@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { resolveEssential } from '../../db/categories'
 import { db, type Item } from '../../db/db'
-import type { Currency } from '../../i18n/regions'
+import type { Currency } from '../../i18n/currencies'
 import { groupTripsByMonth, useHistory, type MonthGroup } from '../history/useHistory'
 
 export interface CategoryStat {

@@ -1,4 +1,4 @@
-import { getRegion } from '../i18n/regionStore'
+import { getLanguageConfig } from '../settings/settingsStore'
 
 const formatters = new Map<string, Intl.DateTimeFormat>()
 
@@ -14,7 +14,7 @@ function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.Da
 
 /**
  * Formats a Trip's `date` (a plain 'YYYY-MM-DD' string, no time/timezone —
- * see newTrip()) as DD.MM.YYYY, e.g. "30.07.2026", per the active region.
+ * see newTrip()) as DD.MM.YYYY, e.g. "30.07.2026", per the active language.
  * Parses the parts manually rather than `new Date(isoDate)`: that parses as
  * UTC midnight, which can display as the previous day in negative-UTC-offset
  * timezones — this app has no time component to lose, so building a local
@@ -22,14 +22,14 @@ function formatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.Da
  */
 export function formatDate(isoDate: string): string {
   const [year, month, day] = isoDate.split('-').map(Number)
-  return formatter(getRegion().dateLocale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(
+  return formatter(getLanguageConfig().dateLocale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(
     new Date(year, month - 1, day),
   )
 }
 
-/** A timestamp (epoch ms) as date + time in the active region, e.g. "30.07.2026, 14:32". */
+/** A timestamp (epoch ms) as date + time in the active language, e.g. "30.07.2026, 14:32". */
 export function formatDateTime(epochMs: number): string {
-  return formatter(getRegion().dateLocale, {
+  return formatter(getLanguageConfig().dateLocale, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -45,12 +45,13 @@ export function monthKey(isoDate: string): string {
 
 /**
  * Formats a month key ('YYYY-MM', see monthKey) as "Month YYYY" in the
- * active region, e.g. "July 2026". Capitalized, since it's used as a
+ * active language, e.g. "July 2026". Capitalized, since it's used as a
  * heading/label and some languages write month names lowercase. Same
  * local-midnight construction as formatDate, for the same timezone reason.
  */
 export function formatMonth(key: string): string {
   const [year, month] = key.split('-').map(Number)
-  const label = formatter(getRegion().monthLocale, { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1))
-  return label.charAt(0).toLocaleUpperCase(getRegion().monthLocale) + label.slice(1)
+  const { monthLocale } = getLanguageConfig()
+  const label = formatter(monthLocale, { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1))
+  return label.charAt(0).toLocaleUpperCase(monthLocale) + label.slice(1)
 }
