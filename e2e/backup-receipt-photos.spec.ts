@@ -27,13 +27,13 @@ async function captureReceipt(page: Page) {
   await expect(page.getByTestId('receipt-item')).toHaveCount(before + 1)
 }
 
-async function goToHistory(page: Page) {
-  await page.getByTestId('nav-history').click()
-  await expect(page.getByTestId('history-page')).toBeVisible()
+async function goToSettings(page: Page) {
+  await page.getByTestId('nav-settings').click()
+  await expect(page.getByTestId('settings-page')).toBeVisible()
 }
 
 async function exportBackup(page: Page) {
-  await goToHistory(page)
+  await goToSettings(page)
   const downloadPromise = page.waitForEvent('download')
   await page.getByTestId('backup-export-button').click()
   const path = await (await downloadPromise).path()
@@ -130,7 +130,7 @@ test('a new-format backup round-trips: the processed receipt shows "no photo", t
   await page.getByTestId('debug-reset-all').click()
   await expect(page.getByTestId('receipt-item')).toHaveCount(0)
 
-  await goToHistory(page)
+  await goToSettings(page)
   await chooseBackupFile(page, content)
   await expect(page.getByTestId('backup-import-confirm')).toContainText('2 receipts (1 with photo)')
   await page.getByTestId('backup-import-confirm-yes').click()
@@ -150,7 +150,7 @@ test('a new-format backup round-trips: the processed receipt shows "no photo", t
 
 test('an old-format (v1) backup, with photos on every receipt, still imports', async ({ page }) => {
   await page.goto('/')
-  await goToHistory(page)
+  await goToSettings(page)
 
   await chooseBackupFile(page, backupWith(1, [receiptRow(1, 'done', PNG_DATA_URL), receiptRow(2, 'pending', PNG_DATA_URL)]))
   await expect(page.getByTestId('backup-import-confirm')).toContainText('2 receipts (2 with photos)')
@@ -167,7 +167,7 @@ test('a backup row that needs processing but has no photo is rejected loudly, an
   page,
 }) => {
   await page.goto('/')
-  await goToHistory(page)
+  await goToSettings(page)
 
   await chooseBackupFile(page, backupWith(2, [receiptRow(7, 'pending')]))
 
@@ -193,7 +193,7 @@ for (const [label, imageBlob] of [
       if (!request.url().startsWith('data:') && /\/(undefined|index\.html)$/.test(request.url())) fetchedNonDataUrl = true
     })
     await page.goto('/')
-    await goToHistory(page)
+    await goToSettings(page)
 
     await chooseBackupFile(page, backupWith(2, [receiptRow(3, 'done', imageBlob as string)]))
 

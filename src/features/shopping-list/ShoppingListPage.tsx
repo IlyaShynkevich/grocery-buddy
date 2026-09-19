@@ -64,10 +64,19 @@ export function ShoppingListPage() {
     .filter(Boolean)
     .join('. ') || undefined
 
+  const [addError, setAddError] = useState<string | null>(null)
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    await addItem(draftName)
-    setDraftName('')
+    setAddError(null)
+    try {
+      await addItem(draftName)
+      setDraftName('')
+    } catch (err) {
+      // The typed text stays in the box so nothing is lost.
+      console.error('Grocery Buddy: adding an item failed', err)
+      setAddError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const listContent: ReactNode = (
@@ -86,6 +95,12 @@ export function ShoppingListPage() {
           {messages.common.add}
         </button>
       </form>
+
+      {addError && (
+        <p role="alert" data-testid="add-item-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: '-0.5rem 0 0.75rem' }}>
+          {messages.shopping.addFailed(addError)}
+        </p>
+      )}
 
       {items.length === 0 && <p style={mutedTextStyle}>{messages.shopping.empty}</p>}
 

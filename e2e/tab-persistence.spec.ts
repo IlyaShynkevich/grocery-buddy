@@ -20,7 +20,7 @@ test('each of the 4 main tabs survives a reload independently', async ({ page })
 
   for (const { nav, pageTestId } of [
     { nav: 'nav-stats', pageTestId: 'stats-page' },
-    { nav: 'nav-customize', pageTestId: 'customize-page' },
+    { nav: 'nav-settings', pageTestId: 'settings-page' },
     { nav: 'nav-shopping', pageTestId: 'shopping-list' },
   ]) {
     await page.getByTestId(nav).click()

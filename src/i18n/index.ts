@@ -1,22 +1,22 @@
 import { en, type Messages } from './messages/en'
 import { ru } from './messages/ru'
-import { getRegion, useRegion } from './regionStore'
-import type { Language } from './regions'
+import { getLanguageConfig, useLanguageConfig } from '../settings/settingsStore'
+import type { Language } from './languages'
 
 const MESSAGES: Record<Language, Messages> = { en, ru }
 
 /**
- * Messages for the active region, for code outside React (thrown errors,
+ * Messages for the active language, for code outside React (thrown errors,
  * data-layer validation). Read at call time — a message built now stays in
  * the language that was active when it was built.
  */
 export function t(): Messages {
-  return MESSAGES[getRegion().language]
+  return MESSAGES[getLanguageConfig().language]
 }
 
-/** Messages for the active region; re-renders the caller when the region changes. */
+/** Messages for the active language; re-renders the caller when it changes. */
 export function useT(): Messages {
-  return MESSAGES[useRegion().language]
+  return MESSAGES[useLanguageConfig().language]
 }
 
 /**

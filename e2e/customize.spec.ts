@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures'
+import { expect, openCustomize, test, type Page } from './fixtures'
 
 function categoryAccordion(page: Page, key: string) {
   return page.locator(`[data-testid="category-accordion"][data-category-key="${key}"]`)
@@ -6,8 +6,7 @@ function categoryAccordion(page: Page, key: string) {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
-  await page.getByTestId('nav-customize').click()
-  await expect(page.getByTestId('customize-page')).toBeVisible()
+  await openCustomize(page)
 })
 
 test('a category starts collapsed, and tapping its header expands/collapses it', async ({ page }) => {
@@ -100,7 +99,7 @@ test('notes persist across reload', async ({ page }) => {
   await expect(frozen.getByTestId('category-note')).toHaveCount(1)
 
   await page.reload()
-  await page.getByTestId('nav-customize').click()
+  await openCustomize(page)
   const frozenAfterReload = categoryAccordion(page, 'frozen')
   await frozenAfterReload.locator('summary').click()
 

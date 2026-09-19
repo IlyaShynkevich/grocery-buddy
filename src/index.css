@@ -17,27 +17,32 @@
   --radius: 10px;
   --radius-sm: 6px;
 
-  color-scheme: light dark;
+  color-scheme: light;
   font: 16px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
   background: var(--bg);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #f3f4f6;
-    --text-muted: rgba(243, 244, 246, 0.6);
-    --bg: #16171d;
-    --surface: #1e1f27;
-    --surface-hover: #262733;
-    --border: #2d2e38;
-    --border-strong: #63646f;
-    --accent: #a1a1aa;
-    --accent-hover: #c3c3ca;
-    --accent-contrast: #16171d;
-    --danger: #f28b82;
-    --danger-contrast: #16171d;
-  }
+/* Dark theme. Keyed on data-theme rather than prefers-color-scheme so the
+   Theme setting can override the device: an inline script in index.html
+   sets data-theme before first paint — "dark", "light", or (for "Same as
+   device") whichever the device prefers — and src/settings/theme.ts keeps
+   it in sync after that. Each token is defined exactly once per theme. */
+:root[data-theme='dark'] {
+  --text: #f3f4f6;
+  --text-muted: rgba(243, 244, 246, 0.6);
+  --bg: #16171d;
+  --surface: #1e1f27;
+  --surface-hover: #262733;
+  --border: #2d2e38;
+  --border-strong: #63646f;
+  --accent: #a1a1aa;
+  --accent-hover: #c3c3ca;
+  --accent-contrast: #16171d;
+  --danger: #f28b82;
+  --danger-contrast: #16171d;
+
+  color-scheme: dark;
 }
 
 * {

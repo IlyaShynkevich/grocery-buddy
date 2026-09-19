@@ -30,6 +30,13 @@ export const test = base.extend<{ page: Page; debugTools: boolean }>({
 
 export const expect = baseExpect
 
+/** Customize isn't in the nav bar — it's reached from a button on Settings. */
+export async function openCustomize(page: Page) {
+  await page.getByTestId('nav-settings').click()
+  await page.getByTestId('settings-open-customize').click()
+  await expect(page.getByTestId('customize-page')).toBeVisible()
+}
+
 /**
  * Debug tools' contents only mount while the panel is open (see
  * DbDebugPanel), and it's closed again after any reload or tab switch —

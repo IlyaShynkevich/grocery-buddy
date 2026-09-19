@@ -9,6 +9,7 @@ import { HistoryPage } from './features/history/HistoryPage'
 import { TripDetailPage } from './features/history/TripDetailPage'
 import { HomePage } from './features/home/HomePage'
 import { BarChartIcon, ClockIcon, GearIcon, HomeIcon, InfoIcon, ShoppingBagIcon, type IconProps } from './features/navigation/icons'
+import { SettingsPage } from './features/settings/SettingsPage'
 import { TabTransition, type SlideDirection } from './features/navigation/TabTransition'
 import { PerfOverlay } from './features/perf/PerfOverlay'
 import { PERF_ENABLED } from './features/perf/perfLog'
@@ -17,19 +18,22 @@ import { ReceiptReviewPanel } from './features/receipt-review/ReceiptReviewPanel
 import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
 import { StatsPage } from './features/stats/StatsPage'
 import { Toast } from './features/toast/Toast'
-import { useDraftCurrencyFollowsRegion } from './features/trip/useDraftCurrencyFollowsRegion'
+import { useDraftCurrencyFollowsSetting } from './features/trip/useDraftCurrencyFollowsSetting'
 import { useT } from './i18n'
-import { useRegion } from './i18n/regionStore'
+import { useCurrencySetting } from './settings/settingsStore'
 import { PAGE_MAX_WIDTH } from './lib/ui'
 
 // The 4 icon-only tabs in the middle of the nav bar — these are the ones
 // swipe gesture navigation moves between. Home and About (the corner icons)
 // are deliberately not part of this set: they're reached only by tapping,
 // same as trip-detail reached via History.
-type TabName = 'shopping' | 'history' | 'stats' | 'customize'
+type TabName = 'shopping' | 'history' | 'stats' | 'settings'
 type View =
   | { name: TabName }
   | { name: 'trip-detail'; tripId: number }
+  // Reached from a button on Settings (not the nav bar), like trip-detail
+  // from History — keeps the Settings tab highlighted.
+  | { name: 'customize' }
   | { name: 'home' }
   | { name: 'about' }
 
@@ -37,7 +41,7 @@ const TABS: Array<{ name: TabName; testId: string; Icon: ComponentType<IconProps
   { name: 'shopping', testId: 'nav-shopping', Icon: ShoppingBagIcon },
   { name: 'history', testId: 'nav-history', Icon: ClockIcon },
   { name: 'stats', testId: 'nav-stats', Icon: BarChartIcon },
-  { name: 'customize', testId: 'nav-customize', Icon: GearIcon },
+  { name: 'settings', testId: 'nav-settings', Icon: GearIcon },
 ]
 
 // Single source of truth for swipe/tab order, shared with the tab bar above.
@@ -62,10 +66,13 @@ const HOME_SEEN_STORAGE_KEY = 'grocery-buddy:homeSeenThisSession'
 function readStoredTab(): TabName {
   try {
     const stored = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY)
+    // 'customize' was a tab before Settings existed; it now lives inside it.
+    if (stored === 'customize') return 'settings'
     return stored !== null && (TAB_ORDER as string[]).includes(stored) ? (stored as TabName) : 'shopping'
-  } catch {
+  } catch (err) {
     // e.g. Safari private browsing throws on any localStorage access — this
-    // is a nice-to-have, not core functionality, so just fall back silently.
+    // is a nice-to-have, not core functionality, so fall back (logged).
+    console.error('Grocery Buddy: could not read the last-used tab', err)
     return 'shopping'
   }
 }
@@ -118,11 +125,11 @@ function cornerButtonStyle(active: boolean): CSSProperties {
 
 function App() {
   // Subscribing here re-renders the whole tree on a language switch, so
-  // every formatter (prices, dates) picks the new region up too — not only
-  // components that read messages themselves.
+  // every formatter (prices, dates) picks the new language up too — not
+  // only components that read messages themselves.
   const messages = useT()
-  const region = useRegion()
-  const draftCurrencyError = useDraftCurrencyFollowsRegion()
+  const currencySetting = useCurrencySetting()
+  const draftCurrencyError = useDraftCurrencyFollowsSetting()
   const debugToolsEnabled = useDebugToolsEnabled()
   const [view, setView] = useState<View>(readInitialView)
   // trip-detail isn't its own tab — it's reached via History, so it keeps
@@ -130,7 +137,13 @@ function App() {
   // Home/About aren't part of the swipeable tab set at all, so neither the
   // middle tab bar nor swipe has an active tab while on either of them.
   const activeTab: TabName | null =
-    view.name === 'trip-detail' ? 'history' : view.name === 'home' || view.name === 'about' ? null : view.name
+    view.name === 'trip-detail'
+      ? 'history'
+      : view.name === 'customize'
+        ? 'settings'
+        : view.name === 'home' || view.name === 'about'
+          ? null
+          : view.name
   const mainRef = useRef<HTMLElement>(null)
 
   // Persist whichever of the 4 main tabs is active (trip-detail counts as
@@ -264,8 +277,8 @@ function App() {
         return <HistoryPage onSelectTrip={(tripId) => setView({ name: 'trip-detail', tripId })} />
       case 'stats':
         return <StatsPage />
-      case 'customize':
-        return <CustomizePage />
+      case 'settings':
+        return <SettingsPage onOpenCustomize={() => setView({ name: 'customize' })} />
     }
   }
 
@@ -306,6 +319,7 @@ function App() {
           aria-label={messages.nav.home}
           title={messages.nav.home}
           onClick={() => setView({ name: 'home' })}
+          aria-current={view.name === 'home' ? 'page' : undefined}
           style={cornerButtonStyle(view.name === 'home')}
         >
           <HomeIcon />
@@ -330,6 +344,7 @@ function App() {
                   }
                   setView({ name: tab.name })
                 }}
+                aria-current={active ? 'page' : undefined}
                 style={tabButtonStyle(active)}
               >
                 <Icon />
@@ -344,6 +359,7 @@ function App() {
           aria-label={messages.nav.about}
           title={messages.nav.about}
           onClick={() => setView({ name: 'about' })}
+          aria-current={view.name === 'about' ? 'page' : undefined}
           style={cornerButtonStyle(view.name === 'about')}
         >
           <InfoIcon />
@@ -359,12 +375,14 @@ function App() {
           data-testid="draft-currency-error"
           style={{ color: 'var(--danger)', fontSize: '0.85rem', maxWidth: PAGE_MAX_WIDTH, margin: '0.75rem auto 0', padding: '0 1rem' }}
         >
-          {messages.currencyErrors.draftNotUpdated(region.currency, draftCurrencyError)}
+          {messages.currencyErrors.draftNotUpdated(currencySetting, draftCurrencyError)}
         </p>
       )}
 
       {view.name === 'trip-detail' ? (
         <TripDetailPage tripId={view.tripId} onBack={() => setView({ name: 'history' })} />
+      ) : view.name === 'customize' ? (
+        <CustomizePage onBack={() => setView({ name: 'settings' })} />
       ) : view.name === 'home' ? (
         <HomePage onShop={() => setView({ name: 'shopping' })} />
       ) : view.name === 'about' ? (

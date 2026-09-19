@@ -1,10 +1,11 @@
-import { expect, test, type Page } from './fixtures'
+import { expect, openCustomize, test, type Page } from './fixtures'
 
 // These pages are tuned to fit one phone screen without scrolling — the
 // usable viewport of the target phone (Xiaomi 14T Pro, browser chrome
 // excluded) — in both languages, since Russian text runs ~15–25% longer.
 // Worst-case content: all 11 categories in Stats, 12 trips over 2 months in
-// History (enough to hit the list's internal scroll and the month filter).
+// History (enough to hit the list's internal scroll and the month filter),
+// and Settings with its storage figures loaded.
 test.use({ viewport: { width: 393, height: 777 }, isMobile: true, hasTouch: true })
 
 const CATEGORIES = ['produce', 'dairy', 'meat_seafood', 'bakery', 'frozen', 'pantry', 'household', 'personal_care', 'snacks', 'drinks', 'other']
@@ -43,8 +44,12 @@ const overflowingLabels = (page: Page, selector: string) =>
   page.locator(selector).evaluateAll((els) => els.filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent))
 
 for (const region of ['en-EUR', 'ru-BYN'] as const) {
-  test(`${region}: About, Stats, History and Customize each fit one screen`, async ({ page }) => {
-    await page.addInitScript((id) => localStorage.setItem('grocery-buddy:region', id), region)
+  test(`${region}: About, Stats, History, Settings and Customize each fit one screen`, async ({ page }) => {
+    await page.addInitScript((id) => {
+      const [language, currency] = id === 'ru-BYN' ? ['ru', 'BYN'] : ['en', 'EUR']
+      localStorage.setItem('grocery-buddy:language', language)
+      localStorage.setItem('grocery-buddy:currency', currency)
+    }, region)
     await page.goto('/')
     await seedWorstCase(page)
 
@@ -52,7 +57,7 @@ for (const region of ['en-EUR', 'ru-BYN'] as const) {
       ['nav-about', 'about-page'],
       ['nav-stats', 'stats-category-chart'],
       ['nav-history', 'history-month-select'],
-      ['nav-customize', 'region-select'],
+      ['nav-settings', 'storage-total'],
     ] as const) {
       await page.getByTestId(tab).click()
       await expect(page.getByTestId(ready)).toBeVisible()
@@ -66,7 +71,30 @@ for (const region of ['en-EUR', 'ru-BYN'] as const) {
           'Stats labels wider than their column',
         ).toEqual([])
       }
+
+      if (tab === 'nav-settings') {
+        // Every setting/storage label and button stays on one line, and
+        // nothing pushes the page sideways.
+        expect(
+          await page.evaluate(() =>
+            Array.from(
+              document.querySelectorAll(
+                '[data-testid="settings-page"] label > span, [data-testid="settings-open-customize"], [data-testid="backup-section"] button, [data-testid^="storage-"] > span',
+              ),
+            )
+              .filter((el) => el.getBoundingClientRect().height > parseFloat(getComputedStyle(el).fontSize) * 1.9 + parseFloat(getComputedStyle(el).paddingTop) + parseFloat(getComputedStyle(el).paddingBottom) + 2)
+              .map((el) => el.textContent),
+          ),
+          'Settings labels wrapping onto two lines',
+        ).toEqual([])
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 'Settings overflows sideways').toBeLessThanOrEqual(0)
+      }
     }
+
+    // Customize now opens from Settings; it must still fit all 11 cards.
+    await openCustomize(page)
+    await expect(page.getByTestId('category-accordion')).toHaveCount(11)
+    expect(await pageOverflow(page), 'Customize overflows the screen').toBeLessThanOrEqual(0)
   })
 }
 
@@ -77,7 +105,11 @@ for (const [region, saveLabel] of [
   ['ru-BYN', 'Сохранить покупку'],
 ] as const) {
   test(`${region}: the Shopping List (3 items + a pending receipt) fits, with "${saveLabel}" and the title each on one line`, async ({ page }) => {
-    await page.addInitScript((id) => localStorage.setItem('grocery-buddy:region', id), region)
+    await page.addInitScript((id) => {
+      const [language, currency] = id === 'ru-BYN' ? ['ru', 'BYN'] : ['en', 'EUR']
+      localStorage.setItem('grocery-buddy:language', language)
+      localStorage.setItem('grocery-buddy:currency', currency)
+    }, region)
     await page.goto('/')
     // Measured capacity at 393x777, identical in both languages: 4 items fit
     // with no receipt, 3 with a pending receipt (its hint under Save trip).

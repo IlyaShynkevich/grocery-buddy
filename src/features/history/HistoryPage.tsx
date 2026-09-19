@@ -4,7 +4,6 @@ import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
 import { cardStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
-import { BackupSection } from './BackupSection'
 import { groupTripsByMonth, useHistory } from './useHistory'
 
 export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) => void }) {
@@ -46,27 +45,28 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
       {/*
         Fixed max-height, not an unbounded page: without this, a long
         history pushes Debug tools/the footer down and off-screen, requiring
-        the whole page to scroll. 25.75rem (412px at the default root font
-        size) is sized to fit exactly 7 trip rows plus one month header —
+        the whole page to scroll. 35.5rem (568px at the default root font
+        size) is sized to fit exactly 10 trip rows plus one month header —
         measured live (not guessed) against a real npm run preview build:
         cardStyle's actual rendered row height is 44.375px, the list's row
         gap is 8px, and a month header (with its own 8px margin-bottom) plus
         the group wrapper's 1rem top margin adds 49.5px of fixed overhead
         above the rows (sticky, see below, doesn't change how much space it
-        occupies — only whether it's pinned). 49.5 + 7*44.375 + 6*8 =
-        408.125px; 412px leaves a few px of slack, the same margin the 9-row
-        value (516px against a measured 512.875px) left. Row height/gap/
-        overhead were re-measured live for this change rather than assumed
-        unchanged from the 9-row tuning, since a guess here previously
-        shorted the container by a full row (see history — the original
-        464px value). max-height (not height) so fewer trips, or a
-        month-filtered view with few trips, still render at their natural
-        height with no forced scrollbar/dead space; only content taller than
-        that clips and scrolls internally. The heading, "No saved trips yet"
+        occupies — only whether it's pinned). 49.5 + 10*44.375 + 9*8 =
+        565.25px; 568px leaves a few px of slack. It was 7 rows (25.75rem)
+        while Backup & restore sat below this list; that moved to Settings,
+        and at 393x777 the list now has 582px before the footer would be
+        pushed off-screen (measured, both languages) — an 11th row would
+        need 617.6px. Row height/gap/overhead were re-measured live for this
+        change rather than assumed unchanged, since a guess here previously
+        shorted the container by a full row. max-height (not height) so
+        fewer trips, or a month-filtered view with few trips, still render
+        at their natural height with no forced scrollbar/dead space; only
+        content taller than that clips and scrolls internally. The heading, "No saved trips yet"
         message, and month filter above stay outside this container so
         they're always visible without scrolling.
       */}
-      <div data-testid="history-list-scroll" style={{ maxHeight: '25.75rem', overflowY: 'auto' }}>
+      <div data-testid="history-list-scroll" style={{ maxHeight: '35.5rem', overflowY: 'auto' }}>
         {visibleGroups.map((group) => (
           <div key={group.key} data-testid="history-month-group" data-month-key={group.key} style={{ marginTop: '1rem' }}>
             {/*
@@ -116,14 +116,6 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
           </div>
         ))}
       </div>
-
-      {/*
-        Below the (possibly scrolling) trip list, not inside it — backup/
-        restore isn't part of the trip list itself, and living outside the
-        maxHeight container means it's never clipped or scrolled out of
-        reach regardless of how many trips there are.
-      */}
-      <BackupSection />
     </section>
   )
 }

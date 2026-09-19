@@ -52,6 +52,15 @@ async function touchSwipe(
  * the heading/button row at the top of every page, so the touch doesn't
  * start on an interactive element. */
 async function contentPoint(page: Page, testId: string): Promise<{ x: number; y: number }> {
+  // The Shopping List's header grows when its trip loads (Save trip appears
+  // beside the date), shifting everything below by ~20px. A point measured
+  // before that lands on the add-item input once the swipe is dispatched —
+  // and the app rightly ignores swipes that start on an input — which made
+  // the first swipe intermittently do nothing. Measure only once it's loaded.
+  if (testId === 'shopping-list') {
+    await expect(page.getByTestId('shopping-list')).not.toHaveAttribute('data-trip-id', '')
+    await expect(page.getByTestId('save-trip-button')).toBeVisible()
+  }
   const box = await page.getByTestId(testId).boundingBox()
   if (!box) throw new Error(`no bounding box for ${testId}`)
   return { x: box.x + box.width / 2, y: box.y + box.height * 0.8 }
@@ -82,16 +91,16 @@ test('swipe left moves forward through the tabs in order', async ({ page }) => {
 
   point = await contentPoint(page, 'stats-page')
   await touchSwipe(page, { x1: point.x + 150, y1: point.y, x2: point.x - 150, y2: point.y })
-  await expect(page.getByTestId('customize-page')).toBeVisible()
+  await expect(page.getByTestId('settings-page')).toBeVisible()
 })
 
 test('swipe right moves backward through the tabs in order', async ({ page }) => {
   await page.goto('/')
-  await page.getByTestId('nav-customize').click()
-  await expect(page.getByTestId('customize-page')).toBeVisible()
+  await page.getByTestId('nav-settings').click()
+  await expect(page.getByTestId('settings-page')).toBeVisible()
   await page.waitForTimeout(ANIMATION_SETTLE_MS)
 
-  let point = await contentPoint(page, 'customize-page')
+  let point = await contentPoint(page, 'settings-page')
   await touchSwipe(page, { x1: point.x - 150, y1: point.y, x2: point.x + 150, y2: point.y })
   await expect(page.getByTestId('stats-page')).toBeVisible()
   await page.waitForTimeout(ANIMATION_SETTLE_MS)
@@ -115,14 +124,14 @@ test('swiping past either edge does not wrap around', async ({ page }) => {
   await touchSwipe(page, { x1: point.x - 150, y1: point.y, x2: point.x + 150, y2: point.y })
   await expect(page.getByTestId('shopping-list')).toBeVisible()
 
-  // Move to the last tab (now Customize, the 4th middle tab), then swiping
+  // Move to the last tab (Settings, the 4th middle tab), then swiping
   // left (forward) must do nothing.
-  await page.getByTestId('nav-customize').click()
-  await expect(page.getByTestId('customize-page')).toBeVisible()
+  await page.getByTestId('nav-settings').click()
+  await expect(page.getByTestId('settings-page')).toBeVisible()
   await page.waitForTimeout(ANIMATION_SETTLE_MS)
-  point = await contentPoint(page, 'customize-page')
+  point = await contentPoint(page, 'settings-page')
   await touchSwipe(page, { x1: point.x + 150, y1: point.y, x2: point.x - 150, y2: point.y })
-  await expect(page.getByTestId('customize-page')).toBeVisible()
+  await expect(page.getByTestId('settings-page')).toBeVisible()
 })
 
 test('a vertical scroll gesture does not trigger a tab change', async ({ page }) => {
@@ -312,7 +321,7 @@ test('Debug tools only appears on Shopping List, instantly, with no settle delay
   await page.getByTestId('nav-stats').click()
   await expect(page.getByTestId('debug-panel-toggle')).toHaveCount(0)
 
-  await page.getByTestId('nav-customize').click()
+  await page.getByTestId('nav-settings').click()
   await expect(page.getByTestId('debug-panel-toggle')).toHaveCount(0)
 
   await page.getByTestId('nav-shopping').click()

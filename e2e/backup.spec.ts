@@ -1,5 +1,5 @@
 import * as fs from 'node:fs/promises'
-import { expect, test, type Page } from './fixtures'
+import { expect, openCustomize, test, type Page } from './fixtures'
 // Drives the Debug tools panel, which is hidden unless enabled for the session.
 test.use({ debugTools: true })
 
@@ -17,17 +17,16 @@ async function itemNames(page: Page): Promise<string[]> {
 }
 
 async function goToCustomize(page: Page) {
-  await page.getByTestId('nav-customize').click()
-  await expect(page.getByTestId('customize-page')).toBeVisible()
+  await openCustomize(page)
 }
 
-async function goToHistory(page: Page) {
-  await page.getByTestId('nav-history').click()
-  await expect(page.getByTestId('history-page')).toBeVisible()
+async function goToSettings(page: Page) {
+  await page.getByTestId('nav-settings').click()
+  await expect(page.getByTestId('settings-page')).toBeVisible()
 }
 
 async function exportBackup(page: Page): Promise<{ suggestedFilename: string; content: string }> {
-  await goToHistory(page)
+  await goToSettings(page)
   const downloadPromise = page.waitForEvent('download')
   await page.getByTestId('backup-export-button').click()
   const download = await downloadPromise
@@ -37,11 +36,15 @@ async function exportBackup(page: Page): Promise<{ suggestedFilename: string; co
   return { suggestedFilename: download.suggestedFilename(), content }
 }
 
-test('the backup section lives on History, not Customize', async ({ page }) => {
+test('the backup section lives on Settings, not History or Customize', async ({ page }) => {
   await page.goto('/')
 
-  await goToHistory(page)
+  await goToSettings(page)
   await expect(page.getByTestId('backup-section')).toBeVisible()
+
+  await page.getByTestId('nav-history').click()
+  await expect(page.getByTestId('history-page')).toBeVisible()
+  await expect(page.getByTestId('backup-section')).toHaveCount(0)
 
   await goToCustomize(page)
   await expect(page.getByTestId('backup-section')).toHaveCount(0)
@@ -118,7 +121,7 @@ test('importing a backup restores all tables into a cleared database', async ({ 
   })
   await expect(frozen.getByTestId('category-notes-empty')).toBeVisible()
 
-  await goToHistory(page)
+  await goToSettings(page)
   await page.getByTestId('backup-import-input').setInputFiles({
     name: 'restore-me.json',
     mimeType: 'application/json',
@@ -149,7 +152,7 @@ test('importing a backup restores all tables into a cleared database', async ({ 
 
 test('importing a malformed file shows a clear error instead of crashing', async ({ page }) => {
   await page.goto('/')
-  await goToHistory(page)
+  await goToSettings(page)
 
   await page.getByTestId('backup-import-input').setInputFiles({
     name: 'not-json.json',
@@ -162,12 +165,12 @@ test('importing a malformed file shows a clear error instead of crashing', async
   await expect(page.getByTestId('backup-import-confirm')).toHaveCount(0)
 
   // The page is still functional — a bad file didn't crash the app.
-  await expect(page.getByTestId('history-page')).toBeVisible()
+  await expect(page.getByTestId('settings-page')).toBeVisible()
 })
 
 test('importing valid JSON that is not a Grocery Buddy backup shows a clear error', async ({ page }) => {
   await page.goto('/')
-  await goToHistory(page)
+  await goToSettings(page)
 
   await page.getByTestId('backup-import-input').setInputFiles({
     name: 'random.json',

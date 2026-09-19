@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures'
+import { expect, openCustomize, test, type Page } from './fixtures'
 
 // Same 1x1 PNG fixture used in the other receipt specs.
 const SAMPLE_IMAGE = Buffer.from(
@@ -11,7 +11,7 @@ function categoryAccordion(page: Page, key: string) {
 }
 
 async function addCategoryNote(page: Page, categoryKey: string, text: string) {
-  await page.getByTestId('nav-customize').click()
+  await openCustomize(page)
   const accordion = categoryAccordion(page, categoryKey)
   await accordion.locator('summary').click()
   await accordion.getByTestId('category-note-input').fill(text)
