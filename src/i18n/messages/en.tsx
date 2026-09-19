@@ -157,7 +157,7 @@ export const en = {
 
   backup: {
     title: 'Backup & restore',
-    intro: 'Your trips and history live only on this device. Export a backup before clearing browser data, uninstalling, or switching phones.',
+    intro: 'Your data lives only on this device — export a backup before clearing it or switching phones.',
     exportData: 'Export data',
     exporting: 'Exporting…',
     importData: 'Import data',

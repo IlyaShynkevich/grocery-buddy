@@ -18,11 +18,13 @@ export function AboutPage() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '1.25rem',
+        // Tuned (with the mascot size and list line-height below) so the whole
+        // page fits a 393x777 phone viewport in both English and Russian.
+        gap: '0.85rem',
         width: '100%',
         maxWidth: PAGE_MAX_WIDTH,
         margin: '0 auto',
-        padding: '2rem 1rem',
+        padding: '1rem 1rem',
         textAlign: 'center',
       }}
     >
@@ -36,7 +38,7 @@ export function AboutPage() {
       {/* Same negative-margin-under-the-title treatment as HomePage's
           mascot, for a consistent "standing just below it" read. */}
       <div style={{ marginTop: '-0.5rem' }}>
-        <Mascot pose="thankyou" size={150} />
+        <Mascot pose="thankyou" size={96} />
       </div>
 
       {/* Left-aligned within the otherwise-centered page — bullet text reads
@@ -46,7 +48,7 @@ export function AboutPage() {
         style={{
           textAlign: 'left',
           fontSize: '0.9rem',
-          lineHeight: 1.5,
+          lineHeight: 1.4,
           margin: 0,
           paddingLeft: '1.1rem',
           display: 'flex',

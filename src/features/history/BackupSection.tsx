@@ -96,9 +96,9 @@ export function BackupSection() {
   }
 
   return (
-    <section data-testid="backup-section" style={{ ...cardStyle, marginTop: '1.25rem', marginBottom: '0.75rem' }}>
+    <section data-testid="backup-section" style={{ ...cardStyle, marginTop: '0.75rem' }}>
       <h2 style={{ fontSize: '1.05rem', marginBottom: '0.25rem' }}>{messages.backup.title}</h2>
-      <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginBottom: '0.6rem' }}>{messages.backup.intro}</p>
+      <p style={{ ...mutedTextStyle, fontSize: '0.8rem', marginBottom: '0.6rem' }}>{messages.backup.intro}</p>
 
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
         <button
