@@ -27,12 +27,18 @@ async function mockSlowExtraction(page: Page, delayMs = 500) {
 // .first() matters once a failed receipt is already in the list — its Retry
 // button shares the same testid, and the newly captured receipt sorts to
 // the top (newest-first), so .first() is always the one just captured.
+//
+// Waits for the new row before clicking: the photo is prepared (shrunk)
+// before it's saved, so the row appears a moment after the file is chosen —
+// clicking straight away could hit the older failed receipt's Retry instead.
 async function captureAndProcess(page: Page) {
+  const before = await page.getByTestId('receipt-item').count()
   await page.getByTestId('receipt-capture-input').setInputFiles({
     name: 'receipt.png',
     mimeType: 'image/png',
     buffer: SAMPLE_IMAGE,
   })
+  await expect(page.getByTestId('receipt-item')).toHaveCount(before + 1)
   await page.getByTestId('receipt-process-button').first().click()
 }
 

@@ -11,7 +11,9 @@ import {
   type SuggestedItemMatch,
 } from '../../db/db'
 import { isLikelyMatch } from '../../lib/itemMatch'
+import { perfMark } from '../perf/perfLog'
 import { ExtractionRequestError, extractReceipt } from './extractReceipt'
+import { prepareReceiptPhoto } from './prepareReceiptPhoto'
 import { isOpenAiTokenLimitError } from './errorMessage'
 import { parseRetryAfterSeconds } from './retryAfter'
 import { useActiveTripId } from '../trip/useActiveTripId'
@@ -33,7 +35,14 @@ export function useReceiptCapture() {
   // necessarily settled yet on first render (e.g. a capture fired the
   // instant the app opens). Going straight to getOrCreateActiveTrip means a
   // capture can never silently no-op while the hook is still catching up.
-  const captureReceipt = async (imageBlob: Blob) => {
+  //
+  // The original camera photo is never stored — only a copy shrunk to at
+  // most 1600px (see prepareReceiptPhoto for why, and the measurements). A
+  // photo that can't be decoded throws here, at capture, with nothing
+  // stored — the caller surfaces it.
+  const captureReceipt = async (photo: Blob) => {
+    const imageBlob = await prepareReceiptPhoto(photo)
+    perfMark(`photo prepared (${(imageBlob.size / 1e3).toFixed(0)} KB)`)
     const trip = await getOrCreateActiveTrip()
     await db.pendingReceipts.add({
       tripId: trip.id,
@@ -58,6 +67,12 @@ export function useReceiptCapture() {
     receipt = claimed
 
     try {
+      if (!receipt.imageBlob) {
+        // Can't happen through the UI (only processed receipts can be
+        // restored without a photo, and those are never processed again) —
+        // but if it does, it's a real failure to show, not something to skip.
+        throw new Error(`Receipt #${receipt.id} has no photo to process`)
+      }
       const categoryNotes = await getCategoryNoteHints()
       const {
         items: extractedItems,

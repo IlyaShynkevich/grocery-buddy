@@ -21,16 +21,18 @@ export function ReceiptCapture() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
-  // True from tapping Camera/Photos until the photo is saved (or the picker
-  // is cancelled). Handing off to the camera app and back can take several
-  // seconds on a real phone before the page gets the photo at all — without
-  // this, nothing on screen changes during that gap and the app looks
-  // frozen.
-  const [awaitingPhoto, setAwaitingPhoto] = useState(false)
+  // 'waiting' from tapping Camera/Photos until the photo arrives (or the
+  // picker is cancelled) — handing off to the camera app and back can take
+  // several seconds on a real phone before the page gets the photo at all.
+  // 'preparing' from then until the shrunk copy is saved (see
+  // prepareReceiptPhoto): decoding a full-resolution photo takes up to ~1s
+  // on a 50MP one. Without these, nothing on screen changes during either
+  // gap and the app looks frozen.
+  const [photoPhase, setPhotoPhase] = useState<'waiting' | 'preparing' | null>(null)
   const [captureError, setCaptureError] = useState<string | null>(null)
   const isProcessing = pendingReceipts.some((receipt) => receipt.status === 'processing')
   const hasFailed = pendingReceipts.some((receipt) => receipt.status === 'failed')
-  const mascotPose = useMascotPose(isProcessing, hasFailed)
+  const mascotPose = useMascotPose(isProcessing || photoPhase === 'preparing', hasFailed)
 
   // The picker/camera being dismissed without a photo fires `cancel` on the
   // input (Chrome 113+, Safari 16.4+) and no `change` — React has no prop
@@ -39,7 +41,7 @@ export function ReceiptCapture() {
     const inputs = [cameraInputRef.current, galleryInputRef.current].filter((input) => input !== null)
     const onCancel = () => {
       perfMark('photo picker cancelled')
-      setAwaitingPhoto(false)
+      setPhotoPhase((phase) => (phase === 'waiting' ? null : phase))
     }
     inputs.forEach((input) => input.addEventListener('cancel', onCancel))
     return () => inputs.forEach((input) => input.removeEventListener('cancel', onCancel))
@@ -54,7 +56,7 @@ export function ReceiptCapture() {
     }
     perfMark(perfLabel)
     setCaptureError(null)
-    setAwaitingPhoto(true)
+    setPhotoPhase('waiting')
     input.click()
   }
 
@@ -67,14 +69,16 @@ export function ReceiptCapture() {
         return
       }
       perfMark(`photo received (${(file.size / 1e6).toFixed(1)} MB, ${file.type || 'unknown type'})`)
+      setCaptureError(null)
+      setPhotoPhase('preparing')
       perfArmNextReceipt()
       await captureReceipt(file)
       perfMark('photo saved')
     } catch (err) {
       console.error('RECEIPT_CAPTURE_ERROR:', err)
-      setCaptureError(`Couldn't save the photo: ${err instanceof Error ? err.message : String(err)}`)
+      setCaptureError(`Photo not saved: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      setAwaitingPhoto(false)
+      setPhotoPhase(null)
       // Reset so picking the same file again still fires a change event.
       input.value = ''
     }
@@ -188,30 +192,34 @@ export function ReceiptCapture() {
         </p>
       )}
 
-      {awaitingPhoto && (
+      {photoPhase && (
         <div
           role="status"
-          data-testid="receipt-waiting-for-photo"
+          data-testid={photoPhase === 'waiting' ? 'receipt-waiting-for-photo' : 'receipt-preparing-photo'}
           style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem' }}
         >
           <span className="gb-pulse" style={{ flex: 1 }}>
-            Waiting for photo…
+            {photoPhase === 'waiting' ? 'Waiting for photo…' : 'Preparing photo…'}
           </span>
           {/* Safety valve for browsers that never fire `cancel`: only hides
-              this indicator — a photo that still arrives is saved as usual. */}
-          <button
-            type="button"
-            data-testid="receipt-waiting-dismiss"
-            aria-label="Stop waiting for photo"
-            onClick={() => setAwaitingPhoto(false)}
-            style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
-          >
-            ✕
-          </button>
+              this indicator — a photo that still arrives is saved as usual.
+              Not offered while preparing: that's already the photo being
+              saved, and it ends on its own either way (saved or an error). */}
+          {photoPhase === 'waiting' && (
+            <button
+              type="button"
+              data-testid="receipt-waiting-dismiss"
+              aria-label="Stop waiting for photo"
+              onClick={() => setPhotoPhase(null)}
+              style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
+            >
+              ✕
+            </button>
+          )}
         </div>
       )}
 
-      {pendingReceipts.length === 0 && !awaitingPhoto && (
+      {pendingReceipts.length === 0 && !photoPhase && (
         <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>No receipts captured yet.</p>
       )}
 

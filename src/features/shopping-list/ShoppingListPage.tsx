@@ -5,7 +5,8 @@ import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../
 import { useShoppingList } from './useShoppingList'
 
 export function ShoppingListPage() {
-  const { trip, items, addItem, renameItem, removeItem, toggleItemChecked, saveTrip } = useShoppingList()
+  const { trip, items, unprocessedReceiptCount, addItem, renameItem, removeItem, toggleItemChecked, saveTrip } =
+    useShoppingList()
   const [draftName, setDraftName] = useState('')
 
   // The list is always collapsible via the toggle, in either direction, at
@@ -37,6 +38,21 @@ export function ShoppingListPage() {
     lastTripId.current = tripId
     setIsOpen(true)
   }, [tripId])
+
+  // Same visible-hint treatment as the review gate (touch has no hover
+  // tooltips). Removing the photo is named as the way out on purpose: it's
+  // the only one in demo mode, where processing always fails.
+  const hasUnprocessedReceipts = unprocessedReceiptCount > 0
+  const unprocessedHint =
+    unprocessedReceiptCount === 1
+      ? 'Process or remove the receipt photo first'
+      : `Process or remove the ${unprocessedReceiptCount} receipt photos first`
+  const saveBlockedReason = [
+    hasUnprocessedReceipts ? `${unprocessedHint} — otherwise it would never be scanned` : null,
+    hasPendingReview ? 'Resolve the receipt review below before saving this trip' : null,
+  ]
+    .filter(Boolean)
+    .join('. ') || undefined
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -118,12 +134,20 @@ export function ShoppingListPage() {
               type="button"
               data-testid="save-trip-button"
               onClick={saveTrip}
-              disabled={hasPendingReview}
-              title={hasPendingReview ? 'Resolve the receipt review below before saving this trip' : undefined}
+              disabled={hasPendingReview || hasUnprocessedReceipts}
+              title={saveBlockedReason}
               style={{ background: 'transparent', color: 'var(--accent)', borderColor: 'var(--accent)' }}
             >
               Save trip
             </button>
+            {hasUnprocessedReceipts && (
+              <span
+                data-testid="save-trip-unprocessed-hint"
+                style={{ ...mutedTextStyle, fontSize: '0.7rem', textAlign: 'right' }}
+              >
+                {unprocessedHint}
+              </span>
+            )}
             {hasPendingReview && (
               <span
                 data-testid="save-trip-disabled-hint"

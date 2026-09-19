@@ -9,7 +9,8 @@ function describeErr(err: unknown): string {
 
 function summarizeBackup(backup: BackupData): string {
   const { trips, items, categoryNotes, pendingReceipts } = backup.tables
-  return `${trips.length} trip${trips.length === 1 ? '' : 's'}, ${items.length} item${items.length === 1 ? '' : 's'}, ${categoryNotes.length} note${categoryNotes.length === 1 ? '' : 's'}, ${pendingReceipts.length} pending receipt${pendingReceipts.length === 1 ? '' : 's'}`
+  const withPhotos = pendingReceipts.filter((receipt) => receipt.imageBlob !== undefined).length
+  return `${trips.length} trip${trips.length === 1 ? '' : 's'}, ${items.length} item${items.length === 1 ? '' : 's'}, ${categoryNotes.length} note${categoryNotes.length === 1 ? '' : 's'}, ${pendingReceipts.length} receipt${pendingReceipts.length === 1 ? '' : 's'} (${withPhotos} with photo${withPhotos === 1 ? '' : 's'})`
 }
 
 /**

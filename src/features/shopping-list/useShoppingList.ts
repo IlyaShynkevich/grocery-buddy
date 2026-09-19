@@ -23,6 +23,23 @@ export function useShoppingList() {
     [],
   )
 
+  // Receipts on this trip whose photo hasn't been turned into items yet
+  // (never processed, mid-processing, or failed). Save trip is blocked while
+  // any exist: saving would leave them attached to a trip that's no longer
+  // shown anywhere — never processed, never reviewed, never deleted.
+  const unprocessedReceiptCount = useLiveQuery(
+    () =>
+      tripId
+        ? db.pendingReceipts
+            .where('tripId')
+            .equals(tripId)
+            .filter((receipt) => receipt.status !== 'done')
+            .count()
+        : 0,
+    [tripId],
+    0,
+  )
+
   const addItem = async (name: string) => {
     const trimmed = name.trim()
     if (!tripId || !trimmed) return
@@ -46,5 +63,5 @@ export function useShoppingList() {
     await completeTrip(tripId)
   }
 
-  return { trip, items: items ?? [], addItem, renameItem, removeItem, toggleItemChecked, saveTrip }
+  return { trip, items: items ?? [], unprocessedReceiptCount, addItem, renameItem, removeItem, toggleItemChecked, saveTrip }
 }
