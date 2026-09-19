@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from 'react'
 import { AboutPage } from './features/about/AboutPage'
+import { ReceiptCleanupNotice } from './features/cleanup/ReceiptCleanupNotice'
 import { CustomizePage } from './features/customize/CustomizePage'
 import { DbDebugPanel } from './features/debug/DbDebugPanel'
 import { Footer } from './features/footer/Footer'
@@ -336,6 +337,10 @@ function App() {
           <InfoIcon />
         </button>
       </nav>
+
+      {/* Runs the one-time receipt cleanup on app load, whatever the
+          starting view, and reports the outcome — see db/receiptCleanup.ts. */}
+      <ReceiptCleanupNotice />
 
       {view.name === 'trip-detail' ? (
         <TripDetailPage tripId={view.tripId} onBack={() => setView({ name: 'history' })} />
