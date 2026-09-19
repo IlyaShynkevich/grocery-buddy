@@ -1,3 +1,5 @@
+import { t } from '../../i18n'
+
 /**
  * True for OpenAI's `"type": "tokens"` / `"code": "rate_limit_exceeded"`
  * variant (tagged server-side in openaiExtract.ts with a stable "(token
@@ -49,32 +51,34 @@ export function isDemoModeError(rawMessage: string): boolean {
  * that didn't make it through for some other reason.
  */
 export function getUserFacingErrorMessage(rawMessage: string, status?: number): string {
+  const errors = t().extractionErrors
+
   if (isDemoModeError(rawMessage)) {
-    return "Receipt scanning is disabled in this public demo. This is a personal project — check the README to run it with your own API key."
+    return errors.demo
   }
 
   // Checked before the generic JSON-parse-failure regex below, since a
   // truncation message legitimately contains "JSON"/"message content" text
   // too and would otherwise be swallowed by that broader, less specific match.
   if (isOpenAiTruncationError(rawMessage)) {
-    return 'Receipt has too many items to process at once — try splitting it into two photos'
+    return errors.truncated
   }
 
   if (isOpenAiTokenLimitError(rawMessage, status)) {
-    return 'Receipt image too large for current plan — try a clearer/smaller photo'
+    return errors.tokenLimit
   }
 
   if (status === 429 || /\b429\b/.test(rawMessage)) {
-    return 'Too many requests — retrying automatically'
+    return errors.rateLimited
   }
 
   if (/\bjson\b|items array|message content|response was malformed/i.test(rawMessage)) {
-    return "Couldn't read this receipt — try again"
+    return errors.unreadable
   }
 
   if (/timed out|request failed|failed to fetch|networkerror|\bnetwork\b/i.test(rawMessage)) {
-    return 'Connection issue — try again'
+    return errors.connection
   }
 
-  return 'Something went wrong — try again'
+  return errors.generic
 }

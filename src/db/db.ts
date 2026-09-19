@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
+import { t } from '../i18n'
 import { DEFAULT_CATEGORY_KEY } from './categories'
 
 export type TripStatus = 'draft' | 'complete'
@@ -326,10 +327,11 @@ export async function completeTrip(tripId: number): Promise<Trip> {
     const receipts = await db.pendingReceipts.where('tripId').equals(tripId).toArray()
     const unfinished = receipts.filter((receipt) => !isReceiptFinished(receipt))
     if (unfinished.length > 0) {
+      const messages = t().saveTripErrors
       const detail = unfinished
-        .map((r) => `#${r.id} (${r.status}${r.status === 'done' ? ', review open' : ''})`)
+        .map((r) => `#${r.id} (${r.status}${r.status === 'done' ? messages.reviewOpen : ''})`)
         .join(', ')
-      throw new Error(`Can't save this trip yet — ${unfinished.length} receipt(s) still need processing or review: ${detail}`)
+      throw new Error(messages.unfinishedReceipts(unfinished.length, detail))
     }
 
     await db.pendingReceipts.bulkDelete(receipts.map((receipt) => receipt.id))

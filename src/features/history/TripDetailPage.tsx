@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
 import { resolveEssential } from '../../db/categories'
 import { db, deleteTrip, recomputeTripTotal, type Item } from '../../db/db'
+import { useT } from '../../i18n'
 import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
 import { cardStyle, dangerButtonStyle, dangerFilledButtonStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
@@ -24,6 +25,7 @@ const LONG_PRESS_MS = 500
 // mutation, gated behind its own explicit confirmation step since it's
 // destructive and irreversible.
 export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () => void }) {
+  const messages = useT()
   const trip = useLiveQuery(() => db.trips.get(tripId), [tripId])
   const items = useLiveQuery(() => db.items.where('tripId').equals(tripId).sortBy('id'), [tripId], [])
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -138,11 +140,11 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
     <section data-testid="trip-detail-page" style={pageStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
         <button type="button" data-testid="trip-detail-back" onClick={onBack}>
-          ← Back to history
+          {messages.tripDetail.back}
         </button>
         {!confirmingDelete && (
           <button type="button" data-testid="trip-detail-delete" onClick={() => setConfirmingDelete(true)} style={dangerButtonStyle}>
-            Delete trip
+            {messages.tripDetail.deleteTrip}
           </button>
         )}
       </div>
@@ -158,22 +160,22 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
             margin: '0.75rem 0',
           }}
         >
-          <p style={{ marginBottom: '0.6rem' }}>Delete this trip? This can't be undone.</p>
+          <p style={{ marginBottom: '0.6rem' }}>{messages.tripDetail.confirmDeleteTrip}</p>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button type="button" data-testid="trip-detail-delete-yes" onClick={handleDelete} style={dangerFilledButtonStyle}>
-              Yes, delete
+              {messages.common.yesDelete}
             </button>
             <button type="button" data-testid="trip-detail-delete-cancel" onClick={() => setConfirmingDelete(false)}>
-              Cancel
+              {messages.common.cancel}
             </button>
           </div>
         </div>
       )}
 
-      <h1 style={{ fontSize: '1.5rem', marginTop: '0.75rem' }}>{trip ? formatDate(trip.date) : 'Loading…'}</h1>
+      <h1 style={{ fontSize: '1.5rem', marginTop: '0.75rem' }}>{trip ? formatDate(trip.date) : messages.tripDetail.loading}</h1>
       {trip?.store && <p style={{ ...mutedTextStyle, marginTop: '0.2rem' }}>{trip.store}</p>}
       <p data-testid="trip-detail-total" style={{ fontWeight: 700, marginTop: '0.4rem' }}>
-        Total: {formatPrice(trip?.total ?? null)}
+        {messages.common.total(formatPrice(trip?.total ?? null))}
       </p>
 
       {multiSelectActive && !confirmingBulkDelete && (
@@ -192,7 +194,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
           }}
         >
           <span data-testid="trip-detail-multiselect-count">
-            {selectedIds!.size} selected
+            {messages.tripDetail.selected(selectedIds!.size)}
           </span>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             {selectedIds!.size > 0 && (
@@ -202,11 +204,11 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                 onClick={() => setConfirmingBulkDelete(true)}
                 style={dangerButtonStyle}
               >
-                Delete
+                {messages.tripDetail.delete}
               </button>
             )}
             <button type="button" data-testid="trip-detail-multiselect-cancel" onClick={exitMultiSelect}>
-              Cancel
+              {messages.common.cancel}
             </button>
           </div>
         </div>
@@ -224,14 +226,14 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
           }}
         >
           <p style={{ marginBottom: '0.6rem' }}>
-            Delete these {selectedIds!.size} item{selectedIds!.size === 1 ? '' : 's'}? This can't be undone.
+            {messages.tripDetail.confirmBulkDelete(selectedIds!.size)}
           </p>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button type="button" data-testid="trip-detail-bulk-delete-yes" onClick={deleteSelectedItems} style={dangerFilledButtonStyle}>
-              Yes, delete
+              {messages.common.yesDelete}
             </button>
             <button type="button" data-testid="trip-detail-bulk-delete-cancel" onClick={() => setConfirmingBulkDelete(false)}>
-              Cancel
+              {messages.common.cancel}
             </button>
           </div>
         </div>
@@ -280,7 +282,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                   data-testid="trip-detail-item-delete-confirm"
                   style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}
                 >
-                  <span>Delete "{item.name}"?</span>
+                  <span>{messages.tripDetail.confirmItemDelete(item.name)}</span>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                       type="button"
@@ -292,7 +294,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                       }}
                       style={dangerFilledButtonStyle}
                     >
-                      Yes, delete
+                      {messages.common.yesDelete}
                     </button>
                     <button
                       type="button"
@@ -303,7 +305,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                         setPendingDeleteItemId(null)
                       }}
                     >
-                      Cancel
+                      {messages.common.cancel}
                     </button>
                   </div>
                 </div>
@@ -313,7 +315,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                   <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     {multiSelectActive ? (
                       <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                        {essential ? 'essential' : 'non-essential'}
+                        {essential ? messages.common.essential : messages.common.nonEssential}
                       </span>
                     ) : (
                       <button
@@ -325,7 +327,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                           e.stopPropagation()
                           toggleEssential(item)
                         }}
-                        aria-label={`Mark ${item.name} as ${essential ? 'non-essential' : 'essential'}`}
+                        aria-label={messages.tripDetail.markAs(item.name, essential)}
                         style={{
                           fontSize: '0.7rem',
                           fontWeight: 600,
@@ -339,7 +341,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                           lineHeight: 1,
                         }}
                       >
-                        {essential ? 'essential' : 'non-essential'}
+                        {essential ? messages.common.essential : messages.common.nonEssential}
                       </button>
                     )}
                     <span>{formatPrice(item.price)}</span>

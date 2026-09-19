@@ -1,3 +1,5 @@
+import { t } from '../../i18n'
+
 /**
  * Longest side a stored receipt photo is kept at. Deliberately the same as
  * what the extraction request has always sent (larger never reaches the AI),
@@ -23,8 +25,13 @@ export async function prepareReceiptPhoto(photo: Blob): Promise<Blob> {
     // Honors EXIF orientation by default, so a portrait photo stays portrait.
     bitmap = await createImageBitmap(photo)
   } catch (err) {
+    const messages = t().capture
     throw new Error(
-      `Couldn't read this photo (${photo.type || 'unknown type'}, ${(photo.size / 1e6).toFixed(1)} MB): ${err instanceof Error ? err.message : String(err)}`,
+      messages.unreadablePhoto(
+        photo.type || messages.unknownType,
+        (photo.size / 1e6).toFixed(1),
+        err instanceof Error ? err.message : String(err),
+      ),
     )
   }
 
@@ -38,12 +45,12 @@ export async function prepareReceiptPhoto(photo: Blob): Promise<Blob> {
     canvas.width = width
     canvas.height = height
     const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Canvas is not supported in this browser')
+    if (!ctx) throw new Error(t().capture.canvasUnsupported)
     ctx.drawImage(bitmap, 0, 0, width, height)
 
     return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
-        (result) => (result ? resolve(result) : reject(new Error(`Failed to encode the ${width}x${height} photo as JPEG`))),
+        (result) => (result ? resolve(result) : reject(new Error(t().capture.encodeFailed(width, height)))),
         'image/jpeg',
         JPEG_QUALITY,
       )

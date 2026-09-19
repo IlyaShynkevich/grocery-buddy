@@ -15,6 +15,7 @@ import { ReceiptCapture } from './features/receipt-capture/ReceiptCapture'
 import { ReceiptReviewPanel } from './features/receipt-review/ReceiptReviewPanel'
 import { ShoppingListPage } from './features/shopping-list/ShoppingListPage'
 import { StatsPage } from './features/stats/StatsPage'
+import { useT } from './i18n'
 import { PAGE_MAX_WIDTH } from './lib/ui'
 
 // The 4 icon-only tabs in the middle of the nav bar — these are the ones
@@ -28,11 +29,11 @@ type View =
   | { name: 'home' }
   | { name: 'about' }
 
-const TABS: Array<{ name: TabName; label: string; testId: string; Icon: ComponentType<IconProps> }> = [
-  { name: 'shopping', label: 'Shopping List', testId: 'nav-shopping', Icon: ShoppingBagIcon },
-  { name: 'history', label: 'History', testId: 'nav-history', Icon: ClockIcon },
-  { name: 'stats', label: 'Stats', testId: 'nav-stats', Icon: BarChartIcon },
-  { name: 'customize', label: 'Customize', testId: 'nav-customize', Icon: GearIcon },
+const TABS: Array<{ name: TabName; testId: string; Icon: ComponentType<IconProps> }> = [
+  { name: 'shopping', testId: 'nav-shopping', Icon: ShoppingBagIcon },
+  { name: 'history', testId: 'nav-history', Icon: ClockIcon },
+  { name: 'stats', testId: 'nav-stats', Icon: BarChartIcon },
+  { name: 'customize', testId: 'nav-customize', Icon: GearIcon },
 ]
 
 // Single source of truth for swipe/tab order, shared with the tab bar above.
@@ -112,6 +113,10 @@ function cornerButtonStyle(active: boolean): CSSProperties {
 }
 
 function App() {
+  // Subscribing here re-renders the whole tree on a language switch, so
+  // every formatter (prices, dates) picks the new region up too — not only
+  // components that read messages themselves.
+  const messages = useT()
   const [view, setView] = useState<View>(readInitialView)
   // trip-detail isn't its own tab — it's reached via History, so it keeps
   // the History tab highlighted rather than showing no active tab at all.
@@ -291,8 +296,8 @@ function App() {
         <button
           type="button"
           data-testid="nav-home"
-          aria-label="Home"
-          title="Home"
+          aria-label={messages.nav.home}
+          title={messages.nav.home}
           onClick={() => setView({ name: 'home' })}
           style={cornerButtonStyle(view.name === 'home')}
         >
@@ -308,8 +313,8 @@ function App() {
                 key={tab.name}
                 type="button"
                 data-testid={tab.testId}
-                aria-label={tab.label}
-                title={tab.label}
+                aria-label={messages.nav[tab.name]}
+                title={messages.nav[tab.name]}
                 onClick={() => {
                   const fromIndex = activeTab === null ? -1 : TAB_ORDER.indexOf(activeTab)
                   const toIndex = TAB_ORDER.indexOf(tab.name)
@@ -329,8 +334,8 @@ function App() {
         <button
           type="button"
           data-testid="nav-about"
-          aria-label="About"
-          title="About"
+          aria-label={messages.nav.about}
+          title={messages.nav.about}
           onClick={() => setView({ name: 'about' })}
           style={cornerButtonStyle(view.name === 'about')}
         >

@@ -1,5 +1,7 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { BackupValidationError, backupFileName, buildBackup, downloadBackup, parseBackup, restoreBackup, type BackupData } from '../../db/backup'
+import { useT } from '../../i18n'
+import type { Messages } from '../../i18n/messages/en'
 import { IconChip } from '../../lib/IconChip'
 import { cardStyle, dangerButtonStyle, dangerFilledButtonStyle, mutedTextStyle } from '../../lib/ui'
 
@@ -7,10 +9,15 @@ function describeErr(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-function summarizeBackup(backup: BackupData): string {
+function summarizeBackup(messages: Messages, backup: BackupData): string {
   const { trips, items, categoryNotes, pendingReceipts } = backup.tables
-  const withPhotos = pendingReceipts.filter((receipt) => receipt.imageBlob !== undefined).length
-  return `${trips.length} trip${trips.length === 1 ? '' : 's'}, ${items.length} item${items.length === 1 ? '' : 's'}, ${categoryNotes.length} note${categoryNotes.length === 1 ? '' : 's'}, ${pendingReceipts.length} receipt${pendingReceipts.length === 1 ? '' : 's'} (${withPhotos} with photo${withPhotos === 1 ? '' : 's'})`
+  return messages.backup.summary({
+    trips: trips.length,
+    items: items.length,
+    notes: categoryNotes.length,
+    receipts: pendingReceipts.length,
+    withPhotos: pendingReceipts.filter((receipt) => receipt.imageBlob !== undefined).length,
+  })
 }
 
 /**
@@ -24,6 +31,7 @@ function summarizeBackup(backup: BackupData): string {
  * deleting a trip.
  */
 export function BackupSection() {
+  const messages = useT()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -77,7 +85,7 @@ export function BackupSection() {
     setImportError(null)
     try {
       await restoreBackup(pendingImport.backup)
-      setImportSuccess(`Restored ${summarizeBackup(pendingImport.backup)} from ${pendingImport.fileName}.`)
+      setImportSuccess(messages.backup.restored(summarizeBackup(messages, pendingImport.backup), pendingImport.fileName))
       setPendingImport(null)
     } catch (err) {
       console.error('Grocery Buddy: backup restore failed', err)
@@ -89,11 +97,8 @@ export function BackupSection() {
 
   return (
     <section data-testid="backup-section" style={{ ...cardStyle, marginTop: '1.25rem', marginBottom: '0.75rem' }}>
-      <h2 style={{ fontSize: '1.05rem', marginBottom: '0.25rem' }}>Backup & restore</h2>
-      <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginBottom: '0.6rem' }}>
-        Your trips and history live only on this device. Export a backup before clearing browser
-        data, uninstalling, or switching phones.
-      </p>
+      <h2 style={{ fontSize: '1.05rem', marginBottom: '0.25rem' }}>{messages.backup.title}</h2>
+      <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginBottom: '0.6rem' }}>{messages.backup.intro}</p>
 
       <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
         <button
@@ -104,7 +109,7 @@ export function BackupSection() {
           style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
         >
           <IconChip src="/icons/icon-export.png" />
-          {exporting ? 'Exporting…' : 'Export data'}
+          {exporting ? messages.backup.exporting : messages.backup.exportData}
         </button>
         <button
           type="button"
@@ -114,7 +119,7 @@ export function BackupSection() {
           style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
         >
           <IconChip src="/icons/icon-import.png" />
-          Import data
+          {messages.backup.importData}
         </button>
       </div>
 
@@ -129,13 +134,13 @@ export function BackupSection() {
 
       {exportError && (
         <p role="alert" data-testid="backup-export-error" style={{ color: 'var(--danger)', marginTop: '0.6rem' }}>
-          Export failed: {exportError}
+          {messages.backup.exportFailed(exportError)}
         </p>
       )}
 
       {importError && (
         <p role="alert" data-testid="backup-import-error" style={{ color: 'var(--danger)', marginTop: '0.6rem' }}>
-          Import failed: {importError}
+          {messages.backup.importFailed(importError)}
         </p>
       )}
 
@@ -157,8 +162,7 @@ export function BackupSection() {
           }}
         >
           <p style={{ marginBottom: '0.6rem' }}>
-            Restore <strong>{pendingImport.fileName}</strong>? It contains {summarizeBackup(pendingImport.backup)}. Any
-            existing trip, item, note, or receipt with a matching id will be overwritten — this can't be undone.
+            {messages.backup.confirmRestore(pendingImport.fileName, summarizeBackup(messages, pendingImport.backup))}
           </p>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
@@ -168,7 +172,7 @@ export function BackupSection() {
               disabled={importing}
               style={dangerFilledButtonStyle}
             >
-              {importing ? 'Restoring…' : 'Yes, restore'}
+              {importing ? messages.backup.restoring : messages.backup.yesRestore}
             </button>
             <button
               type="button"
@@ -177,7 +181,7 @@ export function BackupSection() {
               disabled={importing}
               style={dangerButtonStyle}
             >
-              Cancel
+              {messages.common.cancel}
             </button>
           </div>
         </div>

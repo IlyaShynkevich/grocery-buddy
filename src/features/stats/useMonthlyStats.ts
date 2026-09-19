@@ -1,11 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { getCategory, resolveEssential } from '../../db/categories'
+import { resolveEssential } from '../../db/categories'
 import { db, type Item } from '../../db/db'
 import { groupTripsByMonth, useHistory, type MonthGroup } from '../history/useHistory'
 
 export interface CategoryStat {
+  /** category key — see categoryLabel() for its display name */
   key: string
-  label: string
   amount: number
 }
 
@@ -78,7 +78,7 @@ export function useMonthlyStats(group: MonthGroup | undefined): MonthlyStats | n
   }
 
   const categories: CategoryStat[] = Array.from(byCategory.entries())
-    .map(([key, amount]) => ({ key, label: getCategory(key).label, amount }))
+    .map(([key, amount]) => ({ key, amount }))
     .sort((a, b) => b.amount - a.amount)
 
   return { total, essential, nonEssential, categories }

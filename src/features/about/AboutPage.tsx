@@ -1,4 +1,5 @@
 import packageJson from '../../../package.json'
+import { useT } from '../../i18n'
 import { PAGE_MAX_WIDTH, mutedTextStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 
@@ -7,6 +8,7 @@ import { Mascot } from '../mascot/Mascot'
 // HomePage, just without a CTA: there's nowhere further for this page to
 // send you.
 export function AboutPage() {
+  const messages = useT()
   return (
     <section
       data-testid="about-page"
@@ -52,23 +54,19 @@ export function AboutPage() {
           gap: '0.4rem',
         }}
       >
-        <li>Build your shopping list before or during a trip, checking items off as you grab them.</li>
-        <li>Scan a receipt (camera or gallery) — AI pulls out items, prices, and categories.</li>
-        <li>Review and confirm each scan — nothing touches your list until you do.</li>
-        <li>Browse your trip history, grouped by month; edit or delete a leftover item, or a whole trip.</li>
-        <li>See monthly stats: essential vs. non-essential spend, and spend by category.</li>
-        <li>Personalize what counts as essential per category on Customize.</li>
-        <li>Back up everything to a file, and restore it on a new device.</li>
+        {messages.about.features.map((feature) => (
+          <li key={feature}>{feature}</li>
+        ))}
       </ul>
 
       <p style={{ fontSize: '0.85rem' }}>Ilya Shynkevich</p>
 
       <p data-testid="about-access" style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
-        Production access is protected behind a shared login.
+        {messages.about.access}
       </p>
 
       <p data-testid="about-planned" style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
-        Planned: trends over time / month-to-month spending comparisons.
+        {messages.about.planned}
       </p>
     </section>
   )

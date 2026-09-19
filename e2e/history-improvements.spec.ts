@@ -42,15 +42,15 @@ async function saveAndGetCompletedTripId(page: Page): Promise<string> {
  * wouldn't fire anyway — callers reload the page afterwards regardless.
  */
 /**
- * Matches the app's own de-DE month formatting (formatMonth/monthKey in
+ * Matches the app's own English month formatting (formatMonth/monthKey in
  * src/lib/formatDate.ts). Trips saved without an explicit setTripDate() call
  * default to today's date, so any assertion about "the current month" must
  * be derived from the real clock instead of a hardcoded string/key — a
- * hardcoded "Juli 2026" only holds for as long as the suite happens to run
+ * hardcoded "July 2026" only holds for as long as the suite happens to run
  * in July 2026, and silently breaks on every month rollover.
  */
 function currentMonthLabel(): string {
-  return new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' }).format(new Date())
+  return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(new Date())
 }
 
 function currentMonthKey(): string {
@@ -139,7 +139,7 @@ test('history groups trips by month, most recent month first, and can filter to 
   await page.getByTestId('nav-history').click()
   await expect(page.getByTestId('history-page')).toBeVisible()
 
-  await expect(page.getByTestId('history-month-header')).toHaveText([currentMonthLabel(), 'Juni 2026', 'Mai 2026'])
+  await expect(page.getByTestId('history-month-header')).toHaveText([currentMonthLabel(), 'June 2026', 'May 2026'])
   await expect(page.getByTestId('history-trip')).toHaveCount(3)
 
   const julyGroup = page.locator(`[data-testid="history-month-group"][data-month-key="${currentMonthKey()}"]`)
@@ -147,10 +147,10 @@ test('history groups trips by month, most recent month first, and can filter to 
   await expect(julyGroup.getByTestId('history-trip')).toContainText('1 item')
 
   // Filter down to a single month.
-  await page.getByTestId('history-month-select').selectOption({ label: 'Juni 2026' })
+  await page.getByTestId('history-month-select').selectOption({ label: 'June 2026' })
 
   await expect(page.getByTestId('history-month-group')).toHaveCount(1)
-  await expect(page.getByTestId('history-month-header')).toHaveText('Juni 2026')
+  await expect(page.getByTestId('history-month-header')).toHaveText('June 2026')
   const visibleTrips = page.getByTestId('history-trip')
   await expect(visibleTrips).toHaveCount(1)
   await expect(visibleTrips).toContainText('1 item')
@@ -303,7 +303,7 @@ test('the pinned month header updates as trips from an earlier month scroll into
 
   await page.reload()
   await page.getByTestId('nav-history').click()
-  await expect(page.getByTestId('history-month-header')).toHaveText([currentMonthLabel(), 'Juni 2026'])
+  await expect(page.getByTestId('history-month-header')).toHaveText([currentMonthLabel(), 'June 2026'])
 
   // The "current" header is the topmost one whose group hasn't fully
   // scrolled past yet (bottom still below the container's top edge) — at
@@ -335,5 +335,5 @@ test('the pinned month header updates as trips from an earlier month scroll into
   await page.getByTestId('history-list-scroll').evaluate((el, distance) => {
     el.scrollTop = distance
   }, julyGroupHeight + 40)
-  await expect.poll(stuckHeaderText).toBe('Juni 2026')
+  await expect.poll(stuckHeaderText).toBe('June 2026')
 })

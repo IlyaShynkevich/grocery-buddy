@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
+import { useT } from '../../i18n'
 
 const BOX: CSSProperties = {
   width: 48,
@@ -14,6 +15,7 @@ const BOX: CSSProperties = {
  * explicit "no photo" tile, not an empty gap or a broken image.
  */
 export function ReceiptThumbnail({ blob, onLoad }: { blob?: Blob; onLoad?: () => void }) {
+  const messages = useT()
   const [url, setUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -30,7 +32,7 @@ export function ReceiptThumbnail({ blob, onLoad }: { blob?: Blob; onLoad?: () =>
     return (
       <div
         data-testid="receipt-thumbnail-missing"
-        title="Photo not kept in the backup this receipt was restored from"
+        title={messages.capture.noPhotoTitle}
         style={{
           ...BOX,
           display: 'flex',
@@ -42,7 +44,7 @@ export function ReceiptThumbnail({ blob, onLoad }: { blob?: Blob; onLoad?: () =>
           color: 'var(--text-muted)',
         }}
       >
-        no photo
+        {messages.capture.noPhoto}
       </div>
     )
   }
@@ -52,7 +54,7 @@ export function ReceiptThumbnail({ blob, onLoad }: { blob?: Blob; onLoad?: () =>
   return (
     <img
       src={url}
-      alt="Receipt thumbnail"
+      alt={messages.capture.thumbnailAlt}
       onLoad={onLoad}
       onError={() => console.error('Receipt thumbnail failed to load', { type: blob.type, size: blob.size })}
       style={{ ...BOX, objectFit: 'cover' }}

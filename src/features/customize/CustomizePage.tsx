@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { CATEGORIES, type Category } from '../../db/categories'
+import { categoryLabel, useT } from '../../i18n'
 import { cardStyle, iconButtonStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { useCategoryNotes } from './useCategoryNotes'
@@ -14,6 +15,7 @@ import { useCategoryNotes } from './useCategoryNotes'
  * just not painted.
  */
 function CategoryNotes({ category }: { category: Category }) {
+  const messages = useT()
   const { notes, addNote, removeNote } = useCategoryNotes(category.key)
   const [draftText, setDraftText] = useState('')
 
@@ -27,7 +29,7 @@ function CategoryNotes({ category }: { category: Category }) {
     <div style={{ padding: '0.75rem 0.1rem 0.1rem' }}>
       {notes.length === 0 ? (
         <p data-testid="category-notes-empty" style={mutedTextStyle}>
-          Nothing set up yet — add what's not essential for you.
+          {messages.customize.notesEmpty}
         </p>
       ) : (
         <ul
@@ -45,7 +47,7 @@ function CategoryNotes({ category }: { category: Category }) {
                 type="button"
                 data-testid="category-note-remove"
                 onClick={() => removeNote(note.id)}
-                aria-label={`Remove note: ${note.text}`}
+                aria-label={messages.customize.removeNote(note.text)}
                 style={iconButtonStyle}
               >
                 ✕
@@ -60,13 +62,13 @@ function CategoryNotes({ category }: { category: Category }) {
           type="text"
           value={draftText}
           onChange={(e) => setDraftText(e.target.value)}
-          placeholder="e.g. nuggets, frozen pizza"
-          aria-label={`Add a note for ${category.label}`}
+          placeholder={messages.customize.notePlaceholder}
+          aria-label={messages.customize.addNoteFor(categoryLabel(messages, category.key))}
           data-testid="category-note-input"
           style={{ flex: 1 }}
         />
         <button type="submit" data-testid="category-note-submit" style={primaryButtonStyle}>
-          Add
+          {messages.common.add}
         </button>
       </form>
     </div>
@@ -87,14 +89,15 @@ function CategoryNotes({ category }: { category: Category }) {
  * tapping a header toggling it open/closed comes for free.
  */
 export function CustomizePage() {
+  const messages = useT()
   return (
     <section data-testid="customize-page" style={pageStyle}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '1.5rem' }}>Customize</h1>
+        <h1 style={{ fontSize: '1.5rem' }}>{messages.customize.title}</h1>
         <Mascot pose="excited" size={32} />
       </div>
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>
-        Add personal notes on items that are NOT essential for you, within each category.
+        {messages.customize.intro}
       </p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.6rem' }}>
@@ -106,7 +109,7 @@ export function CustomizePage() {
             style={{ ...cardStyle, padding: '0.55rem 0.75rem' }}
           >
             <summary data-testid="category-accordion-toggle" style={{ fontWeight: 600, cursor: 'pointer' }}>
-              {category.label}
+              {categoryLabel(messages, category.key)}
             </summary>
             <CategoryNotes category={category} />
           </details>

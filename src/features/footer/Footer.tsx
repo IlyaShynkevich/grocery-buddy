@@ -1,4 +1,5 @@
 import packageJson from '../../../package.json'
+import { useT } from '../../i18n'
 import { mutedTextStyle, PAGE_MAX_WIDTH } from '../../lib/ui'
 
 // Placeholder mascot — same shopping-bag glyph already used for the
@@ -7,6 +8,7 @@ import { mutedTextStyle, PAGE_MAX_WIDTH } from '../../lib/ui'
 const MASCOT_ICON_SRC = '/favicon.svg'
 
 export function Footer() {
+  const messages = useT()
   return (
     <footer
       data-testid="app-footer"
@@ -27,7 +29,7 @@ export function Footer() {
     >
       <img
         src={MASCOT_ICON_SRC}
-        alt="Grocery Buddy mascot"
+        alt={messages.footer.mascotAlt}
         width={32}
         height={32}
         style={{ borderRadius: 'var(--radius-sm)' }}

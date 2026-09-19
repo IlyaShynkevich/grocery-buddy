@@ -1,3 +1,4 @@
+import { t } from '../i18n'
 import { blobToDataUrl } from '../lib/dataUrl'
 import { db, type AppStateEntry, type CategoryNote, type Item, type PendingReceipt, type ReceiptStatus, type Trip } from './db'
 
@@ -56,20 +57,18 @@ async function dataUrlToBlob(dataUrl: string, receiptId: unknown): Promise<Blob>
   // parseBackup has already checked the shape; re-checked here since this
   // is the line that would otherwise store whatever fetch() returns.
   if (!isImageDataUrl(dataUrl)) {
-    throw new Error(`Receipt #${String(receiptId)}'s photo is not an image data URL — nothing was imported.`)
+    throw new Error(t().backup.errors.photoNotDataUrl(String(receiptId)))
   }
   // fetch() on a data: URL is a local decode under the hood, not a network
   // request — works offline and is the simplest cross-browser way back from
   // a data URL to a Blob.
   const response = await fetch(dataUrl)
   if (!response.ok) {
-    throw new Error(`Receipt #${String(receiptId)}'s photo could not be decoded (${response.status}) — nothing was imported.`)
+    throw new Error(t().backup.errors.photoUndecodable(String(receiptId), response.status))
   }
   const blob = await response.blob()
   if (blob.size === 0 || !blob.type.startsWith('image/')) {
-    throw new Error(
-      `Receipt #${String(receiptId)}'s photo decoded to ${blob.size} bytes of ${blob.type || 'unknown type'}, not an image — nothing was imported.`,
-    )
+    throw new Error(t().backup.errors.photoNotImage(String(receiptId), blob.size, blob.type || t().capture.unknownType))
   }
   return blob
 }
@@ -93,7 +92,7 @@ export async function buildBackup(): Promise<BackupData> {
     pendingReceipts.map(async ({ imageBlob, ...rest }): Promise<PendingReceiptExport> => {
       if (rest.status === 'done') return rest
       if (!imageBlob) {
-        throw new Error(`Receipt #${rest.id} (${rest.status}) has no photo — it can't be processed, so it can't be backed up as-is.`)
+        throw new Error(t().backup.errors.exportMissingPhoto(rest.id, rest.status))
       }
       return { ...rest, imageBlob: await blobToDataUrl(imageBlob) }
     }),
@@ -150,27 +149,25 @@ export function parseBackup(json: string): BackupData {
   try {
     parsed = JSON.parse(json)
   } catch (err) {
-    throw new BackupValidationError(`That file is not valid JSON (${err instanceof Error ? err.message : String(err)}).`)
+    throw new BackupValidationError(t().backup.errors.notJson(err instanceof Error ? err.message : String(err)))
   }
 
   if (!isPlainObject(parsed)) {
-    throw new BackupValidationError('That file is not a Grocery Buddy backup (expected a JSON object at the top level).')
+    throw new BackupValidationError(t().backup.errors.notObject)
   }
   if (typeof parsed.schemaVersion !== 'number') {
-    throw new BackupValidationError('That file is missing a schemaVersion — it is not a Grocery Buddy backup file.')
+    throw new BackupValidationError(t().backup.errors.noSchemaVersion)
   }
   if (parsed.schemaVersion > BACKUP_SCHEMA_VERSION) {
-    throw new BackupValidationError(
-      `That backup was made by a newer version of Grocery Buddy (schema v${parsed.schemaVersion}) than this app supports (v${BACKUP_SCHEMA_VERSION}). Update the app, then try importing again.`,
-    )
+    throw new BackupValidationError(t().backup.errors.newerSchema(parsed.schemaVersion, BACKUP_SCHEMA_VERSION))
   }
   if (!isPlainObject(parsed.tables)) {
-    throw new BackupValidationError('That file is missing its "tables" section — it is not a valid Grocery Buddy backup file.')
+    throw new BackupValidationError(t().backup.errors.noTables)
   }
 
   for (const key of REQUIRED_TABLE_KEYS) {
     if (!Array.isArray(parsed.tables[key])) {
-      throw new BackupValidationError(`That file's "${key}" table is missing or malformed — it is not a valid Grocery Buddy backup file.`)
+      throw new BackupValidationError(t().backup.errors.badTable(key))
     }
   }
 
@@ -188,25 +185,22 @@ export function parseBackup(json: string): BackupData {
  * storing the app's own HTML page as the image.
  */
 function validateReceiptRow(row: unknown, index: number) {
+  const errors = t().backup.errors
   if (!isPlainObject(row)) {
-    throw new BackupValidationError(`Receipt entry ${index + 1} in that file is not an object — the backup is damaged. Nothing was imported.`)
+    throw new BackupValidationError(errors.receiptNotObject(index + 1))
   }
-  const label = `Receipt #${String(row.id ?? index + 1)}`
+  const label = errors.receiptLabel(String(row.id ?? index + 1))
   if (!RECEIPT_STATUSES.includes(row.status as ReceiptStatus)) {
-    throw new BackupValidationError(`${label} has an unknown status (${JSON.stringify(row.status)}) — the backup is damaged. Nothing was imported.`)
+    throw new BackupValidationError(errors.unknownStatus(label, JSON.stringify(row.status)))
   }
   if (row.imageBlob === undefined) {
     if (row.status !== 'done') {
-      throw new BackupValidationError(
-        `${label} (${String(row.status)}) has no photo, so it could never be processed after restoring — the backup is incomplete or damaged. Nothing was imported.`,
-      )
+      throw new BackupValidationError(errors.missingPhoto(label, String(row.status)))
     }
     return
   }
   if (typeof row.imageBlob !== 'string' || !isImageDataUrl(row.imageBlob)) {
-    throw new BackupValidationError(
-      `${label}'s photo is not a valid image (expected a base64 "data:image/…" URL) — the backup is damaged. Nothing was imported.`,
-    )
+    throw new BackupValidationError(errors.invalidPhoto(label))
   }
 }
 
