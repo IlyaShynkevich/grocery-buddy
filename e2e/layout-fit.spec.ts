@@ -4,7 +4,8 @@ import { expect, openCustomize, test, type Page } from './fixtures'
 // usable viewport of the target phone (Xiaomi 14T Pro, browser chrome
 // excluded) — in both languages, since Russian text runs ~15–25% longer.
 // Worst-case content: all 11 categories in Stats, 12 trips over 2 months in
-// History (enough to hit the list's internal scroll and the month filter).
+// History (enough to hit the list's internal scroll and the month filter),
+// and Settings with its storage figures loaded.
 test.use({ viewport: { width: 393, height: 777 }, isMobile: true, hasTouch: true })
 
 const CATEGORIES = ['produce', 'dairy', 'meat_seafood', 'bakery', 'frozen', 'pantry', 'household', 'personal_care', 'snacks', 'drinks', 'other']
@@ -43,7 +44,7 @@ const overflowingLabels = (page: Page, selector: string) =>
   page.locator(selector).evaluateAll((els) => els.filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent))
 
 for (const region of ['en-EUR', 'ru-BYN'] as const) {
-  test(`${region}: About, Stats, History and Customize each fit one screen`, async ({ page }) => {
+  test(`${region}: About, Stats, History, Settings and Customize each fit one screen`, async ({ page }) => {
     await page.addInitScript((id) => {
       const [language, currency] = id === 'ru-BYN' ? ['ru', 'BYN'] : ['en', 'EUR']
       localStorage.setItem('grocery-buddy:language', language)
@@ -56,7 +57,7 @@ for (const region of ['en-EUR', 'ru-BYN'] as const) {
       ['nav-about', 'about-page'],
       ['nav-stats', 'stats-category-chart'],
       ['nav-history', 'history-month-select'],
-      ['nav-settings', 'settings-language'],
+      ['nav-settings', 'storage-total'],
     ] as const) {
       await page.getByTestId(tab).click()
       await expect(page.getByTestId(ready)).toBeVisible()
@@ -69,6 +70,24 @@ for (const region of ['en-EUR', 'ru-BYN'] as const) {
           await overflowingLabels(page, '[data-testid="stats-category-label"], [data-testid^="stats-split-"] > span:first-child'),
           'Stats labels wider than their column',
         ).toEqual([])
+      }
+
+      if (tab === 'nav-settings') {
+        // Every setting/storage label and button stays on one line, and
+        // nothing pushes the page sideways.
+        expect(
+          await page.evaluate(() =>
+            Array.from(
+              document.querySelectorAll(
+                '[data-testid="settings-page"] label > span, [data-testid="settings-open-customize"], [data-testid="backup-section"] button, [data-testid^="storage-"] > span',
+              ),
+            )
+              .filter((el) => el.getBoundingClientRect().height > parseFloat(getComputedStyle(el).fontSize) * 1.9 + parseFloat(getComputedStyle(el).paddingTop) + parseFloat(getComputedStyle(el).paddingBottom) + 2)
+              .map((el) => el.textContent),
+          ),
+          'Settings labels wrapping onto two lines',
+        ).toEqual([])
+        expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 'Settings overflows sideways').toBeLessThanOrEqual(0)
       }
     }
 
