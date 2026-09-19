@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { CATEGORIES, type Category } from '../../db/categories'
 import { categoryLabel, useT } from '../../i18n'
+import { setRegion, useRegion } from '../../i18n/regionStore'
+import { isRegionId, REGIONS } from '../../i18n/regions'
 import { cardStyle, iconButtonStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { useCategoryNotes } from './useCategoryNotes'
@@ -88,12 +90,63 @@ function CategoryNotes({ category }: { category: Category }) {
  * collapsible section — rather than hand-rolled open/close state, so
  * tapping a header toggling it open/closed comes for free.
  */
+/**
+ * Sits in the title row rather than on its own line: the page is tuned so
+ * all 11 category cards fit on one screen, and a separate row would push
+ * the last ones below the fold.
+ */
+function RegionPicker() {
+  const messages = useT()
+  const region = useRegion()
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const handleChange = (id: string) => {
+    if (!isRegionId(id)) {
+      console.error(`Grocery Buddy: unknown region picked: ${JSON.stringify(id)}`)
+      return
+    }
+    setSaveError(null)
+    try {
+      setRegion(id)
+    } catch (err) {
+      console.error('Grocery Buddy: could not save the language setting', err)
+      // Rendered in the (already switched) new language.
+      setSaveError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  return (
+    <>
+      <select
+        data-testid="region-select"
+        aria-label={messages.customize.region}
+        title={messages.customize.region}
+        value={region.id}
+        onChange={(e) => handleChange(e.target.value)}
+        style={{ minHeight: '2.5rem', minWidth: 0, flexShrink: 1 }}
+      >
+        {Object.values(REGIONS).map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {saveError && (
+        <p role="alert" data-testid="region-save-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', flexBasis: '100%' }}>
+          {messages.customize.regionSaveFailed(saveError)}
+        </p>
+      )}
+    </>
+  )
+}
+
 export function CustomizePage() {
   const messages = useT()
   return (
     <section data-testid="customize-page" style={pageStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '1.5rem' }}>{messages.customize.title}</h1>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <h1 style={{ fontSize: '1.5rem', marginRight: 'auto' }}>{messages.customize.title}</h1>
+        <RegionPicker />
         <Mascot pose="excited" size={32} />
       </div>
       <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>

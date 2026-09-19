@@ -228,6 +228,8 @@ export const en = {
 
   customize: {
     title: 'Customize',
+    region: 'Language & currency',
+    regionSaveFailed: (message: string) => `Language changed for now, but couldn't be saved for next time: ${message}`,
     intro: 'Add personal notes on items that are NOT essential for you, within each category.',
     notesEmpty: "Nothing set up yet — add what's not essential for you.",
     notePlaceholder: 'e.g. nuggets, frozen pizza',

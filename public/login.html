@@ -153,9 +153,48 @@
     </main>
 
     <script>
+      // Language: the app's own saved region setting (src/i18n/regionStore.ts,
+      // same localStorage key), mapped to this page's handful of strings —
+      // this page is plain static HTML outside the React app, so it can't
+      // import the app's dictionaries.
+      const STRINGS = {
+        en: {
+          title: 'Log in — Grocery Buddy',
+          password: 'Password',
+          submit: 'Log in',
+          incorrectPassword: 'Incorrect password',
+          notConfigured: 'Login is not configured on this deployment.',
+          failed: 'Login failed — try again.',
+          connection: 'Connection issue — try again.',
+        },
+        ru: {
+          title: 'Вход — Grocery Buddy',
+          password: 'Пароль',
+          submit: 'Войти',
+          incorrectPassword: 'Неверный пароль',
+          notConfigured: 'Вход не настроен на этом сервере.',
+          failed: 'Не удалось войти — попробуйте ещё раз.',
+          connection: 'Проблема со связью — попробуйте ещё раз.',
+        },
+      }
+      let language = 'en'
+      try {
+        const region = localStorage.getItem('grocery-buddy:region')
+        if (region === 'ru-BYN') language = 'ru'
+      } catch (err) {
+        console.error('Grocery Buddy: could not read the language setting — using English', err)
+      }
+      const text = STRINGS[language]
+      document.documentElement.lang = language
+      document.title = text.title
+
       const form = document.getElementById('login-form')
       const errorEl = form.querySelector('[data-error]')
       const submitButton = form.querySelector('button')
+      const passwordInput = form.querySelector('input[name="password"]')
+      passwordInput.placeholder = text.password
+      passwordInput.setAttribute('aria-label', text.password)
+      submitButton.textContent = text.submit
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault()
@@ -179,10 +218,19 @@
             window.location.href = isSafeNext ? next : '/'
             return
           }
-          const data = await res.json().catch(() => null)
-          errorEl.textContent = data?.error || 'Login failed — try again.'
-        } catch {
-          errorEl.textContent = 'Connection issue — try again.'
+          // The server's own error text is English; the known cases are
+          // mapped by status so they're shown in the page's language, and
+          // anything else keeps the server's detail after a generic message.
+          const data = await res.json().catch((err) => {
+            console.error('Grocery Buddy: login error response was not JSON', err)
+            return null
+          })
+          if (res.status === 401) errorEl.textContent = text.incorrectPassword
+          else if (res.status === 503) errorEl.textContent = text.notConfigured
+          else errorEl.textContent = data?.error ? `${text.failed} (${data.error})` : text.failed
+        } catch (err) {
+          console.error('Grocery Buddy: login request failed', err)
+          errorEl.textContent = text.connection
         } finally {
           submitButton.disabled = false
         }

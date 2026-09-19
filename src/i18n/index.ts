@@ -1,8 +1,9 @@
 import { en, type Messages } from './messages/en'
+import { ru } from './messages/ru'
 import { getRegion, useRegion } from './regionStore'
 import type { Language } from './regions'
 
-const MESSAGES: Record<Language, Messages> = { en }
+const MESSAGES: Record<Language, Messages> = { en, ru }
 
 /**
  * Messages for the active region, for code outside React (thrown errors,

@@ -28,6 +28,10 @@ test('the shopping list is open by default, and the toggle collapses/expands it 
   page,
 }) => {
   await page.goto('/')
+  // The list re-opens itself when the active trip id first arrives (it
+  // resets per trip) — toggle only after that, or a slow load can undo the
+  // click below.
+  await expect(page.getByTestId('shopping-list')).not.toHaveAttribute('data-trip-id', '')
 
   await expect(page.getByTestId('add-item-input')).toBeVisible()
   await expect(page.getByText("No items yet — add what you're picking up.")).toBeVisible()
