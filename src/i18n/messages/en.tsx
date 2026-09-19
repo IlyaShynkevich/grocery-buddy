@@ -68,6 +68,7 @@ export const en = {
     reviewHint: 'Resolve the receipt review first',
     reviewTitle: 'Resolve the receipt review below before saving this trip',
     saveFailed: (message: string) => `Trip not saved: ${message}`,
+    addFailed: (message: string) => `Item not added: ${message}`,
     hideList: 'Hide shopping list',
     showList: 'Show shopping list',
     addPlaceholder: 'Add an item…',

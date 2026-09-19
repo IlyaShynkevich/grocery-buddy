@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { completeTrip, db, newItem } from '../../db/db'
+import { completeTrip, db, getOrCreateActiveTrip, newItem } from '../../db/db'
 import { useActiveTripId } from '../trip/useActiveTripId'
 
 export function useShoppingList() {
@@ -40,10 +40,15 @@ export function useShoppingList() {
     0,
   )
 
+  // Resolves the active trip itself rather than trusting `tripId` above,
+  // same as captureReceipt: the form is usable before that has loaded, and
+  // returning early when it hadn't silently dropped the item (the input
+  // still cleared) — easy to hit on a slow phone right after opening.
   const addItem = async (name: string) => {
     const trimmed = name.trim()
-    if (!tripId || !trimmed) return
-    await db.items.add(newItem(tripId, { name: trimmed }))
+    if (!trimmed) return
+    const trip = await getOrCreateActiveTrip()
+    await db.items.add(newItem(trip.id, { name: trimmed }))
   }
 
   const renameItem = async (itemId: number, name: string) => {

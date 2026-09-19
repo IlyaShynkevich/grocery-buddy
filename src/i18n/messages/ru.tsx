@@ -70,6 +70,7 @@ export const ru: Messages = {
     reviewHint: 'Сначала проверьте чек',
     reviewTitle: 'Проверьте распознанный чек ниже, прежде чем сохранять покупку',
     saveFailed: (message) => `Покупка не сохранена: ${message}`,
+    addFailed: (message) => `Товар не добавлен: ${message}`,
     hideList: 'Скрыть список',
     showList: 'Показать список',
     addPlaceholder: 'Добавить товар…',
