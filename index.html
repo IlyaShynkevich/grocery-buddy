@@ -5,9 +5,32 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#16171d" />
+    <meta name="theme-color" data-theme-color="light" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" data-theme-color="dark" media="(prefers-color-scheme: dark)" content="#16171d" />
     <title>Grocery Buddy</title>
+    <script>
+      // Applies the saved Theme setting before first paint, so a forced
+      // light/dark theme never flashes the device's one first. Same logic as
+      // applyTheme() in src/settings/theme.ts (which takes over once the app
+      // loads) and the copy in public/login.html — keep the three in step.
+      ;(function () {
+        var theme = 'system'
+        try {
+          var saved = localStorage.getItem('grocery-buddy:theme')
+          if (saved === 'light' || saved === 'dark' || saved === 'system') theme = saved
+          else if (saved !== null) console.error('Grocery Buddy: unknown saved theme ' + JSON.stringify(saved) + ' — using the device theme')
+        } catch (err) {
+          console.error('Grocery Buddy: could not read the theme setting — using the device theme', err)
+        }
+        var resolved = theme === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme
+        document.documentElement.dataset.theme = resolved
+        document.documentElement.style.colorScheme = resolved
+        document.querySelectorAll('meta[name="theme-color"][data-theme-color]').forEach(function (meta) {
+          var own = meta.dataset.themeColor
+          meta.media = theme === 'system' ? '(prefers-color-scheme: ' + own + ')' : own === theme ? 'all' : 'not all'
+        })
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

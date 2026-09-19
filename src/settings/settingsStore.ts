@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { CURRENCIES, DEFAULT_CURRENCY, isCurrency, type Currency } from '../i18n/currencies'
 import { DEFAULT_LANGUAGE, isLanguage, LANGUAGES, type Language, type LanguageConfig } from '../i18n/languages'
+import { applyTheme, DEFAULT_THEME, isTheme, onDeviceThemeChange, THEMES, type Theme } from './theme'
 
 /**
  * The app's device settings, each persisted independently in localStorage —
@@ -13,11 +14,16 @@ export interface Settings {
   language: Language
   /** What new trips are recorded in — never applied to existing trips. */
   currency: Currency
+  /** 'system' follows the device's light/dark preference, live. */
+  theme: Theme
 }
 
 export const SETTINGS_KEYS = {
   language: 'grocery-buddy:language',
   currency: 'grocery-buddy:currency',
+  // Also read by the inline pre-paint scripts in index.html and
+  // public/login.html.
+  theme: 'grocery-buddy:theme',
 } as const
 
 /**
@@ -26,7 +32,7 @@ export const SETTINGS_KEYS = {
  * still falls back to it in case it loads before the app has migrated.
  */
 export const LEGACY_REGION_KEY = 'grocery-buddy:region'
-const LEGACY_REGIONS: Record<string, Settings> = {
+const LEGACY_REGIONS: Record<string, Pick<Settings, 'language' | 'currency'>> = {
   'en-EUR': { language: 'en', currency: 'EUR' },
   'ru-BYN': { language: 'ru', currency: 'BYN' },
 }
@@ -43,9 +49,10 @@ function read(key: string): string | null {
 function load(): Settings {
   const storedLanguage = read(SETTINGS_KEYS.language)
   const storedCurrency = read(SETTINGS_KEYS.currency)
+  const storedTheme = read(SETTINGS_KEYS.theme)
   const legacyValue = read(LEGACY_REGION_KEY)
 
-  let legacy: Settings | undefined
+  let legacy: Pick<Settings, 'language' | 'currency'> | undefined
   if (legacyValue !== null) {
     legacy = LEGACY_REGIONS[legacyValue]
     if (!legacy) console.error(`Grocery Buddy: unknown saved region ${JSON.stringify(legacyValue)} — ignoring it`)
@@ -60,6 +67,7 @@ function load(): Settings {
   const settings: Settings = {
     language: pick(storedLanguage, isLanguage, legacy?.language ?? DEFAULT_LANGUAGE, 'language'),
     currency: pick(storedCurrency, isCurrency, legacy?.currency ?? DEFAULT_CURRENCY, 'currency'),
+    theme: pick(storedTheme, isTheme, DEFAULT_THEME, 'theme'),
   }
 
   // One-time migration of the old combined setting: write the split values
@@ -82,8 +90,13 @@ const listeners = new Set<() => void>()
 
 function applyToDocument(settings: Settings) {
   document.documentElement.lang = LANGUAGES[settings.language].htmlLang
+  applyTheme(settings.theme)
 }
 applyToDocument(current)
+// "Same as device" has to follow the device switching while the app is open.
+onDeviceThemeChange(() => {
+  if (current.theme === 'system') applyTheme('system')
+})
 
 /**
  * Applies `changes` immediately, then persists them. If persisting fails the
@@ -105,6 +118,10 @@ export function setLanguage(language: Language): void {
 
 export function setCurrency(currency: Currency): void {
   update({ currency })
+}
+
+export function setTheme(theme: Theme): void {
+  update({ theme })
 }
 
 export function getSettings(): Settings {
@@ -139,4 +156,5 @@ export function useCurrencySetting(): Currency {
   return useSyncExternalStore(subscribe, getCurrency)
 }
 
-export { CURRENCIES, LANGUAGES }
+export { CURRENCIES, LANGUAGES, THEMES }
+export type { Theme }

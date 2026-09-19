@@ -4,6 +4,31 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Log in — Grocery Buddy</title>
+    <script>
+      // The app's saved Theme setting, applied before first paint. Same logic
+      // as the script in index.html and applyTheme() in
+      // src/settings/theme.ts — keep the three in step. This page has no
+      // theme-color metas, so only data-theme/color-scheme apply; "Same as
+      // device" also follows the device switching while the page is open.
+      ;(function () {
+        var theme = 'system'
+        try {
+          var saved = localStorage.getItem('grocery-buddy:theme')
+          if (saved === 'light' || saved === 'dark' || saved === 'system') theme = saved
+          else if (saved !== null) console.error('Grocery Buddy: unknown saved theme ' + JSON.stringify(saved) + ' — using the device theme')
+        } catch (err) {
+          console.error('Grocery Buddy: could not read the theme setting — using the device theme', err)
+        }
+        var darkQuery = matchMedia('(prefers-color-scheme: dark)')
+        function apply() {
+          var resolved = theme === 'system' ? (darkQuery.matches ? 'dark' : 'light') : theme
+          document.documentElement.dataset.theme = resolved
+          document.documentElement.style.colorScheme = resolved
+        }
+        apply()
+        if (theme === 'system') darkQuery.addEventListener('change', apply)
+      })()
+    </script>
     <style>
       :root {
         /* Same grayscale palette as src/index.css, duplicated here since
@@ -23,24 +48,25 @@
         --radius: 10px;
         --radius-sm: 6px;
 
-        color-scheme: light dark;
+        color-scheme: light;
         font: 16px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif;
       }
 
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --text: #f3f4f6;
-          --text-muted: rgba(243, 244, 246, 0.6);
-          --bg: #16171d;
-          --surface: #1e1f27;
-          --surface-hover: #262733;
-          --border: #2d2e38;
-          --border-strong: #63646f;
-          --accent: #a1a1aa;
-          --accent-hover: #c3c3ca;
-          --accent-contrast: #16171d;
-          --danger: #f28b82;
-        }
+      /* Keyed on data-theme like src/index.css, set by the script below. */
+      :root[data-theme='dark'] {
+        --text: #f3f4f6;
+        --text-muted: rgba(243, 244, 246, 0.6);
+        --bg: #16171d;
+        --surface: #1e1f27;
+        --surface-hover: #262733;
+        --border: #2d2e38;
+        --border-strong: #63646f;
+        --accent: #a1a1aa;
+        --accent-hover: #c3c3ca;
+        --accent-contrast: #16171d;
+        --danger: #f28b82;
+
+        color-scheme: dark;
       }
 
       * {
@@ -153,8 +179,8 @@
     </main>
 
     <script>
-      // Language: the app's own saved region setting (src/i18n/regionStore.ts,
-      // same localStorage key), mapped to this page's handful of strings —
+      // Language: the app's own saved language setting, mapped to this
+      // page's handful of strings —
       // this page is plain static HTML outside the React app, so it can't
       // import the app's dictionaries.
       const STRINGS = {

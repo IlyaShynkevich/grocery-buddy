@@ -3,7 +3,8 @@ import { CURRENCIES, isCurrency } from '../../i18n/currencies'
 import { isLanguage, LANGUAGES } from '../../i18n/languages'
 import { useT } from '../../i18n'
 import { cardStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
-import { setCurrency, setLanguage, useSettings } from '../../settings/settingsStore'
+import { setCurrency, setLanguage, setTheme, useSettings } from '../../settings/settingsStore'
+import { isTheme, THEMES } from '../../settings/theme'
 import { Mascot } from '../mascot/Mascot'
 import { TagIcon } from '../navigation/icons'
 
@@ -21,7 +22,8 @@ const selectStyle = { minHeight: '2.5rem', minWidth: '9rem' }
 
 /**
  * The app's configuration: language and currency (independent — the
- * currency only decides what new trips use), and the way into Customize.
+ * currency only decides what new trips use), theme, and the way into
+ * Customize.
  */
 export function SettingsPage({ onOpenCustomize }: { onOpenCustomize: () => void }) {
   const messages = useT()
@@ -89,6 +91,25 @@ export function SettingsPage({ onOpenCustomize }: { onOpenCustomize: () => void 
             {messages.settings.currencyHint}
           </p>
         </div>
+
+        <SettingRow label={messages.settings.theme}>
+          <select
+            data-testid="settings-theme"
+            value={settings.theme}
+            onChange={(e) => {
+              const value = e.target.value
+              if (!isTheme(value)) return console.error(`Grocery Buddy: unknown theme picked: ${JSON.stringify(value)}`)
+              apply(() => setTheme(value))
+            }}
+            style={selectStyle}
+          >
+            {THEMES.map((option) => (
+              <option key={option} value={option}>
+                {messages.settings.themeOptions[option]}
+              </option>
+            ))}
+          </select>
+        </SettingRow>
 
         {saveError && (
           <p role="alert" data-testid="settings-save-error" style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>

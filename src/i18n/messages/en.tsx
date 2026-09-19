@@ -249,6 +249,8 @@ export const en = {
     currency: 'Currency',
     currencyOption: (code: string) => (code === 'EUR' ? 'EUR — €' : code === 'BYN' ? 'BYN — Br' : code),
     currencyHint: 'For new trips — saved trips keep their own currency.',
+    theme: 'Theme',
+    themeOptions: { system: 'Same as device', light: 'Light', dark: 'Dark' },
     saveFailed: (message: string) => `Changed for now, but couldn't be saved for next time: ${message}`,
     openCustomize: 'Customize categories',
   },

@@ -246,6 +246,8 @@ export const ru: Messages = {
     currency: 'Валюта',
     currencyOption: (code) => (code === 'EUR' ? 'EUR — €' : code === 'BYN' ? 'BYN — Br' : code),
     currencyHint: 'Для новых покупок — у сохранённых остаётся своя валюта.',
+    theme: 'Тема',
+    themeOptions: { system: 'Как на устройстве', light: 'Светлая', dark: 'Тёмная' },
     saveFailed: (message) => `Изменено, но не сохранится до следующего запуска: ${message}`,
     openCustomize: 'Мои категории',
   },
