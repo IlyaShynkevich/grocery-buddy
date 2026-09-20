@@ -6,7 +6,8 @@ original v1/v2 scope, see
 [`DOCS/grocery-buddy-spec.md`](grocery-buddy-spec.md). For the
 chronological history of every milestone and post-deploy fix, see
 [`DOCS/CHANGELOG.md`](CHANGELOG.md). `CLAUDE.md` has the project's working
-conventions (git workflow, commit format, testing policy).
+conventions (git workflow, commit format, testing policy) and the design
+system's tokens.
 
 ## 1. Architecture overview
 
@@ -22,9 +23,10 @@ Three pieces, two of which never talk to each other directly:
 └─────────────────────────────┘        └──────────────────────────┘        └─────────────┘
 ```
 
-- **The frontend is the whole app.** Shopping list, history, stats, and
-  customize notes are pure client-side Dexie reads/writes — no network
-  call, no server round-trip, ever. This is why they "work completely
+- **The frontend is the whole app.** Shopping list, history, stats,
+  settings and customize notes are pure client-side Dexie reads/writes (or,
+  for device settings, localStorage — see §9) — no network call, no server
+  round-trip, ever. This is why they "work completely
   normally" even when the app has no `OPENAI_API_KEY` at all (demo mode,
   §3/§4/§8) — those features never depended on the server in the first
   place.
@@ -56,10 +58,10 @@ indexed), but adding a new table or a new *indexed* field needs a new
 
 | Table | Key fields | Purpose |
 |---|---|---|
-| `trips` | `id`, `date`, `status` (`draft`\|`complete`), `total`, `completedAt` | One row per shopping trip. Exactly one `draft` trip is ever "active" at a time. |
+| `trips` | `id`, `date`, `status` (`draft`\|`complete`), `total`, `currency`, `completedAt`, `dateFromReceipt` | One row per shopping trip. Exactly one `draft` trip is ever "active" at a time. `currency` is recorded per trip so changing the currency setting never relabels history (§9); `dateFromReceipt` marks a `date` that came off a scanned receipt, so `refreshDraftDate` leaves it alone. |
 | `items` | `id`, `tripId`, `name`, `price`, `category`, `essentialOverride`, `source` (`typed`\|`ai`\|`manual`), `isDiscount` | Line items, typed or AI-extracted, belonging to a trip. |
-| `pendingReceipts` | `id`, `tripId`, `imageBlob`, `status` (`pending`\|`processing`\|`failed`\|`done`), `lastError`, `retryAt`, `stagedItems`, `suggestedMatches`, `reviewed` | The offline-capable receipt queue — see §3. `stagedItems` is the extraction result held for review; nothing in it is an `items` row until Confirm. |
-| `appState` | `key`, `value` | Single-row-per-key pointer table; today only holds `activeTripId`. |
+| `pendingReceipts` | `id`, `tripId`, `imageBlob`, `status` (`pending`\|`processing`\|`failed`\|`done`), `lastError`, `retryAt`, `stagedItems`, `stagedDate`, `suggestedMatches`, `reviewed` | The offline-capable receipt queue — see §3. `stagedItems`/`stagedDate` are the extraction result held for review; nothing in either is written to `items` or to the trip until Confirm. `imageBlob` is optional only on a processed receipt restored from a v2+ backup, which drops photos that have served their purpose. |
+| `appState` | `key`, `value` | Single-row-per-key pointer table: `activeTripId` (below) and the `cleanup:savedTripReceipts:v1` ran-once marker for the one-time photo cleanup (§3). |
 | `categoryNotes` | `id`, `categoryKey`, `text` | Freeform personal notes per category, written on Customize — see §3/§4. |
 
 **Active trip identity is a persisted pointer, not a heuristic.** `items`
@@ -132,7 +134,8 @@ per-category breakdown both exactly reconciled with the trip total; not
 doing this was a real production bug.
 
 **Backup & restore** ([`src/db/backup.ts`](../src/db/backup.ts), UI in
-`BackupSection.tsx` on History) is the one escape hatch against IndexedDB
+`BackupSection.tsx` on **Settings** — it lived on History until the
+Settings page existed) is the one escape hatch against IndexedDB
 being wiped (cache clear, uninstall, switching phones) — there's no
 server-side copy of anything. Export builds a single JSON document from
 every table above (`trips`, `items`, `categoryNotes`, `pendingReceipts`,
@@ -149,6 +152,26 @@ restore itself is additive: `bulkPut` (upsert by id) for every table inside
 one transaction, never a wipe-and-replace, and only runs after an explicit
 two-step confirm in the UI showing what the file contains.
 
+The backup file carries its own `schemaVersion`, currently **3**, and
+import is backward-compatible across all of them: v1 is the original
+shape; v2 stopped copying the photos of already-processed receipts (they
+have served their purpose, and they were 99.9% of a 101.6MB export — see
+`DOCS/CHANGELOG.md`), keeping only the photos of receipts that still need
+processing; v3 added each trip's `currency`, with v1/v2 files importing as
+EUR. Every photo in a file is validated before anything is written (it must
+be an image data URL, and is required unless the receipt is already
+processed), so a malformed file fails loudly up front rather than leaving a
+receipt whose missing photo gets fetched as a relative URL later. A
+processed receipt restored without a photo renders an explicit "no photo"
+tile. A file claiming a `schemaVersion` newer than this build understands
+is rejected outright.
+
+**Device settings are deliberately *not* in the database or in backups**
+(§9): language, currency and theme are properties of the device, whereas
+the data that depends on them — each trip's own `currency` — is stored on
+the trip itself, which is what makes a restore onto a differently-configured
+phone still correct.
+
 ## 3. Receipt extraction flow, end to end
 
 1. **Typed items** — `ShoppingListPage` writes `Item` rows directly
@@ -160,7 +183,16 @@ two-step confirm in the UI showing what the file contains.
    `captureReceipt()` in `useReceiptCapture.ts`, which adds a
    `PendingReceipt` (`status: 'pending'`) with the photo stored as a `Blob`
    **directly in IndexedDB** — no upload happens yet. This is what makes
-   capture itself fully offline-capable (§5).
+   capture itself fully offline-capable (§5). The photo is shrunk to at
+   most 1600px on its longest side *at this point*
+   (`prepareReceiptPhoto.ts`), not at request time: 1600px is the most the
+   extraction request has ever sent, so nothing the AI could use is lost,
+   and the expensive full-resolution decode then happens once at capture
+   instead of on every processing attempt (measured: a 12.5MP photo goes
+   3.8MB → ~0.32MB stored, processing 975ms → 369ms, memory peak +67MB →
+   +15MB). A JPEG already within that size is kept byte-for-byte rather
+   than re-encoded, so a later upload adds no second lossy pass. A photo
+   that can't be read produces a visible error and nothing is stored.
 3. **Processing trigger** — three independent triggers all funnel into the
    same `processReceipt()`: a manual Process/Retry click, `ReceiptRow`'s
    own per-row `setTimeout` (scheduled from a parsed rate-limit wait, see
@@ -174,20 +206,25 @@ two-step confirm in the UI showing what the file contains.
    in under 40 seconds.
 4. **Request** — `getCategoryNoteHints()` (`db.ts`) reads all
    `categoryNotes` grouped by category. `extractReceiptItems()`
-   (`extractReceipt.ts`, frontend) resizes/re-encodes the photo client-side
-   via `<canvas>` (max 1600px edge, JPEG quality 0.8) — phone photos plus
-   base64's ~37% size overhead can otherwise exceed Vercel's 4.5MB function
-   body limit — then `POST`s `{ image, notes }` to `/api/extract-receipt`
-   (`notes` omitted entirely when empty, so a user with no notes sends
-   the exact same request shape as before personalization existed).
+   (`extractReceipt.ts`, frontend) `POST`s `{ image, notes }` to
+   `/api/extract-receipt` (`notes` omitted entirely when empty, so a user
+   with no notes sends the exact same request shape as before
+   personalization existed). The photo needs no resizing here any more —
+   it was already shrunk at capture (step 2), which is what keeps the
+   request under Vercel's 4.5MB function body limit once base64's ~37%
+   overhead is added.
 5. **Server** — `api/extract-receipt.ts` validates the body and checks
    `OPENAI_API_KEY`. Missing key → the demo-mode response (§4/§8), not a
    500. Otherwise it calls `extractReceiptItems()` in
    `api/_lib/openaiExtract.ts`, the actual OpenAI client (see §4 for the
    request/response details and error taxonomy).
-6. **Items are staged, not written** — extracted items are held on the
-   `PendingReceipt` row itself (`stagedItems: Omit<Item, 'id'>[]`), *not*
-   written to `items` yet. The shopping list is purely the user's own typed
+6. **Items *and the purchase date* are staged, not written** — extracted
+   items are held on the `PendingReceipt` row itself (`stagedItems:
+   Omit<Item, 'id'>[]`), *not* written to `items` yet, and the receipt's
+   own purchase date is held alongside them (`stagedDate`, ISO
+   `YYYY-MM-DD`) rather than applied to the trip. A date the model read but
+   that couldn't be parsed is kept as raw text (`stagedDateRaw`) and shown
+   as a warning, deliberately not dropped. The shopping list is purely the user's own typed
    notes plus whatever's been explicitly confirmed from a scan — a scan
    that's dismissed, or a receipt that's deleted before ever being
    confirmed, never touched `items` at all. Editing a staged price or
@@ -210,21 +247,41 @@ two-step confirm in the UI showing what the file contains.
    not-yet-`reviewed` receipt, collapsed by default (a compact total +
    Confirm; the full item-by-item list, with editable prices, only on
    request). Lets the user edit/remove a staged line and answer each
-   suggested match, but none of that is acted on until **Confirm**:
-   `confirmReview` (in a single Dexie transaction) deletes the typed
-   duplicate for any match answered "yes", `bulkAdd`s the surviving staged
-   items into `items`, and recomputes the trip total. **Dismiss**
+   suggested match, and correct the purchase date, but none of that is acted
+   on until **Confirm**: `confirmReview` (in a single Dexie transaction)
+   deletes the typed duplicate for any match answered "yes", `bulkAdd`s the
+   surviving staged items into `items`, writes the staged date onto the
+   trip (setting `dateFromReceipt` so `refreshDraftDate` stops resetting it
+   to today on the next load), and recomputes the trip total. **Dismiss**
    (`dismissReview`) instead just discards `stagedItems` — zero `items`
    writes, as if the scan never happened. Deleting the receipt photo
    (`removeReceipt`) needs no special-case cleanup for this either: the
    staged items live on that same row, so deleting it discards them too.
-9. **Save trip** — `completeTrip()` marks the trip `complete` and
-   immediately creates+pins a fresh empty draft as the new active trip.
-   Disabled (with a visible explanation, not just greyed out) while any
-   receipt for the active trip is `done` and not yet `reviewed` — otherwise
-   a still-staged scan would go nowhere: completing the trip switches the
-   active-trip pointer, and the review panel only ever surfaces the active
-   trip's pending receipt.
+9. **Save trip** — `completeTrip()` marks the trip `complete`, deletes
+   that trip's receipt rows and their photos, and immediately creates+pins
+   a fresh empty draft as the new active trip — all in one transaction. The
+   deletion is the point at which a scanned photo stops being needed: a
+   saved trip's receipts are never shown again, and keeping them was what
+   grew IndexedDB to ~76MB on the real device.
+
+   Two independent gates, both with a visible explanation rather than a
+   greyed-out button: it is disabled while any receipt for the active trip
+   is `done` and not yet `reviewed` (a still-staged scan would otherwise go
+   nowhere — completing the trip switches the active-trip pointer, and the
+   review panel only ever surfaces the active trip's pending receipt), and
+   while any receipt is still unprocessed. `completeTrip` re-checks the
+   same condition itself (`isReceiptFinished`) and refuses, writing
+   nothing, if a caller bypasses the UI gate — so the photo can never be
+   deleted while it still has a job to do.
+
+10. **One-time cleanup of the backlog** — receipts saved *before* step 9
+    existed are cleaned up once on app load by `receiptCleanup.ts`
+    (`ReceiptCleanupNotice` at the App root), in a single transaction with
+    a ran-once marker in `appState` so a failure rolls back fully and
+    retries next load rather than half-running. It only ever touches
+    finished receipts on completed trips — never pending, processing,
+    failed or open-review ones, and never anything on a draft trip — and
+    reports what it removed, or fails visibly.
 
 ## 4. AI integration specifics
 
@@ -243,6 +300,19 @@ read small receipt text rather than a downsampled thumbnail). `temperature:
 constrain output, `max_completion_tokens: 4500` (receipts with many line
 items need real headroom to avoid getting cut off mid-generation — see
 truncation handling below).
+
+**The prompt covers German, Russian and Belarusian receipts**, since the
+app is bilingual (§9) and the receipts are not necessarily in either UI
+language: it names the total/VAT lines to skip, treats a "Скидка" line as a
+discount the same way it treats a German one, and keeps product names
+exactly as printed rather than translating them. It also extracts a
+top-level `purchaseDate`, parsed server-side into ISO (day-first, 2-digit
+year = 20YY, a trailing time or "г." ignored, impossible dates rejected). A
+date the model read but that can't be parsed comes back as
+`purchaseDateRaw` — the raw text, not an English sentence — so the
+user-facing message can be built in the app's own language; a
+`purchaseDate` that is malformed in the response shape fails the extraction
+rather than being quietly ignored.
 
 **Personalization stays out of the static prompt.** `SYSTEM_PROMPT` is a
 fixed module-level string — it never changes per request. Category notes
@@ -324,7 +394,8 @@ network-level request in the first place.
 **What works fully offline**: viewing/editing the shopping list, adding
 items, capturing a receipt photo (stored straight into IndexedDB as a
 `Blob`, no upload attempted at capture time), and browsing History, Stats,
-and Customize — all pure local Dexie reads.
+Settings and Customize — all pure local Dexie reads, or localStorage for
+the settings themselves (§9).
 
 **What requires connectivity**: only the actual OpenAI extraction call. A
 receipt captured offline just sits at `status: 'pending'` in the queue;
@@ -334,20 +405,32 @@ trips (not just the active one) and processes them one at a time, reusing
 the exact same extraction/retry path as a manual click.
 
 **Installability**: the Web App Manifest (name, icons, `display:
-'standalone'`, theme/background colors matching the app's dark UI) is
-generated by the same `vite-plugin-pwa` config — "Add to Home Screen" on
+'standalone'`, theme/background colors) is generated by the same
+`vite-plugin-pwa` config. The browser/status-bar colour is *not* fixed to
+one theme: `index.html` carries one `theme-color` meta per theme and the
+theme setting decides which applies (§9) — "Add to Home Screen" on
 mobile gets a real app-like launch with no browser chrome, no app store
 involved.
 
 ## 6. Navigation/tab system
 
 `App.tsx` owns all navigation as a single `view` union type
-(`shopping`/`history`/`stats`/`customize`/`trip-detail`/`home`/`about`).
-`TAB_ORDER` (the 4 main tabs) is the single source of truth for both the
-tab bar's rendering order and swipe direction — Home and About are
-deliberately excluded from it: they're corner icons reached only by
-tapping, never swiped to, and don't participate in the tab-persistence
-scheme below the same way.
+(`shopping`/`history`/`stats`/`settings`/`trip-detail`/`customize`/`home`/
+`about`). `TAB_ORDER` — the 4 main tabs, **Shopping List, History, Stats,
+Settings** — is the single source of truth for both the tab bar's rendering
+order and swipe direction. The nav bar shows six icons: those four in the
+middle, with Home (top-left) and About (top-right) as corner icons
+deliberately excluded from `TAB_ORDER`, reached only by tapping, never
+swiped to, and not participating in the tab-persistence scheme below the
+same way. The active button is marked with `aria-current="page"`.
+
+**Two views are sub-pages, not tabs**: `trip-detail` (reached from
+History) and `customize` (reached from a button on Settings). Each keeps
+its parent tab highlighted rather than showing no active tab, and each has
+its own back button. Customize *was* a top-level tab before Settings
+existed, so `readStoredTab()` maps a leftover `'customize'` value in
+`localStorage['grocery-buddy:activeTab']` onto Settings rather than
+failing to match it and silently falling back to Shopping List.
 
 **Two independent storage mechanisms, two different lifetimes**:
 
@@ -404,12 +487,33 @@ List (`ReceiptCapture.tsx`): `scanning` while any pending receipt is
 idle`) is deliberate, so an in-flight or just-succeeded scan is never
 covered up by an older failure sitting alongside it. Every other page just
 renders `<Mascot pose="..." />` with a fixed pose and no hook involved:
-Home (`thumbsup`) and About (`thankyou`) show it large and centered as a
-page-level illustration; History (`receiptfound`), Stats (`onit`), and
-Customize (`excited`) show it small (32px) inline next to the `<h1>` — kept
-small on those three specifically so it doesn't push list/chart/accordion
-content down (Customize in particular needs all 11 categories to fit one
-screen without scrolling).
+Home (`thumbsup`, 150px) and About (`thankyou`, 96px) show it large and
+centered as a page-level illustration; History (`receiptfound`), Stats
+(`onit`), Settings (`excited`) and Customize (`excited`) show it small
+(32px) inline next to the `<h1>` — kept small on those four specifically so
+it doesn't push list/chart/accordion content down (Customize in particular
+needs all 11 categories to fit one screen without scrolling).
+
+**Only the two large ones animate.** `.gb-mascot-hop` (`index.css`) gives
+Home's and About's mascot an idle hop every 3.2s — crouch, stretch, landing
+squash, overshoot — pivoting on `transform-origin: bottom center`, since
+the character is a paper bag standing on its flat base. It is `transform`
+only and never a layout property, because every page here is tuned to fit
+one screen with a few px to spare (§7's `layout-fit` spec) and a hop that
+changed the document height would push the footer off-screen once per
+cycle. The class sits on the element that carries Home's secret triple-tap
+handler rather than on an inner wrapper: hit-testing follows a transform,
+so the tap target travels with the mascot instead of being left behind at
+the resting position. It is disabled by the same
+`prefers-reduced-motion` block as `.gb-tab-slide`/`.gb-pulse`/`.gb-toast`,
+and deliberately not applied to the 32px title-row mascots, where motion
+would sit next to data being read.
+
+**Debug tools is hidden behind a gesture.** The DB Debug Panel renders only
+on Shopping List, and only when switched on for the *session* by three
+quick taps on the Home mascot (`debugTools.ts`, a `sessionStorage` flag),
+with a toast confirming each toggle. It deliberately advertises nothing —
+no button role, no pointer cursor, no tap feedback on the mascot.
 
 ## 7. Testing approach
 
@@ -440,13 +544,37 @@ specific error-taxonomy branches from §4).
 
 **`e2e/fixtures.ts`** is a thin wrapper around `test`/`expect` that
 pre-seeds the `homeSeenThisSession` sessionStorage flag (§6) before every
-test's first navigation. It exists so the ~20 existing specs — all written
-before Home existed, all assuming `page.goto('/')` lands directly on
-Shopping List — didn't need their test bodies touched when Home shipped;
+test's first navigation. It exists so the specs that predate Home — all
+of which assume `page.goto('/')` lands directly on Shopping List — didn't
+need their test bodies touched when Home shipped;
 only their import line moved from `@playwright/test` to `./fixtures`.
 Specs that need the real, unseeded fresh-launch path (`home.spec.ts`)
 import straight from `@playwright/test` instead, deliberately bypassing the
-fixture.
+fixture. It also exposes a `debugTools` test option, **off by default so it
+matches the real app** (§6); the specs that drive the DB Debug Panel opt in
+with `test.use({ debugTools: true })` rather than performing the tap
+gesture.
+
+**Layout is a tested property, not an eyeballed one.** `layout-fit.spec.ts`
+drives every page at a 393x777 viewport — the target phone's usable area —
+in **both English and Russian**, with worst-case content (all 11 categories
+in Stats, 12 trips over 2 months in History, Settings with its storage
+figures loaded), and asserts nothing overflows, no label wraps onto a
+second line, and nothing pushes the page sideways. Russian runs 15–25%
+longer than English, so a change that fits in one language routinely
+doesn't in the other. Several pages have only single-digit pixels of slack,
+so any change that adds height is expected to be measured against this spec
+rather than estimated — see `CLAUDE.md`'s design-system section for the
+current budget.
+
+**Anything claimed to be invisible or non-disturbing gets mutation-tested.**
+Two assertions in `mascot-hop.spec.ts` were written, passed, and were then
+found to be incapable of failing: a "no layout shift" check that measured
+only page height (which a centred `flex: 1` section absorbs without
+moving), and a timing check written as a *fraction* of the animation cycle
+(which is identical at any duration, since keyframe offsets are
+percentages). Both were rewritten and re-checked against the broken code
+they were supposed to reject. See `CLAUDE.md`'s "Known gotchas".
 
 ## 8. Deployment setup
 
@@ -510,3 +638,57 @@ raising the function's own limit, Vercel's platform default (10s on Hobby,
 15s on Pro) would kill the function first on a genuinely slow (not
 rate-limited) OpenAI response, before that 25s abort ever gets a chance to
 produce a real error message.
+
+## 9. Settings, language and theming
+
+Three device settings — **language**, **currency** and **theme** — live in
+`localStorage`, each under its own key
+(`src/settings/settingsStore.ts`'s `SETTINGS_KEYS`), read **synchronously**
+so the very first render is already correct rather than flashing the wrong
+language. They are deliberately *not* in Dexie and *not* in backups (§2):
+they describe this device, whereas the data that depends on them — each
+trip's own `currency` — is recorded on the trip.
+
+**Language and currency are independent, and used to be one setting.** The
+original `grocery-buddy:region` key paired them (`en-EUR` / `ru-BYN`), so
+choosing Russian also switched new trips to BYN. `load()` migrates a
+leftover region value into the two new keys on startup; a failure to write
+the migrated values is logged and retried rather than silently discarded,
+and `public/login.html` falls back to reading the old key in case it loads
+before the app has ever run the migration.
+
+**i18n** (`src/i18n/`) is a typed dictionary, not a runtime lookup service.
+`messages/en.ts` is the source of truth for the *shape*: every other
+language's dictionary is typed against it, so a missing or misspelled key
+is a compile error rather than a blank string on screen. Entries are
+functions where a string needs interpolation or plural agreement, which is
+what lets Russian carry real plural forms instead of English-shaped ones.
+Prices and dates format through the active language, with the currency
+always passed in as an argument and never inferred from the language.
+Debug tools is deliberately left untranslated.
+
+**Currency never relabels history.** `Trip.currency` is fixed when the trip
+is created; changing the setting affects only trips created afterwards. The
+one exception is the current draft, which follows the setting until it
+holds its first priced item and then locks — the point past which
+re-labelling would change what the recorded numbers mean. Stats totals each
+currency separately, with a note when a month contains more than one.
+
+**Theme** (`src/settings/theme.ts`) is `light` / `dark` / `system`. Dark
+values are keyed on `:root[data-theme='dark']` rather than on
+`prefers-color-scheme` directly, which is what lets an explicit choice
+override the device; `system` resolves against the media query and keeps
+following it live while the app is open. `applyTheme()` sets three things:
+`data-theme`, `color-scheme` (native form controls and scrollbars), and
+which of the `theme-color` metas applies, so the browser/status bar colour
+follows the choice too.
+
+**The pre-paint script is duplicated on purpose, and has to be kept in
+step.** The same resolve-and-apply logic exists three times: inline in
+`index.html`'s `<head>`, inline in `public/login.html`'s `<head>`, and in
+`theme.ts`. The two inline copies run before first paint — that is the
+entire point, since a React-side effect would paint the default theme
+first and then correct it, which is visible as a flash. `login.html` needs
+its own copy because it is a standalone static file outside the Vite build
+(it has to be reachable before any app asset loads, see §8), which is also
+why it carries its own copy of the colour palette.
