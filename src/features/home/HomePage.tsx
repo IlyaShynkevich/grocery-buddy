@@ -64,8 +64,22 @@ export function HomePage({ onShop }: HomePageProps) {
     >
       <h1 style={displayStyle}>Grocery Buddy</h1>
       {/* Negative margin pulls the mascot right up under the title, reading
-          as "standing just below it" rather than floating with its own gap. */}
-      <div data-testid="home-mascot" onClick={handleMascotTap} style={{ marginTop: `-${space.md}`, touchAction: 'manipulation' }}>
+          as "standing just below it" rather than floating with its own gap.
+
+          The idle hop (index.css) goes on this element rather than on an
+          inner wrapper deliberately: this is also the secret triple-tap
+          target, and hit-testing follows a transform, so animating the
+          element the handler is on keeps the tap target exactly under the
+          mascot you can see. Animating an inner wrapper instead would have
+          left the target behind at the resting position while the mascot
+          was in the air. e2e/mascot-hop.spec.ts taps it at the top of the
+          arc to hold that. */}
+      <div
+        data-testid="home-mascot"
+        className="gb-mascot-hop"
+        onClick={handleMascotTap}
+        style={{ marginTop: `-${space.md}`, touchAction: 'manipulation' }}
+      >
         <Mascot pose="thumbsup" size={150} />
       </div>
       <button

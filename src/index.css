@@ -279,10 +279,62 @@ summary {
   100% { opacity: 0; }
 }
 
+/*
+ * The mascot's idle hop, on the two pages where it is a large, centred
+ * character rather than a small title-row accent (Home and About). Mostly
+ * still, then one hop: crouch, stretch, landing squash, overshoot, settle.
+ * The crouch before the jump is what makes it read as intent rather than
+ * as the image jittering, and every squash conserves volume (wider when
+ * shorter) so it reads as a physical object rather than a stretched image.
+ *
+ * The character is a paper bag standing on its flat base, so the pivot is
+ * `transform-origin: bottom center` — it pushes off the ground it is
+ * standing on.
+ *
+ * transform only, never a layout property: the pages in this app are tuned
+ * to fit one 393x777 screen with very little slack, and a hop that changed
+ * the document height would push the footer off-screen every 3.2 seconds.
+ * e2e/mascot-hop.spec.ts samples the page height across the whole cycle to
+ * hold that.
+ *
+ * The 1.33s the hop itself takes is fixed by the keyframes below; the
+ * cycle length is what sets how long it waits between hops. At 3.2s that
+ * is ~1.9s of stillness — see e2e/mascot-hop.spec.ts, which pins the
+ * arithmetic so a future duration change can't silently turn this into a
+ * continuous bounce.
+ */
+.gb-mascot-hop {
+  display: inline-block;
+  transform-origin: bottom center;
+  animation: gb-mascot-hop 3.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes gb-mascot-hop {
+  0%,
+  58.4%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  65% {
+    transform: translateY(0) scale(1.07, 0.93);
+  }
+  73.75% {
+    transform: translateY(-13%) scale(0.95, 1.06);
+  }
+  82.5% {
+    transform: translateY(0) scale(1.08, 0.92);
+  }
+  91.25% {
+    transform: translateY(0) scale(0.985, 1.015);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gb-tab-slide,
   .gb-pulse,
-  .gb-toast {
+  .gb-toast,
+  .gb-mascot-hop {
     animation: none !important;
   }
 }

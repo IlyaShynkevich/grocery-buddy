@@ -36,8 +36,10 @@ export function AboutPage() {
       </div>
 
       {/* Same negative-margin-under-the-title treatment as HomePage's
-          mascot, for a consistent "standing just below it" read. */}
-      <div style={{ marginTop: `-${space.md}` }}>
+          mascot, for a consistent "standing just below it" read — and the
+          same idle hop, since this is the other page where the mascot is a
+          large centred character rather than a small title-row accent. */}
+      <div data-testid="about-mascot" className="gb-mascot-hop" style={{ marginTop: `-${space.md}` }}>
         <Mascot pose="thankyou" size={96} />
       </div>
 
