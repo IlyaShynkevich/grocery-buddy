@@ -33,6 +33,11 @@ section is just a short index into it.
   hairline-divided rows rather than a stack of bordered cards — see
   "Known gotchas" for what that means for anything that styled itself by
   overriding a card's border.
+- **Mascot idle hop**: the large centred mascot on Home and About hops
+  every 3.2s (`.gb-mascot-hop` in `src/index.css`). Transform only, gated
+  on `prefers-reduced-motion`, and deliberately not applied to the small
+  title-row mascots. Chosen by comparing seven CSS-only idle treatments on
+  a throwaway `?mascot=1` page, since removed.
 - **Password gate**: the Production deployment (not the public demo) is
   gated behind a shared password, enforced server-side via a Vercel Edge
   Middleware (`middleware.ts`) — see `DOCS/ARCHITECTURE.md` §8 and the
@@ -136,6 +141,19 @@ App.tsx's bottom group is exactly the remaining slack.
   border added 2px to a selected row and shunted every row below it down.
   Anything asserting on computed `borderColor` is now measuring the
   grouped-list hairline, not the state.
+
+- **"No layout shift" is not proved by measuring page height alone.** Home
+  and About are centred `flex: 1` sections with hundreds of px of spare
+  room, so they absorb a stray margin without the document height or the
+  footer moving — only the content inside them shifts. A mutation check
+  caught `e2e/mascot-hop.spec.ts` passing against exactly that bug; it now
+  also snapshots every sibling element's box across the animation. Same
+  applies to anything else claiming not to disturb a layout.
+- **A test asserting a *fraction* of a CSS animation's cycle cannot detect
+  a duration change.** Keyframe offsets are percentages, so the still/
+  moving ratio is identical at 1.8s and at 7s. The mascot hop's timing
+  assertions are in milliseconds for that reason — a fraction-based one
+  passed happily against a frantic 1.8s bounce.
 
 ## Commands
 

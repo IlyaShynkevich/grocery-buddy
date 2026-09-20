@@ -1525,3 +1525,56 @@ summary of each milestone below and points back here for details.
   - `public/login.html` carries its own copy of the palette (it is a
     standalone static file outside the Vite build) and was brought onto
     the same tokens, font stack and radii.
+- **Mascot idle hop on Home and About**: the mascot was completely static,
+  which read as dead on the one screen where it is the whole composition.
+  Seven CSS-only idle treatments (breathing, weight shift, occasional hop,
+  wander, float, crinkle, peek) were built behind a throwaway `?mascot=1`
+  comparison page and judged on a real phone. The subtle options —
+  breathing, weight shift, float — read as nothing at all at arm's length.
+  Wander had real presence but moves the mascot ~60px horizontally, which
+  also moves the secret triple-tap Debug tools target, so it was out. The
+  hop won, but its original 7s cycle meant it was rarely seen.
+  - `.gb-mascot-hop` in `src/index.css`: crouch, stretch, landing squash,
+    overshoot, settle. `transform-origin: bottom center`, since the
+    character is a paper bag standing on its flat base and pushes off the
+    ground it is standing on. Every squash conserves volume (wider when
+    shorter) so it reads as a physical object, not a stretched image.
+  - **Cycle set to 3.2s, not the 3.0s originally asked for.** The hop's own
+    motion is fixed by the keyframes at 1.33s, so the cycle length is
+    purely how long it waits in between. At 3.0s that leaves 1.67s of
+    stillness — only 1.26x the hop's own length, at which point the hop
+    stops reading as an interruption of stillness and starts reading as
+    half of an alternating rhythm. 3.2s leaves 1.87s (1.4x) and still lands
+    inside "roughly every 3 seconds". Judged off a frame strip sampling
+    3.0 / 3.2 / 3.6s at 100ms, not estimated.
+  - Applied to Home and About — the two pages where the mascot is a large
+    centred character — and deliberately not to the 32px title-row mascots
+    on Shopping List, History, Stats, Settings and Customize, where motion
+    would sit next to data being read.
+  - The hop is on the element that carries the triple-tap handler, not an
+    inner wrapper. Hit-testing follows a transform, so the tap target
+    travels with the mascot; animating an inner wrapper would have left the
+    target behind at the resting position while the mascot was in the air.
+  - Added to `index.css`'s existing `prefers-reduced-motion` block
+    alongside `.gb-tab-slide` / `.gb-pulse` / `.gb-toast`.
+  - New `e2e/mascot-hop.spec.ts`: the mascot actually leaves the ground and
+    squashes (asserted on the computed transform matrix, not on a class
+    name); the cycle's timing; reduced motion disabling it; no layout shift
+    on either page; the triple-tap gesture working both while animating and
+    pinned at the top of the arc; and the title-row mascots staying still.
+  - `src/features/mascot-lab/` and its `main.tsx` ternary deleted in the
+    same change — none of the comparison page ships.
+  - **Two of those tests were written wrong first and only found by
+    mutation-testing them** (deliberately breaking the code to check the
+    test fails). Both were passing against code they were supposed to
+    reject:
+    - The "no layout shift" test measured document height and footer
+      position. Home is a centred `flex: 1` section with ~300px of spare
+      room, so giving the mascot a `margin-bottom` at the top of its arc
+      moved neither — it only shoved the CTA down. It now also snapshots
+      every sibling element's box at every point in the cycle.
+    - The timing test asserted the still *fraction* of the cycle. Keyframe
+      offsets are percentages, so that fraction is identical at 1.8s and at
+      7s; the test passed against a frantic 1.8s bounce. It now asserts the
+      gap and the hop's own duration in milliseconds, and was re-checked
+      against both 1.8s and 7s to confirm it rejects them.
