@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { runReceiptCleanupOnce, type ReceiptCleanupResult } from '../../db/receiptCleanup'
 import { useT } from '../../i18n'
 import type { Messages } from '../../i18n/messages/en'
-import { cardStyle, PAGE_MAX_WIDTH } from '../../lib/ui'
+import { cardStyle, footnoteStyle, PAGE_MAX_WIDTH, space } from '../../lib/ui'
 
 type NoticeState = { kind: 'done'; result: ReceiptCleanupResult } | { kind: 'error'; message: string } | null
 
@@ -45,15 +45,20 @@ export function ReceiptCleanupNotice() {
       data-testid={isError ? 'receipt-cleanup-error' : 'receipt-cleanup-notice'}
       style={{
         ...cardStyle,
+        ...footnoteStyle,
         display: 'flex',
         alignItems: 'flex-start',
-        gap: '0.6rem',
-        width: 'calc(100% - 2rem)',
-        maxWidth: `calc(${PAGE_MAX_WIDTH}px - 2rem)`,
-        margin: '0.75rem auto 0',
-        fontSize: '0.85rem',
+        gap: space.md,
+        width: `calc(100% - ${space.xl} * 2)`,
+        maxWidth: `calc(${PAGE_MAX_WIDTH}px - ${space.xl} * 2)`,
+        margin: `${space.lg} auto 0`,
         textAlign: 'left',
-        ...(isError ? { borderColor: 'var(--danger)', color: 'var(--danger)' } : {}),
+        // cardStyle's edge is a box-shadow ring, not a border, so the
+        // failure state has to restate the whole shadow to turn that ring
+        // red — overriding `borderColor` (as this did while cards had a
+        // 1px border) would now silently do nothing and a cleanup failure
+        // would read as an ordinary notice.
+        ...(isError ? { boxShadow: '0 0 0 1px var(--danger)', color: 'var(--danger)' } : {}),
       }}
     >
       <span style={{ flex: 1 }}>
@@ -66,7 +71,7 @@ export function ReceiptCleanupNotice() {
         data-testid="receipt-cleanup-dismiss"
         aria-label={messages.common.dismiss}
         onClick={() => setNotice(null)}
-        style={{ padding: '0.25rem 0.5rem', lineHeight: 1 }}
+        style={{ padding: `${space.xs} ${space.md}`, lineHeight: 1, background: 'transparent', border: 'none', color: 'inherit' }}
       >
         ✕
       </button>

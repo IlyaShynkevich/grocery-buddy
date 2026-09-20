@@ -3,7 +3,7 @@ import type { PendingReceipt } from '../../db/db'
 import { useT } from '../../i18n'
 import { formatDateTime } from '../../lib/formatDate'
 import { IconChip } from '../../lib/IconChip'
-import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
+import { calloutStyle, captionStyle, cardStyle, footnoteStyle, iconButtonStyle, listGroupStyle, listRowStyle, mutedTextStyle, pageStyle, primaryButtonStyle, space } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { useMascotPose } from '../mascot/useMascotPose'
 import { perfArmNextReceipt, perfMark, perfNewReceiptMilestone } from '../perf/perfLog'
@@ -82,23 +82,16 @@ export function ReceiptCapture() {
 
   return (
     <section data-testid="receipt-capture" style={pageStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: space.lg }}>
         <div>
-          <h2 style={{ fontSize: '1.1rem' }}>{messages.capture.title}</h2>
+          <h2>{messages.capture.title}</h2>
 
-          <div style={{ position: 'relative', display: 'inline-block', marginTop: '0.6rem' }}>
+          <div style={{ position: 'relative', display: 'inline-block', marginTop: space.lg }}>
             <button
               type="button"
               data-testid="receipt-add-button"
               onClick={() => setMenuOpen((open) => !open)}
-              style={{
-                padding: '0.5rem 0.9rem',
-                fontWeight: 600,
-                background: 'var(--accent)',
-                color: 'var(--accent-contrast)',
-                border: '1px solid var(--accent)',
-                borderRadius: 'var(--radius-sm)',
-              }}
+              style={primaryButtonStyle}
             >
               {messages.capture.addPhoto}
             </button>
@@ -114,25 +107,24 @@ export function ReceiptCapture() {
                   data-testid="receipt-source-menu"
                   style={{
                     position: 'absolute',
-                    top: 'calc(100% + 0.4rem)',
+                    top: `calc(100% + ${space.sm})`,
                     left: 0,
                     zIndex: 2,
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '0.35rem',
+                    gap: space.sm,
                     background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius)',
-                    padding: '0.4rem',
+                    borderRadius: 'var(--radius-lg)',
+                    padding: space.sm,
                     minWidth: '13rem',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                    boxShadow: '0 0 0 1px var(--separator), 0 8px 20px rgba(0, 0, 0, 0.18)',
                   }}
                 >
                   <button
                     type="button"
                     data-testid="receipt-camera-option"
                     onClick={() => openPicker(cameraInputRef.current, 'Camera tap')}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left', width: '100%' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: space.md, textAlign: 'left', width: '100%' }}
                   >
                     <IconChip src="/icons/icon-camera.png" />
                     {messages.capture.camera}
@@ -141,7 +133,7 @@ export function ReceiptCapture() {
                     type="button"
                     data-testid="receipt-gallery-option"
                     onClick={() => openPicker(galleryInputRef.current, 'Photos tap')}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textAlign: 'left', width: '100%' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: space.md, textAlign: 'left', width: '100%' }}
                   >
                     <IconChip src="/icons/icon-gallery.png" />
                     {messages.capture.gallery}
@@ -183,7 +175,7 @@ export function ReceiptCapture() {
       />
 
       {captureError && (
-        <p role="alert" data-testid="receipt-capture-error" style={{ color: 'var(--danger)', marginTop: '0.75rem' }}>
+        <p role="alert" data-testid="receipt-capture-error" style={{ ...footnoteStyle, color: 'var(--danger)', marginTop: space.lg }}>
           {captureError}
         </p>
       )}
@@ -192,7 +184,7 @@ export function ReceiptCapture() {
         <div
           role="status"
           data-testid={photoPhase === 'waiting' ? 'receipt-waiting-for-photo' : 'receipt-preparing-photo'}
-          style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.75rem' }}
+          style={{ ...cardStyle, ...calloutStyle, display: 'flex', alignItems: 'center', gap: space.lg, marginTop: space.lg }}
         >
           <span className="gb-pulse" style={{ flex: 1 }}>
             {photoPhase === 'waiting' ? messages.capture.waiting : messages.capture.preparing}
@@ -207,7 +199,7 @@ export function ReceiptCapture() {
               data-testid="receipt-waiting-dismiss"
               aria-label={messages.capture.stopWaiting}
               onClick={() => setPhotoPhase(null)}
-              style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
+              style={{ ...iconButtonStyle, background: 'transparent', border: 'none', color: 'var(--text-muted)' }}
             >
               ✕
             </button>
@@ -216,13 +208,10 @@ export function ReceiptCapture() {
       )}
 
       {pendingReceipts.length === 0 && !photoPhase && (
-        <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>{messages.capture.empty}</p>
+        <p style={{ ...footnoteStyle, ...mutedTextStyle, marginTop: space.lg }}>{messages.capture.empty}</p>
       )}
 
-      <ul
-        style={{ listStyle: 'none', padding: 0, margin: '0.75rem 0 0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
-        data-testid="receipt-list"
-      >
+      <ul className="gb-group" style={{ ...listGroupStyle, marginTop: space.lg }} data-testid="receipt-list">
         {pendingReceipts.map((receipt) => (
           <ReceiptRow
             key={receipt.id}
@@ -291,19 +280,19 @@ function ReceiptRow({
     <li
       data-testid="receipt-item"
       data-status={receipt.status}
-      style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.75rem' }}
+      style={{ ...listRowStyle, gap: space.lg }}
     >
       <ReceiptThumbnail
         blob={receipt.imageBlob}
         onLoad={() => perfNewReceiptMilestone('thumbnail', receipt.capturedAt, 'thumbnail loaded')}
       />
       <div style={{ flex: 1 }}>
-        <div data-testid="receipt-status">{statusText}</div>
-        <div data-testid="receipt-timestamp" style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
+        <div data-testid="receipt-status" style={calloutStyle}>{statusText}</div>
+        <div data-testid="receipt-timestamp" style={{ ...captionStyle, ...mutedTextStyle }}>
           {formatDateTime(receipt.capturedAt)}
         </div>
         {receipt.status === 'failed' && receipt.lastError && (
-          <div data-testid="receipt-error" style={{ fontSize: '0.75rem', color: demoMode ? 'var(--text-muted)' : 'var(--danger)' }}>
+          <div data-testid="receipt-error" style={{ ...captionStyle, color: demoMode ? 'var(--text-muted)' : 'var(--danger)' }}>
             {getUserFacingErrorMessage(receipt.lastError, receipt.lastErrorStatus)}
           </div>
         )}
@@ -321,7 +310,12 @@ function ReceiptRow({
           {receipt.status === 'failed' ? messages.capture.retry : messages.capture.process}
         </button>
       )}
-      <button type="button" onClick={() => onRemove(receipt.id)} aria-label={messages.capture.removeReceipt} style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}>
+      <button
+        type="button"
+        onClick={() => onRemove(receipt.id)}
+        aria-label={messages.capture.removeReceipt}
+        style={{ ...iconButtonStyle, background: 'transparent', border: 'none', color: 'var(--text-muted)' }}
+      >
         ✕
       </button>
     </li>

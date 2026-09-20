@@ -1,6 +1,6 @@
 import packageJson from '../../../package.json'
 import { useT } from '../../i18n'
-import { mutedTextStyle, PAGE_MAX_WIDTH } from '../../lib/ui'
+import { captionStyle, PAGE_MAX_WIDTH, space, subtleTextStyle } from '../../lib/ui'
 
 // Placeholder mascot — same shopping-bag glyph already used for the
 // favicon/app icons (see public/favicon.svg). Swap this one path for real
@@ -16,15 +16,15 @@ export function Footer() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: '0.75rem',
+        gap: space.lg,
         // Matches every other page section's capped width (see pageStyle) —
         // an earlier deliberate full-bleed treatment was reverted since it
         // read as inconsistent with the rest of the app's content width.
         width: '100%',
         maxWidth: PAGE_MAX_WIDTH,
         margin: '0 auto',
-        padding: '0.75rem 1rem',
-        borderTop: '1px solid var(--border)',
+        padding: `${space.lg} ${space.xl}`,
+        borderTop: '1px solid var(--separator)',
       }}
     >
       <img
@@ -34,7 +34,7 @@ export function Footer() {
         height={32}
         style={{ borderRadius: 'var(--radius-sm)' }}
       />
-      <div style={{ ...mutedTextStyle, textAlign: 'right', fontSize: '0.75rem', lineHeight: 1.4 }}>
+      <div style={{ ...captionStyle, ...subtleTextStyle, textAlign: 'right' }}>
         <div>Ilya Shynkevich</div>
         <div data-testid="app-footer-version">v{packageJson.version}</div>
       </div>

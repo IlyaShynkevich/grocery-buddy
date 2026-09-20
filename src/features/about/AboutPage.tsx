@@ -1,6 +1,6 @@
 import packageJson from '../../../package.json'
 import { useT } from '../../i18n'
-import { PAGE_MAX_WIDTH, mutedTextStyle } from '../../lib/ui'
+import { PAGE_MAX_WIDTH, calloutStyle, captionStyle, displayStyle, footnoteStyle, mutedTextStyle, space, subtleTextStyle } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 
 // Reached only via the top-right About icon (outside the swipeable tab set,
@@ -20,24 +20,24 @@ export function AboutPage() {
         justifyContent: 'center',
         // Tuned (with the mascot size and list line-height below) so the whole
         // page fits a 393x777 phone viewport in both English and Russian.
-        gap: '0.85rem',
+        gap: space.lg,
         width: '100%',
         maxWidth: PAGE_MAX_WIDTH,
         margin: '0 auto',
-        padding: '1rem 1rem',
+        padding: space.xl,
         textAlign: 'center',
       }}
     >
       <div>
-        <h1 style={{ fontSize: '1.75rem' }}>Grocery Buddy</h1>
-        <p data-testid="about-version" style={{ ...mutedTextStyle, fontSize: '0.8rem', marginTop: '0.2rem' }}>
+        <h1 style={displayStyle}>Grocery Buddy</h1>
+        <p data-testid="about-version" style={{ ...footnoteStyle, ...subtleTextStyle, marginTop: space.xs }}>
           v{packageJson.version}
         </p>
       </div>
 
       {/* Same negative-margin-under-the-title treatment as HomePage's
           mascot, for a consistent "standing just below it" read. */}
-      <div style={{ marginTop: '-0.5rem' }}>
+      <div style={{ marginTop: `-${space.md}` }}>
         <Mascot pose="thankyou" size={96} />
       </div>
 
@@ -46,14 +46,13 @@ export function AboutPage() {
       <ul
         data-testid="about-description"
         style={{
+          ...calloutStyle,
           textAlign: 'left',
-          fontSize: '0.9rem',
-          lineHeight: 1.4,
           margin: 0,
-          paddingLeft: '1.1rem',
+          paddingLeft: space.xl,
           display: 'flex',
           flexDirection: 'column',
-          gap: '0.4rem',
+          gap: space.sm,
         }}
       >
         {messages.about.features.map((feature) => (
@@ -61,13 +60,13 @@ export function AboutPage() {
         ))}
       </ul>
 
-      <p style={{ fontSize: '0.85rem' }}>Ilya Shynkevich</p>
+      <p style={{ ...footnoteStyle, fontWeight: 500 }}>Ilya Shynkevich</p>
 
-      <p data-testid="about-access" style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
+      <p data-testid="about-access" style={{ ...captionStyle, ...mutedTextStyle }}>
         {messages.about.access}
       </p>
 
-      <p data-testid="about-planned" style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
+      <p data-testid="about-planned" style={{ ...captionStyle, ...subtleTextStyle }}>
         {messages.about.planned}
       </p>
     </section>

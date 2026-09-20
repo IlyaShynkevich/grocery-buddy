@@ -3,22 +3,72 @@
      highlights, focus rings, active nav) are distinguished purely by
      lightness/shade, not by introducing color. */
   --text: #1a1a1a;
-  --text-muted: rgba(26, 26, 26, 0.62);
+  --text-muted: rgba(26, 26, 26, 0.6);
+  /* A third, quieter text tier below --text-muted, for the lowest-priority
+     labels (footer byline/version, "estimate" notes). Three tiers — full,
+     muted, subtle — are what let hierarchy come from weight and colour
+     rather than from more font sizes. */
+  --text-subtle: rgba(26, 26, 26, 0.42);
   --bg: #ffffff;
-  --surface: #f5f5f6;
-  --surface-hover: #ebebec;
-  --border: #e0e0e0;
+  --surface: #f1f1f4;
+  --surface-hover: #e7e7ec;
+  --border: #e3e3e8;
   --border-strong: #b7b7bc;
+  /* Hairline *inside* a surface (the rules between rows of a grouped list).
+     Translucent, not a solid colour, so one token works on --bg and on
+     --surface alike without a second variable per theme. */
+  --separator: rgba(26, 26, 26, 0.1);
+  /* Cards carry an edge without a layout-affecting border: a sub-pixel ring
+     plus one soft shadow. Swapping the 1px border for this is what paid for
+     the extra breathing room elsewhere on the tightest pages. */
+  --shadow-card: 0 0 0 0.5px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.04);
   --accent: #3f3f46;
   --accent-hover: #27272a;
   --accent-contrast: #ffffff;
   --danger: #c62828;
   --danger-contrast: #ffffff;
+
+  /* Corner radii: one step per component size. Controls (buttons, inputs,
+     selects) share --radius; cards and panels are rounder. */
+  --radius-lg: 14px;
   --radius: 10px;
-  --radius-sm: 6px;
+  --radius-sm: 8px;
+
+  /* Spacing scale. Every gap/margin/padding in the app comes from these —
+     src/lib/ui.ts re-exports them as `space` for the inline style objects,
+     so there is exactly one place these numbers are defined. */
+  --space-2xs: 2px;
+  --space-xs: 4px;
+  --space-sm: 6px;
+  --space-md: 8px;
+  --space-lg: 12px;
+  --space-xl: 16px;
+  --space-2xl: 20px;
+  --space-3xl: 24px;
+
+  /* Type scale. Six steps, each with one job — hierarchy beyond that comes
+     from weight (700/600/400) and from the three text colour tiers, not
+     from inventing more sizes. src/lib/ui.ts exposes each as a ready-made
+     style object (titleStyle, headingStyle, ...). */
+  --text-display: 1.75rem; /* 28px — Home/About wordmark */
+  --text-title: 1.625rem; /* 26px — page <h1> */
+  --text-heading: 1.0625rem; /* 17px — section <h2> */
+  --text-body: 1rem; /* 16px — default */
+  --text-callout: 0.9375rem; /* 15px — dense list rows */
+  --text-footnote: 0.8125rem; /* 13px — hints, secondary lines */
+  --text-caption: 0.75rem; /* 12px — the quietest labels */
 
   color-scheme: light;
-  font: 16px/1.45 system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* -apple-system/BlinkMacSystemFont put San Francisco first on Apple
+     devices; Segoe UI Variable Text then Segoe UI on Windows; Roboto on
+     Android. All four have full, well-fitted Cyrillic, which matters since
+     every screen also renders in Russian. */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', system-ui, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: var(--text-body);
+  line-height: 1.45;
+  /* Matches the weight Apple platforms render UI text at; on Windows and
+     Android this property is ignored, so nothing regresses there. */
+  -webkit-font-smoothing: antialiased;
   color: var(--text);
   background: var(--bg);
 }
@@ -30,12 +80,17 @@
    it in sync after that. Each token is defined exactly once per theme. */
 :root[data-theme='dark'] {
   --text: #f3f4f6;
-  --text-muted: rgba(243, 244, 246, 0.6);
+  --text-muted: rgba(243, 244, 246, 0.58);
+  --text-subtle: rgba(243, 244, 246, 0.4);
   --bg: #16171d;
-  --surface: #1e1f27;
-  --surface-hover: #262733;
+  --surface: #212229;
+  --surface-hover: #2a2b34;
   --border: #2d2e38;
   --border-strong: #63646f;
+  --separator: rgba(243, 244, 246, 0.11);
+  /* A drop shadow is invisible on a dark background, so a card's edge here
+     is the lighter --surface plus a faint light ring instead. */
+  --shadow-card: 0 0 0 0.5px rgba(255, 255, 255, 0.06);
   --accent: #a1a1aa;
   --accent-hover: #c3c3ca;
   --accent-contrast: #16171d;
@@ -74,16 +129,47 @@ body {
   min-height: 100svh;
 }
 
+/* The type scale's headings, so a page doesn't have to restate a size
+   inline. Larger text gets tighter leading and tighter tracking — the
+   optical correction that keeps a big title from reading loose and a small
+   one from reading cramped. */
 h1,
 h2,
 h3 {
-  font-weight: 600;
-  letter-spacing: -0.01em;
   margin: 0;
+}
+
+h1 {
+  font-size: var(--text-title);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.021em;
+}
+
+h2 {
+  font-size: var(--text-heading);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: var(--text-callout);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.006em;
 }
 
 p {
   margin: 0;
+}
+
+/* A grouped list: one card holding rows divided by hairlines, instead of a
+   stack of separate bordered cards with gaps between them. Quieter to look
+   at, and it reclaims every inter-row gap — which is what makes the rest of
+   this type/spacing scale fit on pages that had only a few px to spare. */
+.gb-group > * + * {
+  border-top: 1px solid var(--separator);
 }
 
 a {
@@ -92,11 +178,14 @@ a {
 
 button {
   font: inherit;
+  /* Medium, not regular: enough weight for a control to read as tappable
+     without the shoutiness of semibold on every button in the app. */
+  font-weight: 500;
   color: inherit;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.5rem 0.9rem;
+  border-radius: var(--radius);
+  padding: var(--space-md) 14px;
   cursor: pointer;
   transition:
     background-color 0.15s ease,
@@ -126,8 +215,8 @@ select {
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius);
+  padding: var(--space-md) var(--space-lg);
 }
 
 input::placeholder {

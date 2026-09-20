@@ -27,6 +27,12 @@ section is just a short index into it.
   history's internally-scrollable trip list with a sticky month header, and
   several Groq extraction reliability fixes (429 handling, retry-backoff
   races, output-token truncation).
+- **Visual design pass**: a type scale, a spacing scale and a quieter card
+  treatment across every screen (`src/index.css` tokens +
+  `src/lib/ui.ts` style objects). Lists are now one card with
+  hairline-divided rows rather than a stack of bordered cards — see
+  "Known gotchas" for what that means for anything that styled itself by
+  overriding a card's border.
 - **Password gate**: the Production deployment (not the public demo) is
   gated behind a shared password, enforced server-side via a Vercel Edge
   Middleware (`middleware.ts`) — see `DOCS/ARCHITECTURE.md` §8 and the
@@ -39,6 +45,39 @@ section is just a short index into it.
 See "Known limitations" and "Planned" below for what's still outstanding.
 For the full narrative — what broke, how it was diagnosed, and exactly what
 changed — see `DOCS/CHANGELOG.md`.
+
+## Design system
+
+Nothing picks its own font size, spacing step or radius. `src/index.css`
+defines the tokens (`--text-*`, `--space-*`, `--radius*`, the colour
+palette); `src/lib/ui.ts` re-exports them as ready-made style objects
+(`titleStyle`, `headingStyle`, `calloutStyle`, `footnoteStyle`,
+`captionStyle`, `space`, `cardStyle`, `listGroupStyle`, `listRowStyle`,
+`numericStyle`, …) for the inline style objects the app is written in.
+Reach for an existing step; don't add `0.35rem`.
+
+- **Type**: six steps — display 28 / title 26 / heading 17 / body 16 /
+  callout 15 / footnote 13 / caption 12. Hierarchy past that is weight
+  (700/600/500/400) and the three text colour tiers (`--text`,
+  `--text-muted`, `--text-subtle`), not more sizes. `index.css` already
+  styles bare `h1`/`h2`/`h3` from the scale, so a page shouldn't restate a
+  size inline.
+- **Spacing**: 2/4/6/8/12/16/20/24px as `--space-2xs` … `--space-3xl`.
+- **Cards**: a fill plus `--shadow-card` (a 0.5px ring), never a `border`.
+  A list is one `listGroupStyle` card with `className="gb-group"` and
+  `listRowStyle` rows, hairline-divided by `--separator` — not a stack of
+  separate cards.
+- **Palette**: grayscale only, no accent hue. Destructive red
+  (`--danger`) is the one exception and is a safety convention, not
+  decoration.
+- **Numbers**: money and byte figures carry `numericStyle`
+  (`tabular-nums`) so columns line up. Running text does not.
+
+Every page is tuned to fit one 393x777 screen in both languages
+(`e2e/layout-fit.spec.ts`). Before changing anything that adds height,
+know the budget: the tightest pages are **Settings (9px)** and **About
+(21px EN)**. Measure, don't estimate — the resolved `margin-top: auto` on
+App.tsx's bottom group is exactly the remaining slack.
 
 ## Known limitations
 
@@ -88,6 +127,15 @@ changed — see `DOCS/CHANGELOG.md`.
   network-level request). Any future server-side check gets the same
   treatment for free, since it's the navigation strategy that changed, not
   something specific to this one gate.
+- **A card's edge is a `box-shadow`, not a `border` — so overriding
+  `borderColor` to signal a state does nothing at all, silently.** Two
+  places styled an error/selected state exactly that way and had to be
+  converted to restate the whole ring as a `box-shadow`
+  (`ReceiptCleanupNotice`'s failure state, `TripDetailPage`'s selected
+  row). The `box-shadow` form is also the right one on its own merits: a
+  border added 2px to a selected row and shunted every row below it down.
+  Anything asserting on computed `borderColor` is now measuring the
+  grouped-list hairline, not the state.
 
 ## Commands
 

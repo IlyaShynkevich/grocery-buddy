@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useT } from '../../i18n'
 import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
-import { cardStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
+import { calloutStyle, footnoteStyle, listGroupStyle, listRowStyle, mutedTextStyle, numericStyle, pageStyle, space } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { groupTripsByMonth, useHistory } from './useHistory'
 
@@ -18,8 +18,8 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
     <section data-testid="history-page" style={pageStyle}>
       {/* The month filter shares the title row (its label kept for screen
           readers): on its own row it pushed the page past one phone screen. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <h1 style={{ fontSize: '1.5rem', marginRight: 'auto' }}>{messages.history.title}</h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: space.md }}>
+        <h1 style={{ marginRight: 'auto' }}>{messages.history.title}</h1>
         {groups.length > 1 && (
           <select
             data-testid="history-month-select"
@@ -40,35 +40,44 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
         <Mascot pose="receiptfound" size={32} />
       </div>
 
-      {trips.length === 0 && <p style={{ ...mutedTextStyle, marginTop: '0.75rem' }}>{messages.history.empty}</p>}
+      {trips.length === 0 && <p style={{ ...mutedTextStyle, marginTop: space.lg }}>{messages.history.empty}</p>}
 
       {/*
         Fixed max-height, not an unbounded page: without this, a long
         history pushes Debug tools/the footer down and off-screen, requiring
         the whole page to scroll. 35.5rem (568px at the default root font
-        size) is sized to fit exactly 10 trip rows plus one month header —
-        measured live (not guessed) against a real npm run preview build:
-        cardStyle's actual rendered row height is 44.375px, the list's row
-        gap is 8px, and a month header (with its own 8px margin-bottom) plus
-        the group wrapper's 1rem top margin adds 49.5px of fixed overhead
-        above the rows (sticky, see below, doesn't change how much space it
-        occupies — only whether it's pinned). 49.5 + 10*44.375 + 9*8 =
-        565.25px; 568px leaves a few px of slack. It was 7 rows (25.75rem)
-        while Backup & restore sat below this list; that moved to Settings,
-        and at 393x777 the list now has 582px before the footer would be
-        pushed off-screen (measured, both languages) — an 11th row would
-        need 617.6px. Row height/gap/overhead were re-measured live for this
-        change rather than assumed unchanged, since a guess here previously
-        shorted the container by a full row. max-height (not height) so
-        fewer trips, or a month-filtered view with few trips, still render
-        at their natural height with no forced scrollbar/dead space; only
-        content taller than that clips and scrolls internally. The heading, "No saved trips yet"
-        message, and month filter above stay outside this container so
-        they're always visible without scrolling.
+        size) is the page's whole remaining height budget — measured live
+        against a real `npm run preview` build at 393x777, in both
+        languages, not guessed.
+
+        What fits in it, with the current grouped-list row metrics
+        (re-measured live for the design pass, since a month's trips are now
+        hairline-divided rows of one card rather than separate cards with an
+        8px gap between them — a guess here previously shorted the container
+        by a full row):
+
+          row height                45px
+          hairline between rows      1px   -> 46px per row after the first
+          month header              22.1px + 6px margin-bottom
+          group wrapper margin-top  16px
+          fixed overhead per month  = 16 + 22.1 + 6 = 44.1px
+
+        One month, 11 rows: 44.1 + 45 + 10*46 = 549.1px, inside 568. A 12th
+        row would need 595.1px, so 11 is the boundary — e2e's
+        history-improvements.spec.ts asserts exactly that (11 fits, 12
+        scrolls). It was 10 while rows were separate cards, and 7 before
+        Backup & restore moved off this page to Settings.
+
+        max-height (not height) so fewer trips, or a month-filtered view
+        with few trips, still render at their natural height with no forced
+        scrollbar/dead space; only content taller than that clips and
+        scrolls internally. The heading, "No saved trips yet" message, and
+        month filter above stay outside this container so they're always
+        visible without scrolling.
       */}
       <div data-testid="history-list-scroll" style={{ maxHeight: '35.5rem', overflowY: 'auto' }}>
         {visibleGroups.map((group) => (
-          <div key={group.key} data-testid="history-month-group" data-month-key={group.key} style={{ marginTop: '1rem' }}>
+          <div key={group.key} data-testid="history-month-group" data-month-key={group.key} style={{ marginTop: space.xl }}>
             {/*
               position: sticky (not static) — the standard "swapping section
               header" pattern (contact lists, calendars): each month's header
@@ -85,14 +94,15 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
             */}
             <h2
               data-testid="history-month-header"
-              style={{ fontSize: '1.1rem', margin: '0 0 0.5rem', position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}
+              style={{ margin: `0 0 ${space.sm}`, position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 1 }}
             >
               {group.label}
             </h2>
-            <ul
-              style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
-              data-testid="history-list"
-            >
+            {/* One card per month, rows divided by hairlines — not a card
+                per trip with gaps between them. Same information, far less
+                edge-drawing, and it gives the month back the ~8px of gap
+                each row used to cost. */}
+            <ul className="gb-group" style={listGroupStyle} data-testid="history-list">
               {group.trips.map((trip) => (
                 <li key={trip.id}>
                   <button
@@ -100,13 +110,13 @@ export function HistoryPage({ onSelectTrip }: { onSelectTrip: (tripId: number) =
                     data-testid="history-trip"
                     data-trip-id={trip.id}
                     onClick={() => onSelectTrip(trip.id)}
-                    style={{ ...cardStyle, display: 'flex', justifyContent: 'space-between', width: '100%', textAlign: 'left' }}
+                    style={{ ...listRowStyle, ...calloutStyle, justifyContent: 'space-between', background: 'transparent', border: 'none', borderRadius: 0 }}
                   >
                     <span>
                       {formatDate(trip.date)}
                       {trip.store ? ` — ${trip.store}` : ''}
                     </span>
-                    <span style={mutedTextStyle}>
+                    <span style={{ ...footnoteStyle, ...mutedTextStyle, ...numericStyle, whiteSpace: 'nowrap' }}>
                       {messages.history.tripSummary(trip.itemCount, formatPrice(trip.total, trip.currency))}
                     </span>
                   </button>

@@ -3,7 +3,7 @@ import { BackupValidationError, backupFileName, buildBackup, downloadBackup, par
 import { useT } from '../../i18n'
 import type { Messages } from '../../i18n/messages/en'
 import { IconChip } from '../../lib/IconChip'
-import { cardStyle, dangerButtonStyle, dangerFilledButtonStyle, mutedTextStyle } from '../../lib/ui'
+import { cardStyle, dangerButtonStyle, dangerFilledButtonStyle, footnoteStyle, mutedTextStyle, space } from '../../lib/ui'
 
 function describeErr(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -96,17 +96,17 @@ export function BackupSection() {
   }
 
   return (
-    <section data-testid="backup-section" style={{ ...cardStyle, marginTop: '0.75rem' }}>
-      <h2 style={{ fontSize: '1.05rem', marginBottom: '0.25rem' }}>{messages.backup.title}</h2>
-      <p style={{ ...mutedTextStyle, fontSize: '0.8rem', marginBottom: '0.6rem' }}>{messages.backup.intro}</p>
+    <section data-testid="backup-section" style={{ ...cardStyle, marginTop: space.lg }}>
+      <h2>{messages.backup.title}</h2>
+      <p style={{ ...footnoteStyle, ...mutedTextStyle, margin: `${space.xs} 0 ${space.lg}` }}>{messages.backup.intro}</p>
 
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: space.md, flexWrap: 'wrap' }}>
         <button
           type="button"
           data-testid="backup-export-button"
           onClick={handleExport}
           disabled={exporting}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          style={{ display: 'flex', alignItems: 'center', gap: space.md }}
         >
           <IconChip src="/icons/icon-export.png" />
           {exporting ? messages.backup.exporting : messages.backup.exportData}
@@ -116,7 +116,7 @@ export function BackupSection() {
           data-testid="backup-import-button"
           onClick={handleChooseFile}
           disabled={importing}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          style={{ display: 'flex', alignItems: 'center', gap: space.md }}
         >
           <IconChip src="/icons/icon-import.png" />
           {messages.backup.importData}
@@ -133,19 +133,19 @@ export function BackupSection() {
       />
 
       {exportError && (
-        <p role="alert" data-testid="backup-export-error" style={{ color: 'var(--danger)', marginTop: '0.6rem' }}>
+        <p role="alert" data-testid="backup-export-error" style={{ ...footnoteStyle, color: 'var(--danger)', marginTop: space.md }}>
           {messages.backup.exportFailed(exportError)}
         </p>
       )}
 
       {importError && (
-        <p role="alert" data-testid="backup-import-error" style={{ color: 'var(--danger)', marginTop: '0.6rem' }}>
+        <p role="alert" data-testid="backup-import-error" style={{ ...footnoteStyle, color: 'var(--danger)', marginTop: space.md }}>
           {messages.backup.importFailed(importError)}
         </p>
       )}
 
       {importSuccess && (
-        <p data-testid="backup-import-success" style={{ marginTop: '0.6rem' }}>
+        <p data-testid="backup-import-success" style={{ ...footnoteStyle, marginTop: space.md }}>
           {importSuccess}
         </p>
       )}
@@ -154,17 +154,17 @@ export function BackupSection() {
         <div
           data-testid="backup-import-confirm"
           style={{
-            background: 'var(--surface)',
+            background: 'var(--bg)',
             border: '1px solid var(--danger)',
             borderRadius: 'var(--radius)',
-            padding: '0.6rem 0.75rem',
-            marginTop: '0.6rem',
+            padding: `${space.lg} ${space.lg}`,
+            marginTop: space.md,
           }}
         >
-          <p style={{ marginBottom: '0.6rem' }}>
+          <p style={{ marginBottom: space.lg }}>
             {messages.backup.confirmRestore(pendingImport.fileName, summarizeBackup(messages, pendingImport.backup))}
           </p>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: space.md }}>
             <button
               type="button"
               data-testid="backup-import-confirm-yes"

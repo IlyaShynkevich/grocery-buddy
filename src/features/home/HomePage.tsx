@@ -3,7 +3,7 @@ import { toggleDebugTools } from '../debug/debugTools'
 import { Mascot } from '../mascot/Mascot'
 import { showToast } from '../toast/toastStore'
 import { useT } from '../../i18n'
-import { PAGE_MAX_WIDTH, primaryButtonStyle } from '../../lib/ui'
+import { displayStyle, PAGE_MAX_WIDTH, primaryButtonStyle, space } from '../../lib/ui'
 
 /** Max gap between taps of the Debug tools gesture (3 taps on the mascot). */
 const SECRET_TAP_GAP_MS = 1500
@@ -54,25 +54,25 @@ export function HomePage({ onShop }: HomePageProps) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '1.25rem',
+        gap: space['2xl'],
         width: '100%',
         maxWidth: PAGE_MAX_WIDTH,
         margin: '0 auto',
-        padding: '2rem 1rem',
+        padding: `${space['3xl']} ${space.xl}`,
         textAlign: 'center',
       }}
     >
-      <h1 style={{ fontSize: '1.75rem' }}>Grocery Buddy</h1>
+      <h1 style={displayStyle}>Grocery Buddy</h1>
       {/* Negative margin pulls the mascot right up under the title, reading
           as "standing just below it" rather than floating with its own gap. */}
-      <div data-testid="home-mascot" onClick={handleMascotTap} style={{ marginTop: '-0.5rem', touchAction: 'manipulation' }}>
+      <div data-testid="home-mascot" onClick={handleMascotTap} style={{ marginTop: `-${space.md}`, touchAction: 'manipulation' }}>
         <Mascot pose="thumbsup" size={150} />
       </div>
       <button
         type="button"
         data-testid="home-shop-button"
         onClick={onShop}
-        style={{ ...primaryButtonStyle, padding: '0.75rem 1.75rem', fontSize: '1rem' }}
+        style={{ ...primaryButtonStyle, padding: `${space.lg} ${space['3xl']}`, borderRadius: 999 }}
       >
         {messages.home.cta}
       </button>

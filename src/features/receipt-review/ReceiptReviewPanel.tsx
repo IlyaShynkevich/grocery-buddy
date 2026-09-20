@@ -5,7 +5,7 @@ import type { Item } from '../../db/db'
 import { categoryLabel, useT } from '../../i18n'
 import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
-import { mutedTextStyle, PAGE_MAX_WIDTH, primaryButtonStyle } from '../../lib/ui'
+import { calloutStyle, captionStyle, footnoteStyle, headingStyle, iconButtonStyle, mutedTextStyle, numericStyle, PAGE_MAX_WIDTH, primaryButtonStyle, space } from '../../lib/ui'
 import { useReceiptReview } from './useReceiptReview'
 
 /**
@@ -144,36 +144,36 @@ export function ReceiptReviewPanel() {
       style={{
         width: '100%',
         maxWidth: PAGE_MAX_WIDTH,
-        margin: '0.75rem auto',
-        padding: '1rem',
+        margin: `${space.lg} auto`,
+        padding: space.xl,
         background: 'var(--surface)',
-        border: '1px solid var(--border-strong)',
-        borderRadius: 'var(--radius)',
+        // A stronger ring than an ordinary card's: this panel is asking for
+        // a decision, so it should read as raised above the page.
+        boxShadow: '0 0 0 1px var(--border-strong)',
+        borderRadius: 'var(--radius-lg)',
         textAlign: 'left',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 data-testid="receipt-review-title" style={{ fontSize: '1.1rem' }}>
-          {title}
-        </h2>
+        <h2 data-testid="receipt-review-title">{title}</h2>
         <button
           type="button"
           data-testid="receipt-review-dismiss"
           aria-label={messages.review.dismiss}
           onClick={dismissReview}
-          style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
+          style={{ ...iconButtonStyle, background: 'transparent', border: 'none', color: 'var(--text-muted)' }}
         >
           ✕
         </button>
       </div>
 
       {matches.length > 0 && (
-        <ul style={{ listStyle: 'none', padding: 0, margin: '0.75rem 0' }}>
+        <ul className="gb-group" style={{ listStyle: 'none', padding: 0, margin: `${space.lg} 0` }}>
           {matches.map((match) => (
             <li
               key={match.typedItemId}
               data-testid="receipt-review-match"
-              style={{ padding: '0.5rem 0', borderBottom: '1px solid var(--border)' }}
+              style={{ padding: `${space.lg} 0` }}
             >
               <div>
                 {messages.review.matchQuestion(
@@ -182,7 +182,7 @@ export function ReceiptReviewPanel() {
                   formatPrice(match.stagedItem.price, tripCurrency),
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem' }}>
+              <div style={{ display: 'flex', gap: space.md, marginTop: space.md }}>
                 <button
                   type="button"
                   data-testid="receipt-review-match-yes"
@@ -206,14 +206,14 @@ export function ReceiptReviewPanel() {
 
       <div
         data-testid="receipt-review-summary"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', margin: '0.75rem 0' }}
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: space.lg, margin: `${space.lg} 0` }}
       >
         <span style={{ display: 'flex', flexDirection: 'column' }}>
-          <span data-testid="receipt-review-total" style={{ fontWeight: 700 }}>
+          <span data-testid="receipt-review-total" style={{ ...headingStyle, ...numericStyle, fontWeight: 700 }}>
             {messages.common.total(formatPrice(total, tripCurrency))}
           </span>
           {shownDate && (
-            <span data-testid="receipt-review-date" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
+            <span data-testid="receipt-review-date" style={{ ...footnoteStyle, ...mutedTextStyle }}>
               {messages.review.date(formatDate(shownDate))}
             </span>
           )}
@@ -222,12 +222,12 @@ export function ReceiptReviewPanel() {
       </div>
 
       {unreadableDate && (
-        <p role="alert" data-testid="receipt-review-date-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
+        <p role="alert" data-testid="receipt-review-date-error" style={{ ...footnoteStyle, color: 'var(--danger)', margin: `0 0 ${space.lg}` }}>
           {messages.review.dateUnreadable(unreadableDate)}
         </p>
       )}
       {dateSaveError && (
-        <p role="alert" data-testid="receipt-review-date-save-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
+        <p role="alert" data-testid="receipt-review-date-save-error" style={{ ...footnoteStyle, color: 'var(--danger)', margin: `0 0 ${space.lg}` }}>
           {messages.review.dateSaveFailed(dateSaveError)}
         </p>
       )}
@@ -237,13 +237,13 @@ export function ReceiptReviewPanel() {
         open={isOpen}
         onToggle={(e) => setIsOpen(e.currentTarget.open)}
       >
-        <summary data-testid="receipt-review-toggle" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
+        <summary data-testid="receipt-review-toggle" style={{ ...footnoteStyle, ...mutedTextStyle }}>
           {isOpen ? messages.review.hideItems : messages.review.showItems}
         </summary>
 
         {shownDate && (
           <label
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.75rem' }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space.md, marginTop: space.lg }}
           >
             {messages.review.purchaseDate}
             {/* keyed by receipt so the next queued receipt's review re-seeds it */}
@@ -251,18 +251,18 @@ export function ReceiptReviewPanel() {
           </label>
         )}
 
-        <ul style={{ listStyle: 'none', padding: 0, margin: '0.75rem 0' }} data-testid="receipt-review-items">
+        <ul className="gb-group" style={{ listStyle: 'none', padding: 0, margin: `${space.lg} 0` }} data-testid="receipt-review-items">
           {addedItems.map(({ stagedIndex, item }) => {
             const essential = resolveEssential(item)
             return (
               <li
                 key={stagedIndex}
                 data-testid="receipt-review-item"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0', borderBottom: '1px solid var(--border)' }}
+                style={{ ...calloutStyle, display: 'flex', alignItems: 'center', gap: space.md, padding: `${space.md} 0` }}
               >
                 <span style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <span>{item.name}</span>
-                  <span style={{ ...mutedTextStyle, fontSize: '0.75rem' }}>
+                  <span style={{ ...captionStyle, ...mutedTextStyle }}>
                     {categoryLabel(messages, item.category)} ·{' '}
                     {essential ? messages.common.essential : messages.common.nonEssential}
                   </span>
@@ -273,7 +273,7 @@ export function ReceiptReviewPanel() {
                   data-testid="receipt-review-item-remove"
                   aria-label={messages.common.remove(item.name)}
                   onClick={() => removeItem(stagedIndex)}
-                  style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
+                  style={{ ...iconButtonStyle, background: 'transparent', border: 'none', color: 'var(--text-muted)' }}
                 >
                   ✕
                 </button>
@@ -282,7 +282,7 @@ export function ReceiptReviewPanel() {
           })}
         </ul>
 
-        {isOpen && <div style={{ marginTop: '0.5rem' }}>{confirmButton}</div>}
+        {isOpen && <div style={{ marginTop: space.md }}>{confirmButton}</div>}
       </details>
     </section>
   )
