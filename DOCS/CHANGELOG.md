@@ -1441,6 +1441,238 @@ summary of each milestone below and points back here for details.
     `TripDetailPage`'s clickable item rows are plain `<li>`s with no
     press feedback of their own — worth a look if tapping one ever feels
     unresponsive on a real device.
+- **Hide the visible scrollbar app-wide, keep scrolling functional**: done
+  and verified in production. The visible scrollbar track/thumb read as
+  "web page" rather than "installed app".
+  - `scrollbar-width: none` added to `index.css`'s existing universal `*`
+    rule, plus a new `*::-webkit-scrollbar { display: none }` rule. The
+    universal selector covers `html`/`body` and every internally-scrollable
+    container — History's `history-list-scroll` div included — plus any
+    future one, automatically.
+  - Only the rendering is suppressed, never scrolling itself: verified with
+    8 saved trips (forcing History's container into overflow) that computed
+    `scrollbar-width` is `none` on both `body` and the container, that
+    `scrollTop` still moves freely, and that the list visibly scrolls with
+    no track or thumb anywhere.
+- **Receipt purchase date extracted and applied to the trip on Confirm**:
+  done and verified in production. A scanned trip was dated "today"
+  whatever the receipt said, so a receipt scanned the next morning landed
+  on the wrong day.
+  - The extraction prompt and response gained a top-level `purchaseDate`,
+    parsed server-side into ISO (day-first, 2-digit year = 20YY, trailing
+    time ignored, impossible dates rejected).
+  - An unparseable date is reported as `purchaseDateError` rather than
+    dropped, and a malformed `purchaseDate` in the API response fails the
+    extraction outright instead of being ignored.
+  - Staged like everything else from a scan: `stagedDate`/`stagedDateError`
+    live on the `pendingReceipts` row, Confirm writes the date to the trip
+    inside the existing transaction, Dismiss discards it.
+  - The collapsed review summary shows the date (falling back to the trip's
+    current date when the AI found none, with an error line when it was
+    unreadable); the expanded panel has a date input to correct it.
+  - Added `Trip.dateFromReceipt` so `refreshDraftDate` stops resetting a
+    confirmed receipt date back to today on the next load — verified the
+    test catches it: with the guard removed, the reload test fails.
+  - New `receipt-date.spec.ts` covering summary display, confirm, dismiss,
+    a null date, correction, an unreadable date and a malformed response.
+- **Shopping tab lag fixed, photo-wait feedback, temporary perf overlay**:
+  done and verified in production. Debug tools rendered every trip and item
+  while collapsed and reloaded all of it on every item write, which was
+  almost all of the measured lag on the Shopping tab.
+  - Debug tools' contents and live queries now mount only while the panel
+    is open. Measured on a large data set at 4x CPU throttle: 47,062 page
+    elements down to 248, reload-to-list 1,387ms down to 278ms, rename
+    blocking 1,770ms down to 0, DB reads per keystroke 124–154 down to 2.
+  - "Waiting for photo…" shows from the Camera/Photos tap until the photo
+    is saved or the picker is cancelled, with a manual dismiss for browsers
+    that never fire `cancel`.
+  - Photo-save failures are surfaced in the UI and thumbnail load errors
+    logged, instead of failing silently.
+  - Added a temporary `?perf=1` overlay logging timestamps from Camera tap
+    through request sent, persisted across reloads, with Copy/Clear — for
+    diagnosing a ~7s capture gap on a real phone.
+  - Added an `openDebugPanel` e2e helper, used wherever a spec reads the
+    panel after a reload or without opening it.
+- **Receipt photos shrunk at capture, backups slimmed down**: done and
+  verified in production. Photos were stored at full camera resolution
+  forever and copied into every backup — 20 receipts came to 101.6MB, of
+  which 99.9% was photos.
+  - Photos are stored shrunk to 1600px (the most extraction ever used, so
+    nothing usable is lost); a small JPEG is kept byte-for-byte and
+    uploaded without a second lossy re-encode. Measured on a 12.5MP photo:
+    3.8MB to ~0.32MB stored, processing 975ms to 369ms, memory peak +67MB
+    to +15MB, since the full-resolution decode now happens once at capture
+    rather than on every processing attempt.
+  - "Preparing photo…" shows while a photo is shrunk, and an unreadable
+    photo produces a visible error with nothing stored.
+  - Backup schema v2 omits photos of processed receipts and keeps them for
+    receipts that still need processing; v1 backups still import.
+  - Every receipt photo is validated on import (must be an image data URL,
+    required unless processed) and fails loudly before anything is written,
+    instead of later fetching a missing photo as a relative URL.
+  - A processed receipt restored without a photo shows an explicit "no
+    photo" tile rather than a gap or a broken image.
+  - Save trip is blocked while any receipt on the trip is unprocessed, with
+    a visible hint to process or remove it.
+- **A trip's receipts and photos are deleted when the trip is saved**: done
+  and verified in production. A saved trip's receipts are never shown
+  again, but every photo was kept forever.
+  - `completeTrip` deletes the trip's receipt rows and photos inside the
+    same transaction that marks it complete and creates the next draft.
+  - It refuses to save, writing nothing, if any receipt is `pending`,
+    `processing`, `failed` or has an open review (`isReceiptFinished`).
+  - Save failures show inline instead of the rejected promise being
+    dropped.
+  - e2e coverage: saving deletes receipts but keeps items, the next trip's
+    receipts are untouched, and a bypassed gate fails visibly.
+- **One-time cleanup of receipt photos left on already-saved trips**: done
+  and verified in production. Before the change above, every scanned photo
+  stayed in IndexedDB forever — about 76MB on the real device.
+  - Finished receipts on completed trips are deleted once, on app load, in
+    a single transaction with a ran-once marker in `appState`, so a failure
+    rolls back fully and retries on the next load rather than half-running.
+  - Never touches pending, processing, failed or open-review receipts, or
+    receipts on draft trips; unfinished ones on saved trips are counted and
+    reported instead.
+  - Shows a notice with receipts removed and MB freed, or a visible error
+    on failure. Every outcome is logged.
+  - e2e coverage: fresh install, selective removal, runs-once, and a
+    mid-way failure that rolls back and retries.
+- **All UI text moved into a typed dictionary, region setting added**: done
+  and verified in production. Groundwork for a Russian/BYN option — no
+  visible change at the time except English month names.
+  - New `src/i18n`: region config, a localStorage-backed region store, and
+    an English dictionary whose shape every other language must match at
+    compile time.
+  - Every page, the review panel and the data-layer error messages route
+    through it. Debug tools deliberately stays English.
+  - Prices and dates format through the active region, with the currency
+    always passed as a parameter and never taken from the region.
+  - Month names show as "July 2026" instead of German, and the receipt
+    timestamp follows the app's region.
+- **Russian translation, language picker, translated login page**: done and
+  verified in production.
+  - Russian dictionary with proper plural forms and Russian month names.
+  - Language picker in the Customize title row, with a visible failure if
+    the setting can't be saved.
+  - `public/login.html` translates from the same saved setting, maps server
+    errors by status, and logs the errors it used to swallow.
+  - New `russian.spec.ts` (switching, persistence, no English leftovers,
+    plurals, months, the receipt flow, the login page); also fixed a
+    load-order race in `shopping-list-collapse`.
+- **A currency is recorded per trip, so switching never relabels history**:
+  done and verified in production. Changing the region would otherwise have
+  re-labelled every past trip's prices in the new currency.
+  - `Trip.currency` added; a version 5 Dexie upgrade marks every existing
+    trip EUR (a statement of fact — the app only ever supported EUR before
+    this), and new trips take the setting's currency.
+  - The draft trip follows a switch until it holds a priced item, then
+    locks; a failure to update it is shown, not swallowed.
+  - Every price formats in its own trip's currency; Stats totals per
+    currency with a note when a month is mixed.
+  - Backup schema v3 carries each trip's currency; v1/v2 import as EUR, and
+    an unknown or missing currency in a v3 file is rejected.
+- **Extraction prompt updated for Russian/Belarusian receipts**: done and
+  verified in production.
+  - The prompt now describes German, Russian and Belarusian receipts: skip
+    total/VAT lines, treat a "Скидка" line as a discount, keep names as
+    printed.
+  - An unreadable date comes back as raw text (`purchaseDateRaw`) instead
+    of an English sentence, so the message can be built in the app's own
+    language.
+  - A trailing "г." after a receipt date is accepted.
+  - Reviews that were already open when the app updated keep showing their
+    legacy date errors rather than losing the warning.
+- **About, Stats and History fitted onto one phone screen in both
+  languages**: done and verified in production. Measured at a 393x777
+  usable viewport: About, Stats (11 categories) and History (12 trips over
+  2 months) all scrolled, and Russian runs 15–25% longer than English.
+  - About: smaller mascot, padding and gaps.
+  - Stats: the total shares the first card, denser category rows, and wider
+    label columns so Russian category names neither wrap nor overflow.
+  - History: month filter moved into the title row, compact backup card and
+    text.
+  - New `layout-fit.spec.ts` checking page height and label overflow in
+    both languages — the spec every later layout change is measured
+    against.
+- **Debug tools hidden behind a mascot gesture; Russian trip wording
+  fixed**: done and verified in production. Debug tools showed on the
+  Shopping List by default, and the Russian word used for a trip was
+  "поход" (a hike), which also made the Save trip button wide enough to
+  squeeze the title onto two lines.
+  - Debug tools is hidden unless toggled for the session by three quick
+    taps on the Home mascot, with a fading toast confirming each toggle.
+    Deliberately gives no hint it exists — no button role, cursor or tap
+    feedback.
+  - Added a small app-wide toast, translated in both languages.
+  - "покупка" is used for a trip throughout the Russian UI ("Сохранить
+    покупку"), with correct grammar in every string.
+  - The Shopping List title moved to its own row with Save trip beside the
+    date, so no label length can squeeze it again in any language.
+  - Added a `debugTools` e2e fixture option (off by default, matching the
+    real app) and opted in the specs that drive the panel.
+- **Region split into independent language and currency settings**: done
+  and verified in production. The paired `en-EUR` / `ru-BYN` region meant
+  picking Russian also switched new trips to BYN, which is wrong for anyone
+  who wants one without the other.
+  - New settings store with separate language and currency keys.
+  - The old `grocery-buddy:region` key is migrated on load; a failure to
+    migrate is logged and retried rather than silently losing the setting.
+  - New trips take the currency setting; saved trips keep their own; the
+    draft follows the setting until it has a priced item.
+  - The login page reads the new language key, falling back to the old one
+    in case it loads before the app has migrated.
+- **Settings tab added, Customize moved into it**: done and verified in
+  production. Settings joins the nav (six icons in total) and Customize
+  stops being a top-level tab.
+  - New Settings page with the language and currency pickers and a
+    save-error message.
+  - A gear icon for Settings and a price-tag icon for the Customize button.
+  - Customize becomes a sub-page with a back button, keeping the Settings
+    tab highlighted while open — the same pattern trip detail uses under
+    History. Russian title "Мои категории".
+  - A `customize` value left in the persisted-tab key from before the move
+    now reopens Settings rather than failing to match.
+  - The active nav button is marked with `aria-current`.
+- **Fix: items added before the trip loaded were silently dropped**: done
+  and verified in production. Tapping Add before the active trip had loaded
+  cleared the box and threw the item away without a word — easy to hit on a
+  slow phone right after opening the app.
+  - `addItem` resolves (or creates) the active trip itself rather than
+    depending on it already being loaded.
+  - A failure to add shows an error and keeps the typed text, so nothing is
+    lost.
+- **Light / dark / same-as-device theme setting**: done and verified in
+  production. Dark colours previously keyed off the media query alone, so
+  the device decided and the user couldn't.
+  - Dark tokens moved to `:root[data-theme='dark']`, each defined exactly
+    once per theme.
+  - An inline script in `index.html`'s `<head>` applies the saved theme
+    before first paint, so there's no flash of the wrong theme.
+  - "Same as device" follows the device switching live, while an explicit
+    choice overrides it.
+  - The browser/status bar colour (`theme-color`) follows the chosen theme,
+    and the login page follows the saved theme too — three copies of the
+    same logic that have to be kept in step (`index.html`,
+    `public/login.html`, `src/settings/theme.ts`).
+- **Backup moved to Settings, storage figures added**: done and verified in
+  production. Backup & restore sat on History, where it had nothing to do
+  with the trip list it was pushing down.
+  - `BackupSection` moved from History to Settings.
+  - New Storage card: total, receipt photos (exact, read from the
+    database), trip data and app files.
+  - Browsers without a breakdown show total vs. everything else; a missing
+    or failing estimate is stated rather than hidden.
+  - Sizes format in the active language's number style.
+  - The Russian currency hint was shortened to keep it on one line.
+- **History given the space backup used to take**: done and verified in
+  production.
+  - History's trip list max-height raised from 25.75rem to 35.5rem
+    (measured live against a real preview build, not estimated), fitting 10
+    rows at 393x777 instead of 7 before it scrolls internally.
+  - The History scroll boundary tests moved to 10/11 trips.
+  - The one-screen layout check now covers Settings in both languages: fit,
+    one-line labels, and no sideways overflow.
 - **Visual design pass: type scale, spacing scale, grouped lists**: a
   refinement pass over every screen — no new features, no layout
   restructuring. The app had default system type at near-uniform sizes (18

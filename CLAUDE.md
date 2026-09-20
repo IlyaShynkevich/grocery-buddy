@@ -27,6 +27,45 @@ section is just a short index into it.
   history's internally-scrollable trip list with a sticky month header, and
   several Groq extraction reliability fixes (429 handling, retry-backoff
   races, output-token truncation).
+- **Password gate**: the Production deployment (not the public demo) is
+  gated behind a shared password, enforced server-side via a Vercel Edge
+  Middleware (`middleware.ts`) — see `DOCS/ARCHITECTURE.md` §8 and the
+  `APP_PASSWORD` entry in `README.md`'s Environment variables section.
+  Post-deploy fix: the service worker's navigation caching strategy had to
+  change from cache-first to network-first, or a returning visitor's
+  cached app shell silently bypassed the gate forever — see "Known
+  gotchas" below.
+
+Since **v1.1.0** (this is **v1.2.0**):
+
+- **Receipt photo lifecycle**: photos are shrunk to 1600px at capture
+  (not at upload), deleted along with the trip's receipts when the trip is
+  saved, dropped from backups once processed, and a one-time cleanup
+  cleared the ~76MB backlog that predated all of that. Save trip is gated
+  on every receipt being processed and reviewed. See
+  `DOCS/ARCHITECTURE.md` §2/§3.
+- **Receipt purchase date**: the scan reads the receipt's own date and
+  stages it like the items — Confirm writes it to the trip, Dismiss
+  discards it, an unreadable one is shown rather than dropped.
+- **Bilingual (English/Russian)**: every string comes from a typed
+  dictionary (`src/i18n`) whose shape every language must match at compile
+  time; the login page translates from the same setting. The extraction
+  prompt handles German, Russian and Belarusian receipts.
+- **Independent language and currency settings**, replacing the old paired
+  "region". Currency is recorded per trip, so changing it never relabels
+  history. See `DOCS/ARCHITECTURE.md` §9.
+- **Settings page**: language, currency, theme, the way into Customize
+  (now a sub-page, no longer a nav tab), backup & restore (moved off
+  History), and storage figures.
+- **Light / dark / same-as-device theme**, applied before first paint from
+  an inline script — duplicated in `index.html`, `public/login.html` and
+  `theme.ts`, which have to be kept in step (§9).
+- **Debug tools hidden behind a gesture**: three quick taps on the Home
+  mascot, per session. Not discoverable by accident, and off by default in
+  the e2e fixture too.
+- **One-screen layout is a tested property**: `e2e/layout-fit.spec.ts`
+  drives every page at 393x777 in both languages with worst-case content.
+  Russian runs 15–25% longer, so fitting in English proves nothing.
 - **Visual design pass**: a type scale, a spacing scale and a quieter card
   treatment across every screen (`src/index.css` tokens +
   `src/lib/ui.ts` style objects). Lists are now one card with
@@ -38,14 +77,9 @@ section is just a short index into it.
   on `prefers-reduced-motion`, and deliberately not applied to the small
   title-row mascots. Chosen by comparing seven CSS-only idle treatments on
   a throwaway `?mascot=1` page, since removed.
-- **Password gate**: the Production deployment (not the public demo) is
-  gated behind a shared password, enforced server-side via a Vercel Edge
-  Middleware (`middleware.ts`) — see `DOCS/ARCHITECTURE.md` §8 and the
-  `APP_PASSWORD` entry in `README.md`'s Environment variables section.
-  Post-deploy fix: the service worker's navigation caching strategy had to
-  change from cache-first to network-first, or a returning visitor's
-  cached app shell silently bypassed the gate forever — see "Known
-  gotchas" below.
+- Smaller: the visible scrollbar is hidden app-wide (scrolling itself
+  untouched), and Debug tools no longer renders its contents while
+  collapsed — which was almost all of the Shopping tab's measured lag.
 
 See "Known limitations" and "Planned" below for what's still outstanding.
 For the full narrative — what broke, how it was diagnosed, and exactly what
@@ -87,10 +121,12 @@ App.tsx's bottom group is exactly the remaining slack.
 ## Known limitations
 
 - **Receipt-review item matching is not translation-aware.** The matching in
-  `src/lib/itemMatch.ts` compares text similarity only. Typed items in
-  English will only match German receipt text when the words happen to look
-  similar as text (e.g. "tomato" matches "Tomaten", but "eggs" does not
-  match "Eier"). This is a known, acceptable limitation for now — unmatched
+  `src/lib/itemMatch.ts` compares text similarity only. A typed item only
+  matches the receipt's text when the two happen to look similar as text
+  (e.g. "tomato" matches "Tomaten", but "eggs" does not match "Eier") —
+  and the app now scans German, Russian and Belarusian receipts, so a
+  Cyrillic receipt against a Latin-script typed list shares no characters
+  to compare at all. This is a known, acceptable limitation for now — unmatched
   items just appear as separate entries and can be manually
   removed/reconciled. Revisit only if this becomes a real usability problem
   in practice.
