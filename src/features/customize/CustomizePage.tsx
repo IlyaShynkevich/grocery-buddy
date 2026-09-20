@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { CATEGORIES, type Category } from '../../db/categories'
 import { categoryLabel, useT } from '../../i18n'
-import { cardStyle, iconButtonStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
+import { footnoteStyle, iconButtonStyle, listGroupStyle, listRowStyle, mutedTextStyle, pageStyle, primaryButtonStyle, space } from '../../lib/ui'
 import { Mascot } from '../mascot/Mascot'
 import { useCategoryNotes } from './useCategoryNotes'
 
@@ -26,7 +26,7 @@ function CategoryNotes({ category }: { category: Category }) {
   }
 
   return (
-    <div style={{ padding: '0.75rem 0.1rem 0.1rem' }}>
+    <div style={{ padding: `${space.lg} 0 ${space['2xs']}` }}>
       {notes.length === 0 ? (
         <p data-testid="category-notes-empty" style={mutedTextStyle}>
           {messages.customize.notesEmpty}
@@ -34,13 +34,14 @@ function CategoryNotes({ category }: { category: Category }) {
       ) : (
         <ul
           data-testid="category-notes-list"
-          style={{ listStyle: 'none', padding: 0, margin: '0 0 0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+          className="gb-group"
+          style={{ ...listGroupStyle, background: 'var(--bg)', boxShadow: 'none', margin: `0 0 ${space.lg}` }}
         >
           {notes.map((note) => (
             <li
               key={note.id}
               data-testid="category-note"
-              style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.5rem' }}
+              style={{ ...listRowStyle, padding: `${space.md} 0` }}
             >
               <span style={{ flex: 1 }}>{note.text}</span>
               <button
@@ -57,7 +58,7 @@ function CategoryNotes({ category }: { category: Category }) {
         </ul>
       )}
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: space.md }}>
         <input
           type="text"
           value={draftText}
@@ -99,33 +100,41 @@ export function CustomizePage({ onBack }: { onBack: () => void }) {
     <section data-testid="customize-page" style={pageStyle}>
       {/* Back button in the title row, not on its own line: the page is
           tuned so all 11 category cards fit one screen. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: space.md }}>
         <button
           type="button"
           data-testid="customize-back"
           aria-label={messages.customize.back}
           title={messages.customize.back}
           onClick={onBack}
-          style={{ minHeight: '2.5rem', minWidth: '2.5rem', padding: '0.35rem 0.6rem', lineHeight: 1 }}
+          style={{ minHeight: '2.5rem', minWidth: '2.5rem', padding: `${space.sm} ${space.md}`, lineHeight: 1 }}
         >
           ←
         </button>
-        <h1 style={{ fontSize: '1.5rem', marginRight: 'auto' }}>{messages.customize.title}</h1>
+        <h1 style={{ marginRight: 'auto' }}>{messages.customize.title}</h1>
         <Mascot pose="excited" size={32} />
       </div>
-      <p style={{ ...mutedTextStyle, fontSize: '0.85rem', marginTop: '0.2rem' }}>
+      <p style={{ ...footnoteStyle, ...mutedTextStyle, marginTop: space.xs }}>
         {messages.customize.intro}
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.6rem' }}>
+      {/* All 11 categories in one card, hairline-divided — same grouped-list
+          treatment as History and the Shopping List. */}
+      <div className="gb-group" style={{ ...listGroupStyle, marginTop: space.lg }}>
         {CATEGORIES.map((category) => (
           <details
             key={category.key}
             data-testid="category-accordion"
             data-category-key={category.key}
-            style={{ ...cardStyle, padding: '0.55rem 0.75rem' }}
+            style={{ padding: `${space.md} ${space.lg}` }}
           >
-            <summary data-testid="category-accordion-toggle" style={{ fontWeight: 600, cursor: 'pointer' }}>
+            {/* minHeight (not more padding) so the row clears a 44px tap
+                target while an expanded category's notes stay tight up
+                against its header. */}
+            <summary
+              data-testid="category-accordion-toggle"
+              style={{ display: 'flex', alignItems: 'center', minHeight: '1.75rem', fontWeight: 600, cursor: 'pointer' }}
+            >
               {categoryLabel(messages, category.key)}
             </summary>
             <CategoryNotes category={category} />

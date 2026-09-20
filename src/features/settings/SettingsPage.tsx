@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { CURRENCIES, isCurrency } from '../../i18n/currencies'
 import { isLanguage, LANGUAGES } from '../../i18n/languages'
 import { useT } from '../../i18n'
-import { cardStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
+import { footnoteStyle, listGroupStyle, listRowStyle, mutedTextStyle, pageStyle, space, subtleTextStyle } from '../../lib/ui'
 import { setCurrency, setLanguage, setTheme, useSettings } from '../../settings/settingsStore'
 import { isTheme, THEMES } from '../../settings/theme'
 import { Mascot } from '../mascot/Mascot'
@@ -10,10 +10,16 @@ import { TagIcon } from '../navigation/icons'
 import { BackupSection } from './BackupSection'
 import { StorageSection } from './StorageSection'
 
-/** Label on the left, control on the right — one compact row per setting. */
-function SettingRow({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * Label on the left, control on the right — one row of the grouped list
+ * below. `padded` is off for the currency row, which is wrapped in a
+ * container that carries the padding for both the row and its hint.
+ */
+function SettingRow({ label, children, padded = true }: { label: string; children: ReactNode; padded?: boolean }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+    // The select is already a 40px tap target, so the row only needs
+    // enough padding to separate it from the hairlines above and below.
+    <label style={{ ...listRowStyle, justifyContent: 'space-between', gap: space.lg, padding: padded ? `${space.sm} ${space.lg}` : 0 }}>
       <span>{label}</span>
       {children}
     </label>
@@ -46,11 +52,11 @@ export function SettingsPage({ onOpenCustomize }: { onOpenCustomize: () => void 
   return (
     <section data-testid="settings-page" style={pageStyle}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: '1.5rem' }}>{messages.settings.title}</h1>
+        <h1>{messages.settings.title}</h1>
         <Mascot pose="excited" size={32} />
       </div>
 
-      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '0.6rem', marginTop: '0.75rem' }}>
+      <div className="gb-group" style={{ ...listGroupStyle, marginTop: space.lg }}>
         <SettingRow label={messages.settings.language}>
           <select
             data-testid="settings-language"
@@ -70,8 +76,8 @@ export function SettingsPage({ onOpenCustomize }: { onOpenCustomize: () => void 
           </select>
         </SettingRow>
 
-        <div>
-          <SettingRow label={messages.settings.currency}>
+        <div style={{ padding: `${space.sm} ${space.lg}` }}>
+          <SettingRow label={messages.settings.currency} padded={false}>
             <select
               data-testid="settings-currency"
               value={settings.currency}
@@ -89,7 +95,7 @@ export function SettingsPage({ onOpenCustomize }: { onOpenCustomize: () => void 
               ))}
             </select>
           </SettingRow>
-          <p data-testid="settings-currency-hint" style={{ ...mutedTextStyle, fontSize: '0.8rem', marginTop: '0.3rem' }}>
+          <p data-testid="settings-currency-hint" style={{ ...footnoteStyle, ...mutedTextStyle, marginTop: space.xs }}>
             {messages.settings.currencyHint}
           </p>
         </div>
@@ -114,21 +120,26 @@ export function SettingsPage({ onOpenCustomize }: { onOpenCustomize: () => void 
         </SettingRow>
 
         {saveError && (
-          <p role="alert" data-testid="settings-save-error" style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>
+          <p role="alert" data-testid="settings-save-error" style={{ ...footnoteStyle, color: 'var(--danger)', padding: `0 ${space.lg} ${space.md}` }}>
             {messages.settings.saveFailed(saveError)}
           </p>
         )}
       </div>
 
+      {/* Styled as a one-row group (surface fill, no border, chevron) rather
+          than as a button-shaped button: it navigates, it doesn't act, and
+          the chevron is what says so. */}
       <button
         type="button"
         data-testid="settings-open-customize"
         onClick={onOpenCustomize}
-        style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', marginTop: '0.75rem', minHeight: '2.75rem' }}
+        style={{ ...listGroupStyle, ...listRowStyle, marginTop: space.lg, minHeight: '2.75rem', border: 'none' }}
       >
         <TagIcon />
         <span style={{ flex: 1, textAlign: 'left' }}>{messages.settings.openCustomize}</span>
-        <span aria-hidden="true">›</span>
+        <span aria-hidden="true" style={subtleTextStyle}>
+          ›
+        </span>
       </button>
 
       <BackupSection />

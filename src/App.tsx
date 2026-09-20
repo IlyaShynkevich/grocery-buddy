@@ -21,7 +21,7 @@ import { Toast } from './features/toast/Toast'
 import { useDraftCurrencyFollowsSetting } from './features/trip/useDraftCurrencyFollowsSetting'
 import { useT } from './i18n'
 import { useCurrencySetting } from './settings/settingsStore'
-import { PAGE_MAX_WIDTH } from './lib/ui'
+import { footnoteStyle, PAGE_MAX_WIDTH, space } from './lib/ui'
 
 // The 4 icon-only tabs in the middle of the nav bar — these are the ones
 // swipe gesture navigation moves between. Home and About (the corner icons)
@@ -112,15 +112,19 @@ function tabButtonStyle(active: boolean): CSSProperties {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '0.5rem',
+    padding: space.md,
+    borderRadius: 'var(--radius)',
     background: active ? 'var(--accent)' : 'transparent',
-    color: active ? 'var(--accent-contrast)' : 'inherit',
+    // An inactive tab is the quietest tier, so the active one reads as
+    // selected on shade alone — no accent hue, per the palette.
+    color: active ? 'var(--accent-contrast)' : 'var(--text-muted)',
+    border: '1px solid transparent',
     borderColor: active ? 'var(--accent)' : 'transparent',
   }
 }
 
 function cornerButtonStyle(active: boolean): CSSProperties {
-  return { ...tabButtonStyle(active), padding: '0.4rem' }
+  return { ...tabButtonStyle(active), padding: space.sm }
 }
 
 function App() {
@@ -303,11 +307,11 @@ function App() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.25rem',
+          gap: space.xs,
           maxWidth: PAGE_MAX_WIDTH,
-          margin: '0.75rem auto 0',
-          padding: '0 1rem 0.75rem',
-          borderBottom: '1px solid var(--border)',
+          margin: `${space.lg} auto 0`,
+          padding: `0 ${space.xl} ${space.lg}`,
+          borderBottom: '1px solid var(--separator)',
         }}
       >
         {/* Home (top-left) and About (top-right) are plain tap-only corner
@@ -325,7 +329,7 @@ function App() {
           <HomeIcon />
         </button>
 
-        <div style={{ display: 'flex', flex: 1, justifyContent: 'center', gap: '0.25rem' }}>
+        <div style={{ display: 'flex', flex: 1, justifyContent: 'center', gap: space.xs }}>
           {TABS.map((tab) => {
             const active = tab.name === activeTab
             const Icon = tab.Icon
@@ -373,7 +377,7 @@ function App() {
         <p
           role="alert"
           data-testid="draft-currency-error"
-          style={{ color: 'var(--danger)', fontSize: '0.85rem', maxWidth: PAGE_MAX_WIDTH, margin: '0.75rem auto 0', padding: '0 1rem' }}
+          style={{ ...footnoteStyle, color: 'var(--danger)', maxWidth: PAGE_MAX_WIDTH, margin: `${space.lg} auto 0`, padding: `0 ${space.xl}` }}
         >
           {messages.currencyErrors.draftNotUpdated(currencySetting, draftCurrencyError)}
         </p>

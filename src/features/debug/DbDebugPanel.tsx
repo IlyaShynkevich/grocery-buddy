@@ -156,7 +156,7 @@ function DbDebugPanelContents() {
   return (
     <div style={{ padding: '1rem', border: '1px dashed var(--border-strong)', borderTop: 'none' }}>
       <h2>DB Debug Panel</h2>
-      <p style={{ fontSize: '0.85rem', opacity: 0.75 }}>
+      <p style={{ fontSize: 'var(--text-footnote)', opacity: 0.75 }}>
         Temporary — for verifying the Dexie schema (M1). Removed once the real shopping-list /
         review UI lands.
       </p>

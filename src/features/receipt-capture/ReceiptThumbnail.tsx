@@ -5,7 +5,7 @@ const BOX: CSSProperties = {
   width: 48,
   height: 48,
   borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--border)',
+  boxShadow: '0 0 0 1px var(--separator)',
   flexShrink: 0,
 }
 
@@ -39,7 +39,7 @@ export function ReceiptThumbnail({ blob, onLoad }: { blob?: Blob; onLoad?: () =>
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          fontSize: '0.6rem',
+          fontSize: '0.625rem',
           lineHeight: 1.1,
           color: 'var(--text-muted)',
         }}

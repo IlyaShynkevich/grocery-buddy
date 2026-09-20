@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import { useT } from '../../i18n'
 import { usePendingReceipt } from '../receipt-review/usePendingReceipt'
 import { formatDate } from '../../lib/formatDate'
-import { cardStyle, mutedTextStyle, pageStyle, primaryButtonStyle } from '../../lib/ui'
+import { captionStyle, footnoteStyle, listGroupStyle, listRowStyle, mutedTextStyle, pageStyle, primaryButtonStyle, space } from '../../lib/ui'
 import { useShoppingList } from './useShoppingList'
 
 export function ShoppingListPage() {
@@ -81,7 +81,7 @@ export function ShoppingListPage() {
 
   const listContent: ReactNode = (
     <>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.5rem', margin: '1rem 0' }}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: space.md, margin: `${space.lg} 0` }}>
         <input
           type="text"
           value={draftName}
@@ -97,22 +97,22 @@ export function ShoppingListPage() {
       </form>
 
       {addError && (
-        <p role="alert" data-testid="add-item-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', margin: '-0.5rem 0 0.75rem' }}>
+        <p role="alert" data-testid="add-item-error" style={{ ...footnoteStyle, color: 'var(--danger)', margin: `-${space.xs} 0 ${space.lg}` }}>
           {messages.shopping.addFailed(addError)}
         </p>
       )}
 
       {items.length === 0 && <p style={mutedTextStyle}>{messages.shopping.empty}</p>}
 
-      <ul
-        style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
-        data-testid="shopping-list-items"
-      >
+      {/* One card, hairline-divided rows — same grouped-list treatment as
+          History and Customize, so a list of things reads the same way
+          everywhere in the app. */}
+      <ul className="gb-group" style={listGroupStyle} data-testid="shopping-list-items">
         {items.map((item) => (
           <li
             key={item.id}
             data-testid="shopping-list-item"
-            style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.5rem' }}
+            style={{ ...listRowStyle, gap: space.md, padding: `${space.xs} ${space.md}` }}
           >
             <input
               type="checkbox"
@@ -139,7 +139,7 @@ export function ShoppingListPage() {
               type="button"
               onClick={() => removeItem(item.id)}
               aria-label={messages.common.remove(item.name)}
-              style={{ padding: '0.35rem 0.6rem', lineHeight: 1 }}
+              style={{ padding: `${space.sm} ${space.md}`, lineHeight: 1, background: 'transparent', border: 'none', color: 'var(--text-muted)' }}
             >
               ✕
             </button>
@@ -159,11 +159,11 @@ export function ShoppingListPage() {
         phone's font. This layout doesn't: neither element ever competes
         with the title for width, in any language.
       */}
-      <h1 style={{ fontSize: '1.5rem' }}>{messages.shopping.title}</h1>
+      <h1>{messages.shopping.title}</h1>
       <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginTop: '0.25rem' }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: space.lg, marginTop: space.xs }}
       >
-        <p data-testid="shopping-trip-date" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
+        <p data-testid="shopping-trip-date" style={{ ...footnoteStyle, ...mutedTextStyle }}>
           {trip ? formatDate(trip.date) : messages.shopping.loadingTrip}
         </p>
         {trip && (
@@ -180,21 +180,21 @@ export function ShoppingListPage() {
         )}
       </div>
       {trip && (hasUnprocessedReceipts || hasPendingReview) && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.15rem', marginTop: '0.3rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: space['2xs'], marginTop: space.xs }}>
           {hasUnprocessedReceipts && (
-            <span data-testid="save-trip-unprocessed-hint" style={{ ...mutedTextStyle, fontSize: '0.75rem', textAlign: 'right' }}>
+            <span data-testid="save-trip-unprocessed-hint" style={{ ...captionStyle, ...mutedTextStyle, textAlign: 'right' }}>
               {unprocessedHint}
             </span>
           )}
           {hasPendingReview && (
-            <span data-testid="save-trip-disabled-hint" style={{ ...mutedTextStyle, fontSize: '0.75rem', textAlign: 'right' }}>
+            <span data-testid="save-trip-disabled-hint" style={{ ...captionStyle, ...mutedTextStyle, textAlign: 'right' }}>
               {messages.shopping.reviewHint}
             </span>
           )}
         </div>
       )}
       {saveError && (
-        <p role="alert" data-testid="save-trip-error" style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>
+        <p role="alert" data-testid="save-trip-error" style={{ ...footnoteStyle, color: 'var(--danger)', marginTop: space.sm }}>
           {messages.shopping.saveFailed(saveError)}
         </p>
       )}
@@ -203,9 +203,9 @@ export function ShoppingListPage() {
         data-testid="shopping-list-collapsible"
         open={isOpen}
         onToggle={(e) => setIsOpen(e.currentTarget.open)}
-        style={{ marginTop: '0.5rem' }}
+        style={{ marginTop: space.md }}
       >
-        <summary data-testid="shopping-list-toggle" style={{ ...mutedTextStyle, fontSize: '0.85rem' }}>
+        <summary data-testid="shopping-list-toggle" style={{ ...footnoteStyle, ...mutedTextStyle }}>
           {isOpen ? messages.shopping.hideList : messages.shopping.showList}
         </summary>
         {listContent}

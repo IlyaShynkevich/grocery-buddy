@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { db } from '../../db/db'
 import { useT } from '../../i18n'
 import { formatBytes } from '../../lib/formatBytes'
-import { cardStyle, mutedTextStyle } from '../../lib/ui'
+import { calloutStyle, cardStyle, footnoteStyle, mutedTextStyle, numericStyle, space } from '../../lib/ui'
 import { readBrowserUsage, readPhotoUsage, type BrowserUsage, type PhotoUsage } from './storageUsage'
 
 function describeErr(err: unknown): string {
@@ -12,9 +12,9 @@ function describeErr(err: unknown): string {
 
 function Row({ label, value, testId, strong }: { label: string; value: string; testId: string; strong?: boolean }) {
   return (
-    <div data-testid={testId} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', fontWeight: strong ? 600 : undefined }}>
+    <div data-testid={testId} style={{ display: 'flex', justifyContent: 'space-between', gap: space.lg, fontWeight: strong ? 600 : undefined }}>
       <span>{label}</span>
-      <span style={{ whiteSpace: 'nowrap' }}>{value}</span>
+      <span style={{ ...numericStyle, whiteSpace: 'nowrap' }}>{value}</span>
     </div>
   )
 }
@@ -57,11 +57,11 @@ export function StorageSection() {
     }
   }, [photos])
 
-  const noteStyle = { ...mutedTextStyle, fontSize: '0.8rem', marginTop: '0.3rem' }
+  const noteStyle = { ...footnoteStyle, ...mutedTextStyle, marginTop: space.sm }
 
   return (
-    <section data-testid="storage-section" style={{ ...cardStyle, marginTop: '0.75rem' }}>
-      <h2 style={{ fontSize: '1.05rem', marginBottom: '0.25rem' }}>{messages.storage.title}</h2>
+    <section data-testid="storage-section" style={{ ...cardStyle, marginTop: space.lg }}>
+      <h2 style={{ marginBottom: space.sm }}>{messages.storage.title}</h2>
 
       {!photos || (!('error' in photos) && !browser) ? (
         <p style={mutedTextStyle}>{messages.storage.loading}</p>
@@ -70,7 +70,7 @@ export function StorageSection() {
           {messages.storage.failed(photos.error)}
         </p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', fontSize: '0.9rem' }}>
+        <div style={{ ...calloutStyle, display: 'flex', flexDirection: 'column', gap: space['2xs'] }}>
           {browser && (browser.kind === 'detailed' || browser.kind === 'total') && (
             <Row testId="storage-total" label={messages.storage.total} value={formatBytes(browser.total)} strong />
           )}
@@ -84,7 +84,7 @@ export function StorageSection() {
           {browser?.kind === 'total' && <Row testId="storage-rest" label={messages.storage.rest} value={formatBytes(browser.rest)} />}
 
           {browser?.kind === 'failed' ? (
-            <p role="alert" data-testid="storage-estimate-error" style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '0.3rem' }}>
+            <p role="alert" data-testid="storage-estimate-error" style={{ ...footnoteStyle, color: 'var(--danger)', marginTop: space.sm }}>
               {messages.storage.failed(browser.message)}
             </p>
           ) : (

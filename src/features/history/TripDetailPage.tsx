@@ -5,7 +5,7 @@ import { db, deleteTrip, recomputeTripTotal, type Item } from '../../db/db'
 import { useT } from '../../i18n'
 import { formatDate } from '../../lib/formatDate'
 import { formatPrice } from '../../lib/formatPrice'
-import { cardStyle, dangerButtonStyle, dangerFilledButtonStyle, mutedTextStyle, pageStyle } from '../../lib/ui'
+import { calloutStyle, captionStyle, dangerButtonStyle, dangerFilledButtonStyle, footnoteStyle, headingStyle, listGroupStyle, listRowStyle, mutedTextStyle, numericStyle, pageStyle, space } from '../../lib/ui'
 
 // How long a press has to hold before it counts as "long press" instead of
 // a tap — long enough that a normal tap/click never crosses it, short
@@ -138,7 +138,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
 
   return (
     <section data-testid="trip-detail-page" style={pageStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: space.md }}>
         <button type="button" data-testid="trip-detail-back" onClick={onBack}>
           {messages.tripDetail.back}
         </button>
@@ -155,13 +155,13 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--danger)',
-            borderRadius: 'var(--radius)',
-            padding: '0.75rem',
-            margin: '0.75rem 0',
+            borderRadius: 'var(--radius-lg)',
+            padding: space.lg,
+            margin: `${space.lg} 0`,
           }}
         >
-          <p style={{ marginBottom: '0.6rem' }}>{messages.tripDetail.confirmDeleteTrip}</p>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <p style={{ marginBottom: space.lg }}>{messages.tripDetail.confirmDeleteTrip}</p>
+          <div style={{ display: 'flex', gap: space.md }}>
             <button type="button" data-testid="trip-detail-delete-yes" onClick={handleDelete} style={dangerFilledButtonStyle}>
               {messages.common.yesDelete}
             </button>
@@ -172,9 +172,11 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
         </div>
       )}
 
-      <h1 style={{ fontSize: '1.5rem', marginTop: '0.75rem' }}>{trip ? formatDate(trip.date) : messages.tripDetail.loading}</h1>
-      {trip?.store && <p style={{ ...mutedTextStyle, marginTop: '0.2rem' }}>{trip.store}</p>}
-      <p data-testid="trip-detail-total" style={{ fontWeight: 700, marginTop: '0.4rem' }}>
+      <h1 style={{ marginTop: space.lg }}>{trip ? formatDate(trip.date) : messages.tripDetail.loading}</h1>
+      {trip?.store && <p style={{ ...footnoteStyle, ...mutedTextStyle, marginTop: space.xs }}>{trip.store}</p>}
+      {/* Heading size, not title size: the <h1> above is already the date,
+          and two 26px lines stacked read as two competing titles. */}
+      <p data-testid="trip-detail-total" style={{ ...headingStyle, ...numericStyle, fontWeight: 700, marginTop: space.xs }}>
         {messages.common.total(trip ? formatPrice(trip.total, trip.currency) : formatPrice(null))}
       </p>
 
@@ -185,18 +187,18 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            gap: '0.5rem',
-            margin: '0.75rem 0',
-            padding: '0.5rem 0.75rem',
+            gap: space.md,
+            margin: `${space.lg} 0`,
+            padding: `${space.md} ${space.lg}`,
             background: 'var(--surface)',
-            border: '1px solid var(--border-strong)',
-            borderRadius: 'var(--radius)',
+            boxShadow: '0 0 0 1px var(--border-strong)',
+            borderRadius: 'var(--radius-lg)',
           }}
         >
           <span data-testid="trip-detail-multiselect-count">
             {messages.tripDetail.selected(selectedIds!.size)}
           </span>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: space.md }}>
             {selectedIds!.size > 0 && (
               <button
                 type="button"
@@ -220,15 +222,15 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--danger)',
-            borderRadius: 'var(--radius)',
-            padding: '0.75rem',
-            margin: '0.75rem 0',
+            borderRadius: 'var(--radius-lg)',
+            padding: space.lg,
+            margin: `${space.lg} 0`,
           }}
         >
-          <p style={{ marginBottom: '0.6rem' }}>
+          <p style={{ marginBottom: space.lg }}>
             {messages.tripDetail.confirmBulkDelete(selectedIds!.size)}
           </p>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: space.md }}>
             <button type="button" data-testid="trip-detail-bulk-delete-yes" onClick={deleteSelectedItems} style={dangerFilledButtonStyle}>
               {messages.common.yesDelete}
             </button>
@@ -239,10 +241,8 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
         </div>
       )}
 
-      <ul
-        style={{ listStyle: 'none', padding: 0, margin: '1rem 0 0', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
-        data-testid="trip-detail-items"
-      >
+      {/* One card, hairline-divided rows — the app's grouped-list treatment. */}
+      <ul className="gb-group" style={{ ...listGroupStyle, marginTop: space.xl }} data-testid="trip-detail-items">
         {regularItems.map((item) => {
           const essential = resolveEssential(item)
           const isSelected = selectedIds?.has(item.id) ?? false
@@ -258,32 +258,25 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
               onPointerLeave={resetPress}
               onPointerCancel={resetPress}
               style={{
-                ...cardStyle,
-                display: 'flex',
+                ...listRowStyle,
+                ...calloutStyle,
                 justifyContent: 'space-between',
-                alignItems: 'center',
                 cursor: 'pointer',
                 userSelect: 'none',
-                // `border` (not the longhand `borderColor`) so this and
-                // cardStyle's own `border: '1px solid var(--border)'` are
-                // the same style key — React can then just revert it
-                // cleanly on deselect. Mixing a shorthand with a longhand
-                // override here previously left a stale border-color once
-                // the longhand key was removed: clearing an inline
-                // `borderColor` doesn't restore the color the `border`
-                // shorthand had set, it falls back to the CSS-initial
-                // `currentColor` — which reads as a stray white/light
-                // outline in dark mode (`--text` there is near-white).
-                ...(isSelected ? { border: '1px solid var(--accent)', background: 'var(--surface-hover)' } : {}),
+                // An inset ring, not a border: a border would add 2px to
+                // the row the moment it's selected, shunting every row
+                // below it down by that much. box-shadow takes no layout
+                // space, so selecting a row moves nothing.
+                ...(isSelected ? { boxShadow: 'inset 0 0 0 2px var(--accent)', background: 'var(--surface-hover)' } : {}),
               }}
             >
               {isPendingSingleDelete ? (
                 <div
                   data-testid="trip-detail-item-delete-confirm"
-                  style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: space.md, width: '100%' }}
                 >
                   <span>{messages.tripDetail.confirmItemDelete(item.name)}</span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: space.md }}>
                     <button
                       type="button"
                       data-testid="trip-detail-item-delete-yes"
@@ -312,9 +305,9 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
               ) : (
                 <>
                   <span>{item.name}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: space.md }}>
                     {multiSelectActive ? (
-                      <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      <span style={{ ...captionStyle, fontWeight: 600, color: 'var(--text-muted)' }}>
                         {essential ? messages.common.essential : messages.common.nonEssential}
                       </span>
                     ) : (
@@ -329,9 +322,9 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                         }}
                         aria-label={messages.tripDetail.markAs(item.name, essential)}
                         style={{
-                          fontSize: '0.7rem',
+                          ...captionStyle,
                           fontWeight: 600,
-                          padding: '0.35rem 0.6rem',
+                          padding: `${space.sm} ${space.md}`,
                           minHeight: '1.75rem',
                           borderRadius: 999,
                           background: essential ? 'var(--accent)' : 'transparent',
@@ -344,7 +337,7 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
                         {essential ? messages.common.essential : messages.common.nonEssential}
                       </button>
                     )}
-                    <span>{formatPrice(item.price, trip?.currency)}</span>
+                    <span style={numericStyle}>{formatPrice(item.price, trip?.currency)}</span>
                   </span>
                 </>
               )}
@@ -355,7 +348,8 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
 
       {discountItems.length > 0 && (
         <ul
-          style={{ listStyle: 'none', padding: 0, margin: '0.5rem 0 0', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}
+          className="gb-group"
+          style={{ ...listGroupStyle, background: 'transparent', boxShadow: `0 0 0 1px var(--separator)`, marginTop: space.md }}
           data-testid="trip-detail-discounts"
         >
           {discountItems.map((item) => (
@@ -363,17 +357,16 @@ export function TripDetailPage({ tripId, onBack }: { tripId: number; onBack: () 
               key={item.id}
               data-testid="trip-detail-discount"
               style={{
+                ...listRowStyle,
+                ...calloutStyle,
                 ...mutedTextStyle,
-                display: 'flex',
                 justifyContent: 'space-between',
-                padding: '0.4rem 0.75rem',
-                border: '1px dashed var(--border)',
-                borderRadius: 'var(--radius)',
+                padding: `${space.md} ${space.lg}`,
                 fontStyle: 'italic',
               }}
             >
               <span>{item.name}</span>
-              <span>{formatPrice(item.price, trip?.currency)}</span>
+              <span style={numericStyle}>{formatPrice(item.price, trip?.currency)}</span>
             </li>
           ))}
         </ul>

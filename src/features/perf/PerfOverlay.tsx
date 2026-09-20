@@ -50,7 +50,7 @@ export function PerfOverlay() {
         background: 'var(--surface)',
         borderTop: '2px solid var(--border-strong)',
         fontFamily: 'monospace',
-        fontSize: '0.7rem',
+        fontSize: 'var(--text-caption)',
         textAlign: 'left',
       }}
     >

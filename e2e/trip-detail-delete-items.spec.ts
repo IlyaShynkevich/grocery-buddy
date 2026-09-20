@@ -142,18 +142,24 @@ test('cancelling out of multi-select clears the selected-item styling, not just 
   await expect(itemRow(page, 'Milk')).toHaveAttribute('data-selected', 'false')
   await expect(itemRow(page, 'Eggs')).toHaveAttribute('data-selected', 'false')
 
-  // ...and so does the visual styling itself: the previously-selected rows'
-  // border must match a row that was never selected (Bread), not remain on
-  // the selected-state accent border (or, worse, fall back to the browser's
-  // CSS-initial currentColor once a stray inline borderColor is cleared —
-  // the actual bug this guards against).
-  const [milkBorder, eggsBorder, breadBorder] = await Promise.all([
-    itemRow(page, 'Milk').evaluate((el) => getComputedStyle(el).borderColor),
-    itemRow(page, 'Eggs').evaluate((el) => getComputedStyle(el).borderColor),
-    itemRow(page, 'Bread').evaluate((el) => getComputedStyle(el).borderColor),
-  ])
-  expect(milkBorder).toBe(breadBorder)
-  expect(eggsBorder).toBe(breadBorder)
+  // ...and so does the visual styling itself: the previously-selected rows
+  // must carry no selection ring and no lingering selected-state
+  // background — the actual bug this guards against is the styling
+  // outliving the state, whatever property carries it. (It reads box-shadow
+  // and background, not borderColor, since the design pass moved the
+  // selected ring off `border` — a border would shunt every row below a
+  // selected one down by 2px; box-shadow takes no layout space. Rows 2+ of
+  // a grouped list also carry a hairline border-top, so borderColor is no
+  // longer even comparable between the first row and the rest.)
+  const rowStyles = (name: string) =>
+    itemRow(page, name).evaluate((el) => {
+      const style = getComputedStyle(el)
+      return { boxShadow: style.boxShadow, background: style.backgroundColor }
+    })
+  const [milk, eggs, bread] = await Promise.all([rowStyles('Milk'), rowStyles('Eggs'), rowStyles('Bread')])
+  expect(milk).toEqual(bread)
+  expect(eggs).toEqual(bread)
+  expect(bread.boxShadow).toBe('none')
 })
 
 test('cancelling the bulk-delete confirm returns to the selection instead of deleting', async ({ page }) => {

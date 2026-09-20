@@ -128,6 +128,12 @@ test('essential + non-essential always equals the month total, including when di
 
   await page.getByTestId('nav-stats').click()
   await expect(page.getByTestId('stats-page')).toBeVisible()
+  // stats-page is the shell — it renders before useMonthlyStats' Dexie live
+  // query has resolved, so the figures below can be read mid-update.
+  // Waiting for the expected bar count first (dairy, bakery, snacks,
+  // drinks, other) is a precondition, not a retry of the assertion: the
+  // arithmetic below still gets exactly one shot at the settled numbers.
+  await expect(page.getByTestId('stats-category-bar')).toHaveCount(5)
 
   const total = parseEuro(await page.getByTestId('stats-total').innerText())
   const essential = parseEuro(await page.getByTestId('stats-split-essential-amount').innerText())

@@ -1441,3 +1441,87 @@ summary of each milestone below and points back here for details.
     `TripDetailPage`'s clickable item rows are plain `<li>`s with no
     press feedback of their own — worth a look if tapping one ever feels
     unresponsive on a real device.
+- **Visual design pass: type scale, spacing scale, grouped lists**: a
+  refinement pass over every screen — no new features, no layout
+  restructuring. The app had default system type at near-uniform sizes (18
+  distinct `fontSize` literals, all at one line-height), 24 distinct
+  `padding` literals and 10 `gap` literals, and cards drawn with *both* a
+  fill and a 1px border.
+
+  The hard constraint was that every page must still fit one 393x777 screen
+  in English and Russian (`e2e/layout-fit.spec.ts`). Measured slack before
+  starting — the resolved `margin-top: auto` on App.tsx's bottom group,
+  which is exactly how much a page can grow before the footer is pushed
+  off-screen — was **Settings 7px, About 4px (EN), Customize 13px, History
+  14px**. So the pass had to pay for itself before it could spend anything.
+
+  - **What paid for it.** Cards lost their 1px border in favour of
+    `--shadow-card`, a 0.5px ring plus (in light mode) one soft shadow —
+    `box-shadow` takes no layout space, so that is −2px of height per card.
+    Headings got proper leading: `h1` went *up* to 26px but at
+    `line-height: 1.2` instead of 1.45, which is a net saving; `h2`
+    unified at 17px/1.3. Biggest win: **grouped lists** — a list is now one
+    card with hairline-divided rows (`.gb-group` in index.css +
+    `listGroupStyle`/`listRowStyle` in ui.ts), the iOS inset-grouped
+    pattern, instead of a stack of separate cards with gaps between them.
+    That reclaims every inter-row gap: ~75px on History, ~60px on
+    Customize. Applied to History, Shopping List, Customize, Trip detail,
+    the receipt list and the review panel's item lists.
+  - **What it spent it on.** A six-step type scale (`--text-display` 28 /
+    `--text-title` 26 / `--text-heading` 17 / `--text-body` 16 /
+    `--text-callout` 15 / `--text-footnote` 13 / `--text-caption` 12),
+    with hierarchy past that coming from weight (700/600/500/400) and from
+    a third text colour tier, `--text-subtle`, rather than from more sizes.
+    A spacing scale (`--space-2xs` … `--space-3xl`: 2/4/6/8/12/16/20/24),
+    defined once in index.css and re-exported from `ui.ts` as `space` for
+    the inline style objects. Radii split by component size: cards 14px,
+    controls 10px, small 8px.
+  - **Font stack** gained `-apple-system, BlinkMacSystemFont` and
+    `Segoe UI Variable Text` ahead of the existing entries — SF on Apple,
+    Segoe on Windows, Roboto on Android, all four with well-fitted
+    Cyrillic, which matters since every screen also renders in Russian.
+    Plus `-webkit-font-smoothing: antialiased`, and
+    `font-variant-numeric: tabular-nums` (`numericStyle`) on money and byte
+    columns only, so a column of prices stops shuffling sideways.
+  - **Palette** stayed grayscale — no accent hue, destructive red intact.
+    Only `--surface` moved (`#f5f5f6` → `#f1f1f4` light, `#1e1f27` →
+    `#212229` dark) so a borderless card still separates from the page,
+    plus the new `--separator` (translucent, so one token works on `--bg`
+    and `--surface` alike) and `--text-subtle`.
+  - **Result, measured at 393x777 in both languages and both themes**:
+    Home 338, Shopping (4 items) 109, Customize 40, Stats 26, About 21
+    (EN) / 37 (RU), History 16, **Settings 9** — every page still fits,
+    with the tightest page now having more room than before, not less.
+    Light and dark measure byte-identical (the theme only changes colours
+    and a box-shadow, neither of which takes layout space) — verified
+    empirically across all four language/theme combinations, not assumed.
+  - **Two things the borderless card broke, both caught and fixed rather
+    than left to fail silently:**
+    - `ReceiptCleanupNotice`'s failure state styled itself by overriding
+      `cardStyle`'s `borderColor` with `--danger`. With no border left to
+      override, that would have silently done nothing and a cleanup
+      failure would have rendered as an ordinary notice. It now restates
+      the whole ring as `box-shadow: 0 0 0 1px var(--danger)`.
+    - `TripDetailPage`'s selected-row style had the same shape (and is the
+      subject of the "stray white outline" fix above). It is now an
+      `inset` box-shadow ring, which also fixes a latent problem the
+      border version had: selecting a row added 2px to it and shunted
+      every row below it down. `e2e/trip-detail-delete-items.spec.ts`'s
+      assertion moved from computed `borderColor` to computed `box-shadow`
+      + `background-color` — the test's intent (the styling must not
+      outlive the selection state) is unchanged; only the property
+      carrying it moved. `borderColor` is no longer even comparable
+      between rows, since rows 2+ of a grouped list carry a hairline
+      `border-top`.
+  - **History's scroll container retuned.** Its `max-height: 35.5rem` is a
+    fixed space budget, and shorter grouped rows mean more of them fit.
+    Re-measured live against a real `npm run preview` build rather than
+    assumed: row 45px, hairline 1px (46px per row after the first), month
+    header 22.1px + 6px margin, group margin-top 16px. One month now fits
+    **11 rows** (44.1 + 45 + 10×46 = 549.1px, inside 568) where it fit 10;
+    a 12th needs 595.1px. `e2e/history-improvements.spec.ts`'s two
+    boundary tests moved from 10/11 to 11/12, the same way they were
+    retuned when the limit moved 7 → 10.
+  - `public/login.html` carries its own copy of the palette (it is a
+    standalone static file outside the Vite build) and was brought onto
+    the same tokens, font stack and radii.
